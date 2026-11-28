@@ -19,6 +19,7 @@
 ### Removed
 
 - **Upgrading a 0.9 workspace to 1.0** (HI-3602). Every user is on 1.6.0 or later, so the upgrade's question, its read-only board and banner, and the copy of 0.9's agent templates it made are gone. A workspace whose board Combwork 0.9 saved now gets one plain refusal as you open it: *This workspace is from Combwork 0.9, which this version can't open.* Nothing in its folder is changed or moved. Workspaces made or upgraded by 1.0 or later open as before. The backups the upgrade kept in `.combwork/backups` stay where they are.
+- **What the 1.0 upgrade still did at each open** (HI-3619). Every workspace has done it by 1.6.0, so it is gone: cards from before 1.0 adopted, a project with no options given the upgrade's, the one-time switch of stored settings (slots brought up to date, Combwork's commit messages), and the banner offering the presets after the upgrade. Card files from before 0.9 (`.combwork/tasks`) are no longer moved into the board: the folder is left as it is. A project from before 1.0 that never got its options now asks *How do you work?* as a new one does. What the upgrade recorded stays and works as before, and a project still waiting to be asked how Combwork should merge its cards is still asked.
 
 ### Fixed
 

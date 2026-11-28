@@ -14,7 +14,6 @@ import { combworkVcs, ensureCombworkExcluded, trackedCombworkFiles, untrackCombw
 import { repairWorktrees } from '../src/main/combworkMove'
 import { commitIn, folderHead } from '../src/main/workflow/runLink'
 import { commitsBehind } from '../src/main/workflow/queueControls'
-import { adoptionInputs } from '../src/main/workflow/upgrade'
 import { presetInputs } from '../src/main/workflow/optionsForm'
 import { commit, gitRepo, sh } from './workflow/harness'
 import { timing } from './timing.cjs'
@@ -91,14 +90,12 @@ describe("R9's moved callers keep their git commands (HI-2792)", { timeout: timi
     same('queue.commitsBehindGone', await traced(base, () => commitsBehind(project, 'main', 'gone')))
   })
 
-  it("reads a card's adoption and the options form's presets, Git and None", async () => {
+  it("reads the options form's presets, Git and None", async () => {
     const base = tempDir('cutover-traces-')
     const project = gitRepo(join(base, 'project'))
     commit(project, { 'a.txt': 'a\n' }, 'first')
     sh(project, 'branch', 'target')
     commit(project, { 'b.txt': 'b\n' }, 'second')
-    same('adoption.git', await traced(base, () => adoptionInputs(project, 'git', 'review', { agent: 'user', target: 'target' })))
-    same('adoption.none', await traced(base, () => adoptionInputs(project, 'none', 'review', { agent: 'user', target: 'target' })))
     same('presets.git', await traced(base, () => presetInputs(project, 'git')))
     same('presets.none', await traced(base, () => presetInputs(project, 'none')))
   })

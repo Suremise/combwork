@@ -17,7 +17,7 @@ import type { StageId } from '@shared/workflow/facts'
 import { shownText } from '@shared/advanced'
 import { fmt, msg, tr, type Msg } from '@shared/i18n'
 import { call, errorMessage } from '../api'
-import { agentProviderOf, cardLabelOf, chooseTab, confirm, focusWorkflowOption, notify, openWorkflowOption, set as setStore, setActivity, useStore, workflowFormAt } from '../store'
+import { agentProviderOf, cardLabelOf, chooseTab, confirm, focusWorkflowOption, notify, set as setStore, setActivity, useStore, workflowFormAt } from '../store'
 import { loadReleaseOffers, ReleaseOfferRow, useReleaseOffers } from '../releaseOffers'
 import { cx } from '../util'
 import { RT, retargetSkippedText } from '../retargetText'
@@ -1334,58 +1334,6 @@ export function RetargetDetails({ preview: p, choice, onChange }: { preview: Ret
           </ul>
         </>
       )}
-    </div>
-  )
-}
-
-const N = {
-  text: msg({ id: 'workflow.presetsNotice.text', defaultMessage: '{n, plural, one {{projects} works} other {{projects} work}} as before this version. A preset sets up a workflow in one click: who reviews the work, which checks pass first and who merges.', description: 'The one-time notice after the upgrade to 1.0 (glossary 2.1: preset, workflow). {projects} is a list of project names; {n} how many.' }),
-  choose: msg({ id: 'workflow.presetsNotice.choose', defaultMessage: 'Choose…', description: 'A button of the one-time presets notice: opens the first project’s Version Control tab at Workflow.' }),
-  notNow: msg({ id: 'workflow.presetsNotice.notNow', defaultMessage: 'Not Now', description: 'A button of the one-time presets notice: dismisses it for good.' })
-}
-
-/**
- * The one-time notice after the upgrade (§16.17, OP-22): the projects kept today's way of working, and the presets on
- * offer. Choose… opens the first one's Workflow section; either answer is the last time it shows in the workspace.
- */
-export function PresetsNotice() {
-  const path = useStore((s) => s.workspace?.path ?? null)
-  const readOnly = useStore((s) => s.boardState?.readOnly ?? null)
-  // What main's answer depends on, as a string (HI-1807): the projects' names, and which have a workflow with no preset.
-  // Not the workspace object, replaced with each agent's change of state: a dozen agents working read it again more than
-  // once a second. The board's own part (answered, the upgrade's) changes only with readOnly or a reload.
-  const asked = useStore((s) => (s.workspace ? JSON.stringify([s.workspace.path, s.workspace.projects.map((p) => [p.path, p.name, !!p.config.workflow && p.config.workflow.preset === null])]) : null))
-  const [projects, setProjects] = useState<{ path: string; name: string }[] | null>(null)
-  // The workspaces answered in this window (#1464): a reload begun before the answer's board write commits (a new
-  // workspace object meanwhile, or one already in flight) reads the old board, and must not show it again.
-  const answered = useRef(new Set<string>())
-  useEffect(() => {
-    if (!asked || !path || readOnly !== null || answered.current.has(path)) return setProjects(null)
-    let live = true
-    call('workflow:presetsNotice')
-      .then((p) => live && setProjects(answered.current.has(path) ? null : p))
-      .catch(() => live && setProjects(null))
-    return () => {
-      live = false
-    }
-  }, [path, asked, readOnly])
-  if (!projects?.length) return null
-  const answer = (choose: boolean): void => {
-    if (path) answered.current.add(path)
-    if (choose) openWorkflowOption(projects[0].path, 'overview')
-    setProjects(null)
-    void call('workflow:presetsNoticeSaid').catch((e) => notify('error', errorMessage(e)))
-  }
-  return (
-    <div className="banner info presets-notice" role="status">
-      <Icon name="info" />
-      <span className="grow">{tr(N.text, { projects: fmt.list(projects.map((p) => p.name)), n: projects.length })}</span>
-      <button className="btn small primary" onClick={() => answer(true)}>
-        {tr(N.choose)}
-      </button>
-      <button className="btn small subtle" onClick={() => answer(false)}>
-        {tr(N.notNow)}
-      </button>
     </div>
   )
 }

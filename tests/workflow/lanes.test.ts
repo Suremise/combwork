@@ -1,8 +1,9 @@
 // Lanes, switching options and the upgrade at the core (#1118, SPEC §16.11, §16.6.5, §16.17).
 import { afterEach, describe, expect, it } from 'vitest'
 import { B1, B2, commit, moved, R1, refusedBy, setup, type Env } from './harness'
-import { preset } from '../../src/shared/workflow/options'
-import { adopt, upgradeOptions } from '../../src/main/workflow/upgrade'
+import { allOff, preset } from '../../src/shared/workflow/options'
+import type { CardRecord } from '../../src/main/workflow/factStore'
+import type { Workflow } from '../../src/main/workflow/runtime'
 import { reconcile } from '../../src/main/workflow/reconcile'
 
 let env: Env | null = null
@@ -156,16 +157,33 @@ describe('lanes', () => {
   })
 })
 
-describe('the upgrade', () => {
-  it('S40: a running lane at the upgrade: Doing, Review (an adopted submission, reviewed as usual) and Passed (no invented verdict, finished by its builder\'s report); old column moves translated', async () => {
-    const opts = upgradeOptions('git', { reviewers: true, worktrees: false })
-    expect(opts).toMatchObject({ review: 'agent', finish: 'notChecked', folder: 'project', preChecks: [] })
-    const e = (env = setup(opts))
+/**
+ * A card in flight adopted at the upgrade to 1.0, its facts as that adoption wrote them (#1218): `Adopted`, a Review
+ * card's adopted `Submitted` at its folder's head, and the move to its column's stage. The adoption is gone (HI-3619);
+ * boards it ran on keep these facts, and the workflow still reads them.
+ */
+async function adopted(wf: Workflow, card: CardRecord, column: 'doing' | 'review' | 'passed', agent: string): Promise<void> {
+  const { execFileSync } = await import('child_process')
+  const head = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: wf.cfg.project, encoding: 'utf8' }).trim()
+  const r = wf.currentRuleset()
+  wf.store.saveRuleset(r)
+  await wf.write(card, r, 'combwork', (w) => {
+    w.tx.appendObserved(card.id, { kind: 'Adopted', actor: 'combwork', source: 'observed', ruleset: r.id, dedupe: 'adopted', data: { folder: 'project', line: 'main', base: head, head, target: 'main', builder: agent, cardKind: card.kind, adoptedFrom: column, ...(column === 'passed' ? { passedBefore1_0: true } : {}) } })
+    if (column === 'review') w.tx.appendObserved(card.id, { kind: 'Submitted', actor: `agent:${agent}`, source: 'observed', ruleset: r.id, dedupe: 'adopted', data: { revision: head, base: head, head, key: null, files: [], round: 1, generation: 0, sameRevision: false, summary: '', adopted: true } })
+    w.move(column === 'doing' ? 'active' : column === 'review' ? 'review' : 'approved', 'derived')
+  })
+}
+
+describe('cards adopted at the upgrade to 1.0', () => {
+  it('S40: a running lane from the upgrade: Doing, Review (an adopted submission, reviewed as usual) and Passed (no invented verdict, finished by its builder\'s report); old column moves translated', async () => {
+    // The options the upgrade gave a project with reviewer agents: review by an agent, Not checked, the project folder.
+    const e = (env = setup({ ...allOff('git'), review: 'agent', noSelfReview: true, folder: 'project' }))
+    expect(e.wf.currentRuleset().stages.map((s) => s.id)).toContain('review')
     const [doing, review, passed] = ['Doing', 'Review', 'Passed'].map((t) => e.wf.createCard({ title: t }))
     commit(e.project, { 'r.txt': 'review work\n' }, 'review work')
-    await adopt(e.wf, doing, 'doing', { agent: 'B1', target: 'main' })
-    await adopt(e.wf, review, 'review', { agent: 'B2', target: 'main' })
-    await adopt(e.wf, passed, 'passed', { agent: 'B1', target: 'main' })
+    await adopted(e.wf, doing, 'doing', 'B1')
+    await adopted(e.wf, review, 'review', 'B2')
+    await adopted(e.wf, passed, 'passed', 'B1')
     // The running lane, in Combwork's list: Passed first, then Review, then Doing.
     e.wf.startLane('L', [passed.id, review.id, doing.id], 'R1')
     expect(e.wf.laneNext('L')).toBe(passed.id)
@@ -177,7 +195,7 @@ describe('the upgrade', () => {
     expect(p.stage).toBe('approved')
     expect(p.verdicts).toEqual([])
     expect(p.started).toMatchObject({ passedBefore1_0: true })
-    // Review and Approved stay visible under the upgrade's options.
+    // Review and Approved stay visible under those options.
     expect(e.wf.currentRuleset().stages.map((s) => s.id)).toEqual(['hold', 'todo', 'active', 'review', 'approved', 'done'])
     // The adopted submission gets its verdict, through the old column move translated into intents.
     const v = await e.wf.agentColumnMove(review.key, R1, 'passed', { translate: true })

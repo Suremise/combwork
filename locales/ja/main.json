@@ -39,8 +39,6 @@
   "main.assistantQuestion.stop.state": "{status, select, working {作業中} waiting {あなたの回答待ち} signin {CLIへの再サインイン待ち（サインインの期限切れ）} starting {起動中} background {自分で開始したバックグラウンドのタスク待ち} watching {カードの変化待ち（カードの監視中：再開するまでカードループが一時停止します）} ready {待機中} finished {待機中（タスク完了）} error {エラー} stopped {停止済み} other {{status}}}",
   "main.assistantQuestion.stop.title": "{project}の{agent}を停止しますか？",
   "main.assistantQuestion.stop.yes": "停止",
-  "main.board.damagedBody": "{files}はボードに追加されませんでした。{folder}に保存されています。",
-  "main.board.damagedTitle": "{n, plural, other {#件のカードファイルを読み込めませんでした}}",
   "main.board.foundBody": "これらは変更されないまま{folder}に保存されています。そのためにボードが変更されたものはありません。「確認…」で1件ずつボードに追加するか、破棄できます。",
   "main.board.foundTitle": "{n, plural, other {古いCombworkで作られたカードが#件見つかりました：確認してください}}",
   "main.board.review": "確認…",

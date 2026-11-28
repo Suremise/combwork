@@ -326,9 +326,6 @@ interface CombworkMessageValues {
   'workflow.preset.pairAgent': undefined
   'workflow.preset.solo': undefined
   'workflow.preset.team': undefined
-  'workflow.presetsNotice.choose': undefined
-  'workflow.presetsNotice.notNow': undefined
-  'workflow.presetsNotice.text': { n: number; projects: string | number }
   'workflow.refused.approval.given.change': undefined
   'workflow.refused.approval.given.message': { card: string | number }
   'workflow.refused.approval.given.next': undefined

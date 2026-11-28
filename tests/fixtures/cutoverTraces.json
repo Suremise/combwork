@@ -50,18 +50,6 @@
     "<base>/project :: rev-parse --verify -q refs/heads/gone",
     "=> null"
   ],
-  "adoption.git": [
-    "<base>/project :: symbolic-ref -q head",
-    "<base>/project :: rev-parse --verify -q head",
-    "<base>/project :: merge-base <id> <id>",
-    "<base>/project :: diff --raw -z --no-abbrev --no-renames --no-ext-diff <id> <id>",
-    "<base>/project :: diff --full-index --no-renames -u0 <id> <id>",
-    "<base>/project :: patch-id --stable",
-    "=> {\"line\":\"main\",\"head\":\"<id>\",\"base\":\"<id>\",\"files\":[{\"status\":\"a\",\"path\":\"b.txt\"}],\"key\":\"<id>\"}"
-  ],
-  "adoption.none": [
-    "=> {\"line\":null,\"head\":null,\"base\":null,\"files\":[],\"key\":null}"
-  ],
   "presets.git": [
     "<base>/project :: config --null --get-regexp ^user/.(name|email)$",
     "=> {\"quick\":[],\"tests\":[],\"commands\":{},\"identity\":{\"name\":\"combwork test\",\"email\":\"test@example.invalid\"},\"target\":\"main\"}"

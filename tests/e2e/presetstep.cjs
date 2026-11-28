@@ -7,13 +7,12 @@
 //   again, its Not now respected;
 // - New Project (a folder with no version control): its tab opens at None's step, with no notice; Customise… fills the
 //   Workflow section with the preset, not saved;
-// - an upgraded workspace (cards from before 1.0, options the upgrade wrote): no step and no notice, only the old
-//   presets notice.
+// - an upgraded workspace (options the upgrade wrote): no step and no notice (the presets notice after the upgrade went
+//   with HI-3619).
 // Screenshots of the step and the notice, light and dark, English and French. Dev build, throwaway profile and workspaces.
 const lib = require('./lib.cjs')
 const fs = require('fs')
 const path = require('path')
-const { DatabaseSync } = require('node:sqlite')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
 const HUNG_MS = lib.timing('hang.ui')
 
@@ -273,17 +272,8 @@ const projectJson = (p) => JSON.parse(fs.readFileSync(path.join(p, '.combwork', 
     const fresh = path.join(ws, 'fresh')
     check('Customise… opens Workflow with Team filled in, not saved', !!(await lib.until(async () => (await page.locator('.git-sections [data-section="workflow"]').getAttribute('aria-selected')) === 'true' && /Team/.test(await text(page.locator('.workflow-preset-now'))), HUNG_MS)) && projectJson(fresh).workflow === undefined, await text(page.locator('.workflow-preset-now')))
 
-    // --- An upgraded workspace: no step, no notice, only the old presets notice.
+    // --- An upgraded workspace: no step, no notice (HI-3619: and no presets notice after the upgrade).
     await lib.openWorkspace(inv, page, upgradedWs)
-    const db = new DatabaseSync(path.join(upgradedWs, '.combwork', 'combwork.db'), { timeout: lib.timing('db.busyMs') })
-    try {
-      db.prepare("INSERT INTO board_meta (key, value) VALUES ('adoption_upto', '3') ON CONFLICT (key) DO UPDATE SET value = excluded.value").run()
-    } finally {
-      db.close()
-    }
-    await page.reload()
-    await lib.appReady(page)
-    check('upgraded: the old presets notice', !!(await lib.until(async () => (await page.locator('.presets-notice').count()) === 1, HUNG_MS)))
     await toTab('old')
     check('…and no step and no notice for its project', (await stepEl().count()) === 0 && (await notice().count()) === 0)
   } catch (e) {

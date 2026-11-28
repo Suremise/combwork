@@ -5,7 +5,6 @@ import { setDbBusyMs } from './db'
 import { initWatches, onWatchedCardsMoved, watchKeepsQuitWaiting } from './watches'
 import { initLoopWakes } from './loopWakes'
 import { migrateAgentsPerProject } from './workflow/preferences'
-import { settleGlobalCommitMessage } from './workflow/commitMessageStep'
 import { initLoopCheck } from './loopCheck'
 import { initDeliveries } from './deliveries'
 import { initReviewsOnOpen } from './reviewsOnOpen'
@@ -1076,14 +1075,9 @@ function showCorrupt(file: string, aside: string, restored: boolean): void {
     file
   )
 }
-/** What the board says as it moves the cards' files into its database, or finds cards an older version saved (#1017). */
+/** What the board says as it finds cards an older version saved (#1017). */
 onBoardNotice((path, n) => {
-  if (n.kind === 'imported') {
-    if (!n.damaged.length) return
-    toast('warning', tr(msg({ id: 'main.board.damagedTitle', defaultMessage: "{n, plural, one {# card file couldn't be read} other {# card files couldn't be read}}", description: "A notice as Combwork moved the board's cards into its database: some card files weren't valid. {n} is how many." }), { n: n.damaged.length }), tr(msg({ id: 'main.board.damagedBody', defaultMessage: '{files} stayed out of the board. They are kept in {folder}.', description: "The notice about card files Combwork couldn't read as it moved the board into its database: {files} lists them, {folder} is where they are kept." }), { files: fmt.list(n.damaged.slice(0, 5), 'unit'), folder: join(path, CW_DIR, n.folder) }), undefined, 'board')
-  } else {
-    toast('warning', tr(msg({ id: 'main.board.foundTitle', defaultMessage: '{n, plural, one {# card made by an older Combwork was found: review it} other {# cards made by an older Combwork were found: review them}}', description: "A notice: this workspace was opened in an older Combwork meanwhile, and it saved cards; they weren't added to the board, but kept for the user to review. {n} is how many." }), { n: n.cards }), tr(msg({ id: 'main.board.foundBody', defaultMessage: 'They are kept, unchanged, in {folder}. Nothing on the board was changed for them: Review… adds each to the board or discards it.', description: 'The notice about cards an older Combwork saved: {folder} is the folder where they are kept.' }), { folder: join(path, CW_DIR, n.folder) }), [{ label: tr(msg({ id: 'main.board.review', defaultMessage: 'Review…', description: "A button on the notice about cards an older Combwork saved: opens a dialog listing them, to add each to the board or discard it." })), command: 'task.reviewSetAside' }], 'board')
-  }
+  toast('warning', tr(msg({ id: 'main.board.foundTitle', defaultMessage: '{n, plural, one {# card made by an older Combwork was found: review it} other {# cards made by an older Combwork were found: review them}}', description: "A notice: this workspace was opened in an older Combwork meanwhile, and it saved cards; they weren't added to the board, but kept for the user to review. {n} is how many." }), { n: n.cards }), tr(msg({ id: 'main.board.foundBody', defaultMessage: 'They are kept, unchanged, in {folder}. Nothing on the board was changed for them: Review… adds each to the board or discards it.', description: 'The notice about cards an older Combwork saved: {folder} is the folder where they are kept.' }), { folder: join(path, CW_DIR, n.folder) }), [{ label: tr(msg({ id: 'main.board.review', defaultMessage: 'Review…', description: "A button on the notice about cards an older Combwork saved: opens a dialog listing them, to add each to the board or discard it." })), command: 'task.reviewSetAside' }], 'board')
 })
 
 onCorruptFile((file, aside, restored) => (reportsReady ? showCorrupt(file, aside, restored) : void corruptReports.push([file, aside, restored])))
@@ -1112,8 +1106,6 @@ app.whenReady().then(async () => {
   readRolesFromConnections()
   // Agents per project from before HI-2001: Maximum agents in Combwork's workflow defaults now.
   await migrateAgentsPerProject()
-  // HI-1997: Combwork's own workflow defaults' commit message from a preset, switched once to the branch's own.
-  await settleGlobalCommitMessage()
   // Show developer features is one of them too, kept under its settings key: the file and the setting stay one value.
   bindAdvancedSettings(config)
   // The developer console's flight recorder (#698): its triggers are advanced settings, followed as they change.
@@ -1589,7 +1581,7 @@ app.on('will-quit', () => {
   flightRecorder.stop()
   advanced.stop()
   destroyTray()
-  // The boards' databases: checkpointed and closed, the stubs older versions read brought up to date (#1017).
+  // The boards' databases: checkpointed and closed.
   closeAllBoards()
   closeAllJournals()
 })

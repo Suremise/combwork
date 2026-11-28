@@ -1,6 +1,6 @@
 import { AsyncLocalStorage } from 'async_hooks'
 import { createHash } from 'crypto'
-import { existsSync, readdirSync, readFileSync, renameSync } from 'original-fs'
+import { existsSync, readdirSync, readFileSync } from 'original-fs'
 import { mkdir, writeFile } from 'original-fs/promises'
 import { basename, join } from 'path'
 import type { DatabaseSync, StatementSync } from 'node:sqlite'
@@ -9,7 +9,7 @@ import { CW_DIR } from '../shared/defaults'
 import { LEGACY_HIVE_DIR } from '../shared/combworkFolderMove' // old-name: 0.9's folder, read to refuse a 0.9 board (HI-3602)
 import { msg } from '../shared/i18n'
 import type { ArchiveBatch, BoardState } from '../shared/types'
-import { cardField, composeCard, decomposeCard, readCardRows, writeCardChanges, writeCardRows, type CardPart, type CardRow, type CardRows } from './schema/cardRows'
+import { cardField, composeCard, decomposeCard, readCardRows, writeCardChanges, type CardPart, type CardRow, type CardRows } from './schema/cardRows'
 import { moveCardsIntoTables } from './schema/cardsStep'
 import { addKey, cardKeys as keysOfCards, cardOfKey, cardPlace, changeKey, currentKeys, keysHeld, KEYS_STEP, moveKeys, movedCardNames, numberCard } from './schema/keysStep'
 import { LANE_RECORD_STEP, moveLaneRecords } from './schema/laneRecordStep'
@@ -57,9 +57,9 @@ const UPGRADE_GROUP_ID = '1.0'
 
 /** The board's schema, step by step (db.ts runs the steps a file hasn't had). */
 /**
- * board_meta's highest card number from before 1.0 (#1218): the cards the upgrade's adoption handles (workflow/adoption.ts).
- * Set by the 1.0 group's last step, in the upgrade's transaction (0 on a board made by 1.0, which has none), and by the
- * import of card files from before 0.9.
+ * board_meta's highest card number from before 1.0 (#1218): set by the 1.0 group's last step, in the upgrade's transaction
+ * (0 on a board made by 1.0, which has none). The upgrade's adoption that read it is gone (HI-3619); its presence still
+ * says the board has taken the 1.0 group (slotMigration.ts).
  */
 export const ADOPTION_UPTO = 'adoption_upto'
 /** The highest card number on the board, as board_meta's ADOPTION_UPTO keeps it. */
@@ -405,25 +405,13 @@ export const BOARD_MIGRATIONS: Migration[] = [
   }
 ]
 
-/** What the import from files recorded (board_meta `imported`). */
-interface Imported {
-  at: string
-  cards: number
-  damaged: string[]
-  appVersion: string
-  /** The folder the files were moved to, as a backup. */
-  folder: string
-  /** The files' folder couldn't be renamed yet (held open): tried again at the next open. */
-  pendingRename?: boolean
-}
-
 interface Board {
   /** The workspace folder, as the workspace has it. */
   path: string
   /** Its real location (`placeKey`) as it opened: another spelling's board of the same folder is closed with it (#1402). */
   place: string
   /**
-   * Its `.combwork` at that real location, as it opened: every write and removal on disk for it (the heartbeat, the stub, the
+   * Its `.combwork` at that real location, as it opened: every write and removal on disk for it (the heartbeat, the
    * presence marker's removal) goes there, never through a spelling that may point elsewhere by then (#1402).
    */
   combwork: string
@@ -454,19 +442,18 @@ let openings = 0
 
 const boards = new Map<string, Board>()
 
-/** For tests: a card whose save fails (as a full disk would); a folder Windows won't rename (something has a file in it open). */
+/** For tests: a card whose save fails (as a full disk would). */
 export const boardTestHooks: {
   failPut: ((n: number) => boolean) | null
-  refuseRename: ((from: string) => boolean) | null
   /** Runs while a group's later steps (a 1.0 board's) hold the file's exclusive lock, committed. */
   whileUpgrading: (() => void) | null
   /** Told as a workspace's open starts waiting for its board to be openable (HI-2199). */
   openableWait: ((path: string) => void) | null
-} = { failPut: null, refuseRename: null, whileUpgrading: null, openableWait: null }
+} = { failPut: null, whileUpgrading: null, openableWait: null }
 const keyOf = (path: string): string => path.toLowerCase()
 
-/** What the board tells the user about the import (index.ts shows it as a notice). */
-export type BoardNotice = { kind: 'imported'; cards: number; damaged: string[]; folder: string } | { kind: 'setAside'; cards: number; folder: string }
+/** What the board tells the user: cards an older version saved were set aside (index.ts shows it as a notice). */
+export type BoardNotice = { kind: 'setAside'; cards: number; folder: string }
 let notify: (path: string, n: BoardNotice) => void = () => undefined
 export function onBoardNotice(fn: (path: string, n: BoardNotice) => void): void {
   notify = fn
@@ -478,37 +465,6 @@ const M = {
   unavailable: msg({ id: 'board.error.unavailable', defaultMessage: "The board couldn't be opened: {error}", description: "An error: the workspace's task board database couldn't be opened or its cards couldn't be moved into it; {error} says why (from the system, often in English). Nothing was lost: the cards are still where they were." })
 }
 
-const stamp = (): string => new Date().toISOString().replace(/[:.]/g, '-')
-
-/** The highest card number among card files' names, damaged files' too: none of them is ever given to another card. */
-const highestName = (names: string[]): number => names.reduce((m, f) => Math.max(m, Number(f.slice(0, -5)) || 0), 0)
-
-const cardFiles = (dir: string): string[] => {
-  try {
-    return readdirSync(dir).filter((f) => /^\d+\.json$/.test(f))
-  } catch {
-    return []
-  }
-}
-
-/** A card file's content, parsed: null when it isn't a card (not JSON, or not an object). */
-function parseCard(file: string): Record<string, unknown> | null {
-  try {
-    const v = JSON.parse(readFileSync(file, 'utf8'))
-    return v && typeof v === 'object' && !Array.isArray(v) ? v : null
-  } catch {
-    return null
-  }
-}
-
-function readJsonFile<T>(file: string, fallback: T): T {
-  try {
-    return JSON.parse(readFileSync(file, 'utf8')) as T
-  } catch {
-    return fallback
-  }
-}
-
 const meta = (db: Db['writer'], key: string): string | null => (db.prepare('SELECT value FROM board_meta WHERE key = ?').get(key) as { value: string } | undefined)?.value ?? null // i18n-ignore: SQL
 const setMeta = (db: Db['writer'], key: string, value: string): void => void db.prepare('INSERT INTO board_meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value').run(key, value) // i18n-ignore: SQL
 
@@ -517,86 +473,6 @@ function nextOf(db: Db['writer']): number {
   const saved = Number(meta(db, 'next')) || 1
   const highest = (db.prepare('SELECT max(number) AS m FROM cards').get() as { m: number | null }).m ?? 0 // i18n-ignore: SQL
   return Math.max(saved, highest + 1)
-}
-
-/** Renames a folder, retried a few times at once (Windows refuses while something has a file in it open); false if it never went. */
-function renameNow(from: string, to: string): boolean {
-  if (boardTestHooks.refuseRename?.(from)) return false
-  for (let i = 0; i < 5; i++) {
-    try {
-      renameSync(from, to)
-      return true
-    } catch (e) {
-      const code = (e as NodeJS.ErrnoException).code
-      if (code !== 'EPERM' && code !== 'EACCES' && code !== 'EBUSY') break
-    }
-  }
-  return false
-}
-
-/**
- * Moves the cards' files into a new database (#1017), once, in one transaction: every `<n>.json` (never .bak, .tmp or
- * anything else) as its text was, board.json's next number and the archive batches. Checked before it commits: as many
- * rows as card files read, each with its file's number, column and archived. A file that isn't a card is left where it
- * is (in the backup folder after the move) and named. Then the folder becomes `tasks.imported-<time>`, kept as a backup.
- */
-function importFiles(b: Board, combwork: string, appVersion: string): void {
-  const db = b.db.writer
-  const dir = join(combwork, TASKS)
-  const names = cardFiles(dir)
-  const cards: { n: number; doc: Record<string, unknown> }[] = []
-  const damaged: string[] = []
-  for (const f of names) {
-    const doc = parseCard(join(dir, f))
-    if (doc) cards.push({ n: Number(f.slice(0, -5)), doc })
-    else damaged.push(f)
-  }
-  const board = readJsonFile<{ next?: unknown }>(join(dir, 'board.json'), {})
-  const batches = readJsonFile<{ batches?: unknown }>(join(dir, 'archive-batches.json'), {})
-  const folder = `${TASKS}.imported-${stamp()}`
-  const t0 = performance.now()
-  const record: Imported = { at: new Date().toISOString(), cards: cards.length, damaged, appVersion, folder, pendingRename: names.length > 0 || existsSync(join(dir, 'board.json')) || existsSync(join(dir, 'archive-batches.json')) }
-  timedStep(`db begin ${DB_FILE}`, () => beginTransaction(db))
-  try {
-    for (const c of cards) writeCardRows(db, decomposeCard(c.n, c.doc))
-    // Cards from before 1.0 keep their number in their project (#1219: #1061 is HI-1061).
-    db.exec("UPDATE cards SET project_number = number WHERE project_id IS NOT NULL AND project_id != ''") // i18n-ignore: SQL
-    // Past every card file's number, a damaged one's too (it is kept, and may be mended): as the old allocator was.
-    setMeta(db, 'next', String(Math.max(Number(board.next) || 1, highestName(names) + 1)))
-    const ins = db.prepare('INSERT OR IGNORE INTO archive_batches (id, doc) VALUES (?, ?)') // i18n-ignore: SQL
-    if (Array.isArray(batches.batches)) for (const x of batches.batches) if (x && typeof x === 'object' && typeof (x as ArchiveBatch).id === 'string') ins.run((x as ArchiveBatch).id, JSON.stringify(x))
-    // Checked before it commits: every card read is there, its document as its file had it.
-    const rows = readCardRows(db)
-    if (rows.length !== cards.length) throw new Error(`${rows.length} cards in the database, ${cards.length} card files read`) // i18n-ignore: an internal check's error, logged and quoted as the reason in board.error.unavailable
-    const byN = new Map(rows.map((r) => [r.card.number, r]))
-    for (const c of cards) {
-      const r = byN.get(c.n)
-      if (!r || JSON.stringify(composeCard(r)) !== JSON.stringify(c.doc)) throw new Error(`card #${c.n} isn't in the database as its file has it`) // i18n-ignore: an internal check's error, logged and quoted as the reason in board.error.unavailable
-    }
-    setMeta(db, 'imported', JSON.stringify(record))
-    // Cards from before 0.9: the adoption marks them as from before 1.0 too (#1218).
-    if (!meta(db, 'adoption')) markAdoptionUpto(db)
-    db.exec('COMMIT')
-  } catch (e) {
-    if (db.isTransaction) db.exec('ROLLBACK')
-    throw e
-  }
-  log.info(`moved ${cards.length} card(s) from ${userText(dir)} into ${DB_FILE} in ${Math.round(performance.now() - t0)} ms${damaged.length ? `; ${damaged.length} file(s) that aren't cards left in the folder: ${damaged.join(', ')}` : ''}`)
-  if (cards.length || damaged.length) notify(b.path, { kind: 'imported', cards: cards.length, damaged, folder })
-  finishMove(b, combwork, record)
-}
-
-/** Renames the old folder to its backup name (or, refused, tries again at the next open). */
-function finishMove(b: Board, combwork: string, record: Imported): void {
-  const dir = join(combwork, TASKS)
-  if (record.pendingRename && existsSync(dir)) {
-    if (!renameNow(dir, join(combwork, record.folder))) {
-      log.warn(`couldn't rename ${userText(dir)} to ${record.folder} (held open): tried again at the next open`)
-      return
-    }
-    log.info(`the card files are kept in ${userText(join(combwork, record.folder))}`)
-  }
-  if (record.pendingRename) setMeta(b.db.writer, 'imported', JSON.stringify({ ...record, pendingRename: false }))
 }
 
 /** Where cards an older version saved in the stub are set aside, intact, for the user to review. */
@@ -811,13 +687,8 @@ function openBoard(path: string): Board {
     }
     b.poll.unref?.()
     b.presence.unref?.()
-    if (writable(db)) {
-      const raw = meta(w, 'imported')
-      const imported = raw ? (JSON.parse(raw) as Imported) : null
-      if (!imported) importFiles(b, combwork, appVersion())
-      else if (imported.pendingRename) finishMove(b, combwork, imported)
-      else keepSetAsideNumbers(b, combwork)
-    }
+    // The card files from before 0.9 are no longer imported (HI-3619): a `tasks` folder is left as it is.
+    if (writable(db)) keepSetAsideNumbers(b, combwork)
     b.dataVersion = (b.version.get() as { data_version: number }).data_version
     markPresent(combwork)
     boards.set(key, b)
@@ -995,8 +866,7 @@ export function noteLanesSaved(path: string): void {
 }
 
 /**
- * Closes a workspace's board (it closed, or its file is replaced): the stub's next number brought up to date for older
- * versions. Every board of that folder, however it was spelt as it opened (#1402: one opened through a junction or an
+ * Closes a workspace's board (it closed). Every board of that folder, however it was spelt as it opened (#1402: one opened through a junction or an
  * 8.3 name, by deliveries say, would otherwise hold the folder until Combwork quits). The folder is `place`, its real
  * location as its window opened it, else as this spelling's board opened: never what the spelling resolves to now, so a
  * junction removed or pointed at another workspace since neither keeps this one's boards open nor closes another's.
@@ -1247,60 +1117,6 @@ function readConn(ws: WorkspaceService): { b: Board; db: Db['reader'] } {
 /** A read of the board's database on one snapshot, as the board's readers make (the fact store's, #1215). */
 export function boardRead<T>(ws: WorkspaceService, fn: (db: Db['reader']) => T): T {
   return readSnapshot(ws, (_b, db) => fn(db))
-}
-
-/** What the upgrade's adoption (#1218, workflow/adoption.ts) needs of a card: where it is, whose it is, and whether it has facts. */
-export interface AdoptionCard {
-  number: number
-  project: string
-  column: string
-  archived: boolean
-  agent: string | null
-  preWorkflow: boolean
-  facts: boolean
-}
-
-const ADOPTION_SQL = 'SELECT number, project, col, archived, agent, pre_workflow, EXISTS (SELECT 1 FROM card_facts f WHERE f.card = cards.number) AS facts FROM cards' // i18n-ignore: SQL
-type AdoptionRow = { number: number; project: string; col: string; archived: number; agent: string | null; pre_workflow: number; facts: number }
-const adoptionCardOf = (r: AdoptionRow): AdoptionCard => ({ number: r.number, project: r.project, column: r.col, archived: r.archived === 1, agent: r.agent, preWorkflow: r.pre_workflow === 1, facts: r.facts === 1 })
-
-/** The AdoptionCard of each card up to `upto` (ADOPTION_UPTO), in number order, on one snapshot. */
-export function adoptionCards(ws: WorkspaceService, upto = Number.MAX_SAFE_INTEGER): AdoptionCard[] {
-  return readSnapshot(ws, (_b, db) => {
-    return (db.prepare(`${ADOPTION_SQL} WHERE number <= ? ORDER BY number`).all(upto) as AdoptionRow[]).map(adoptionCardOf) // i18n-ignore: SQL
-  })
-}
-
-/** A card's AdoptionCard as it is now, inside boardWrite (what the adoption checks again before it writes); null when it has gone. */
-export function adoptionCardNow(ws: WorkspaceService, n: number): AdoptionCard | null {
-  return writeOp(ws, (b) => {
-    const r = b.db.writer.prepare(`${ADOPTION_SQL} WHERE number = ?`).get(n) as AdoptionRow | undefined // i18n-ignore: SQL
-    return r ? adoptionCardOf(r) : null
-  })
-}
-
-/**
- * Marks cards as from before 1.0 (#1218, SPEC §16.4.1: no facts), inside boardWrite: each only while it is as the
- * adoption classified it (its project, column and archived state), has no facts and isn't marked yet, so a card a Combwork
- * has meanwhile started, adopted or moved is left alone. `marked`: how many it marked; `changed`: those it left that are
- * still neither marked nor started (classified again from fresh data by the adoption's next run).
- */
-export function markPreWorkflow(ws: WorkspaceService, cards: AdoptionCard[]): { marked: number; changed: number } {
-  return writeOp(ws, (b) => {
-    const db = b.db.writer
-    const mark = db.prepare('UPDATE cards SET pre_workflow = 1 WHERE number = ? AND project = ? AND col = ? AND archived = ? AND pre_workflow = 0 AND NOT EXISTS (SELECT 1 FROM card_facts f WHERE f.card = cards.number)') // i18n-ignore: SQL
-    const now = db.prepare(`${ADOPTION_SQL} WHERE number = ?`) // i18n-ignore: SQL
-    let marked = 0
-    let changed = 0
-    for (const c of cards) {
-      if (Number(mark.run(c.number, c.project, c.column, c.archived ? 1 : 0).changes)) marked++
-      else {
-        const r = now.get(c.number) as AdoptionRow | undefined
-        if (r && !r.facts && !r.pre_workflow) changed++
-      }
-    }
-    return { marked, changed }
-  })
 }
 
 /** A value the board keeps of its own (board_meta), or null. */
@@ -1937,7 +1753,7 @@ export function takeNumber(ws: WorkspaceService): number {
   return writeOp(ws, (b) => takeNumberIn(b.db.writer))
 }
 
-/** The next card number, taken on a connection inside its transaction (the fact store's cards, #1215): as takeNumber, but for the stub. */
+/** The next card number, taken on a connection inside its transaction (the fact store's cards, #1215): as takeNumber. */
 export function takeNumberIn(db: Db['writer']): number {
   const n = nextOf(db)
   setMeta(db, 'next', String(n + 1))

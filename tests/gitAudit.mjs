@@ -567,7 +567,6 @@ export const SWITCHES = {
   'src/main/nameUpgradeProjects': { n: 2, class: 'historic', why: "1.1's name upgrade moves a Git repository's refs and exclude line (HI-2594): its boundary read as Git's" },
   'src/main/ipc': { n: 1, class: 'gitUi', why: "the Files tab's Git menu reads only a Git repository's boundary (git:…)" },
   'src/main/workflow/platformSwitch': { n: 1, class: 'gitUi', why: "the switch to None warns that the folder is still a Git repository (gitFolder, git.vc.switch.gitFolder): Git-facing text" },
-  'src/main/workflow/commitMessageStep': { n: 2, class: 'historic', why: "HI-1997's one-time step over G19's stored Git options (in force, or kept as `kept.git`): Git's data alone" },
   'src/renderer/src/components/AgentTiles': { n: 1, class: 'data', why: "a CSS grid column token (`none`): not a platform" },
   'src/renderer/src/views/VersionControl': { n: 1, class: 'gitUi', why: "the Version Control tab compares git's own read of the folder (its status summary) with detection finding Git: Git's page" },
   'src/renderer/src/views/VersionControlHeader': { n: 1, class: 'gitUi', why: "Initialise repository… switches the project to Git by name once Git's page made it one (switchAfterInit): Git's page" },

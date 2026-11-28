@@ -1,7 +1,7 @@
 // "How do you work? Solo / Pair / Team" (#1423, SPEC §16.3.5): the preset step for a project added since 1.0, per
 // platform. A project asks while the platform in force has no preset, no options of its own and no answer: a project
-// from before 1.0 has the options its upgrade wrote, and one switched to a platform it never had asks for that one
-// (#1419: nothing in `kept`). The answer (`chosen` or `notNow`) is the platform's: it goes into `kept` with its options
+// from before 1.0 has the options its upgrade wrote, one whose upgrade never ran asks too (HI-3619: the upgrade's
+// adoption is gone), and one switched to a platform it never had asks for that one (#1419: nothing in `kept`). The answer (`chosen` or `notNow`) is the platform's: it goes into `kept` with its options
 // when the project switches away, and comes back with them. Nothing is applied until the user chooses.
 
 import type { PlatformId } from '../platform/descriptors'
@@ -10,12 +10,10 @@ import { PREFERENCE_OPTIONS, type PresetId } from './options'
 import { agentWorkflowRole, reviewsWork, type WorkflowRole } from './roles'
 
 /**
- * Whether a project asks "How do you work?" for the platform in force. A project with no platform recorded is from
- * before 1.0 (Combwork records it as it makes a project.json): its upgrade gives it options, so it never asks, also while
- * that upgrade is still to run.
+ * Whether a project asks "How do you work?" for the platform in force. A project with no platform recorded (from before
+ * 1.0, its upgrade's options never written) asks as any other does (HI-3619).
  */
 export function asksPreset(cfg: Pick<ProjectConfig, 'workflow' | 'platform'>, platform: PlatformId): boolean {
-  if (cfg.platform === undefined) return false
   const wf = cfg.workflow
   if (!wf || wf.platform !== platform) return true
   // Card loops and file locks (HI-1766) aren't a way of working: a project with only those has chosen none.

@@ -1,5 +1,4 @@
-// The Version Control tab's Workflow section (#1418; P4's plain form #1278 before it): after an upgrade from 0.9 the
-// one-time presets notice names the project, and Choose… opens its tab at Workflow. The options are in groups (Review,
+// The Version Control tab's Workflow section (#1418; P4's plain form #1278 before it). The options are in groups (Review,
 // Checks, Merging, Where cards are built, Card loops, Stages; None: Review, Checks, The work, Card loops, Stages; File
 // locks and Card loops options since HI-1766, File locks shown with slots too), each worded as an outcome with one sentence on what it does and where its value comes from. Each preset
 // (and All off) previews what it sets and why, marking what it would change, before Use fills the form: Pair (the agent
@@ -11,8 +10,8 @@
 // window (#1483): a reviewer agent chosen from All off (#1508), G1b two reviewers, G12, G13, G14 on the project's own row; None's N1, N3, N4, N6. G4 set from the tab decides a clean
 // rebase: Same change carries the pass over, Exact revision only makes it stale (S9). Screenshots in both themes, in
 // German and in Polish. Dev build, throwaway profiles and workspaces; the fake Claude Code for G4's agents.
-// Dev build only (#1578): it starts this checkout's Electron itself, writes the board's tables, and holds a read with a
-// test seam (CW_TEST_SLOW_IPC); its queue's builders are on slots, as 1.0 has them.
+// Dev build only (#1578): it starts this checkout's Electron itself and writes the board's tables; its queue's builders
+// are on slots, as 1.0 has them.
 const lib = require('./lib.cjs')
 const q = require('./queueFixture.cjs')
 const { _electron } = require('playwright-core')
@@ -32,7 +31,7 @@ const check = (name, ok, extra = '') => {
   console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${ok || !extra ? '' : ` (${extra})`}`)
 }
 
-/** Writes to the workspace's board from outside Combwork, as another process would (the upgrade's marks, a lane's rows). */
+/** Writes to the workspace's board from outside Combwork, as another process would (a lane's rows). */
 function board(sql, ...args) {
   const db = new DatabaseSync(path.join(ws, '.combwork', 'combwork.db'), { timeout: lib.timing('db.busyMs') })
   try {
@@ -129,50 +128,19 @@ async function theForm(page, app, inv) {
     const projectJson = (p = project) => JSON.parse(fs.readFileSync(path.join(p, '.combwork', 'project.json'), 'utf8'))
     const saved = () => projectJson().workflow?.options ?? {}
 
-    // A board made by 1.0 has no notice; one upgraded from 0.9 (cards from before it) has, once.
-    check('no presets notice on a board made by 1.0', (await inv('workflow:presetsNotice')) === null)
-    const card = await inv('tasks:create', { title: 'Lane card', project: 'web' })
-    board("INSERT INTO board_meta (key, value) VALUES ('adoption_upto', '7') ON CONFLICT (key) DO UPDATE SET value = excluded.value")
     // A running lane of the project's, as the card-loop skill registers one (lanes.ts reads its table each time).
+    const card = await inv('tasks:create', { title: 'Lane card', project: 'web' })
     const at = new Date().toISOString()
     board("INSERT INTO lanes (id, ord, project, builder_id, builder_name, reviewer_id, reviewer_name, rounds, wait_minutes, state, started_by, started_at, updated_at) VALUES ('lane-e2e1', 0, 'web', 'b1', 'B1', 'r1', 'R1 (reviewer)', 10, 360, 'active', 'B1 (web)', ?, ?)", at, at)
     board("INSERT INTO lane_cards (lane, ord, card) VALUES ('lane-e2e1', 0, ?)", card.number)
     await page.reload()
     await lib.appReady(page)
-    const notice = page.locator('.presets-notice')
-    check('after the upgrade, the presets notice names the project', !!(await lib.until(async () => (await notice.count()) > 0 && (await notice.innerText()).includes('web'), HUNG_MS)), await page.locator('.main-area').innerText().catch(() => ''))
-    // Agents changing state replace the window's workspace each time; the notice reads main again only when what it
-    // shows can change (HI-1807: a dozen agents working read it about once a second). Each call is counted in main.
-    await app.evaluate(({ ipcMain }) => {
-      const handlers = ipcMain._invokeHandlers
-      const h = handlers.get('workflow:presetsNotice')
-      globalThis.__presetsCalls = 0
-      handlers.set('workflow:presetsNotice', (...x) => (globalThis.__presetsCalls++, h(...x)))
-    })
-    const status = (agentId, s) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('cw:event', ev), { type: 'session-status', state: { provider: 'claude-code', runId: `wo-${agentId}`, projectPath: project, agentId, cwd: project, sessionId: '', status: s, runtime: { lifecycle: s === 'stopped' ? 'stopped' : 'running', maintenance: null, attention: null, composer: 'free' }, startedAt: new Date().toISOString(), launchSignature: '', unseen: false } })
-    const running = page.locator('.project-row', { hasText: 'web' }).locator('.agent-count')
-    for (const s of ['ready', 'working', 'waiting', 'working']) for (const a of ['b1', 'r1']) await status(a, s)
-    // Main knows nothing of these made-up runs, so a workspace refresh meanwhile (a project.json write's) drops them: they
-    // go on reporting, as running agents do, until the row shows them (HI-1774: it raced that refresh). The count is read
-    // without Playwright's wait (HI-2639): a refresh between count() and innerText() removed it, and innerText() then
-    // waited 30 s for it while nothing reported the runs again.
-    const twoShown = !!(await lib.until(async () => {
-      const shown = await running.allInnerTexts()
-      if (shown.length === 1 && shown[0].trim() === '2') return true
-      for (const a of ['b1', 'r1']) await status(a, 'working')
-      return false
-    }, HUNG_MS))
-    for (const a of ['b1', 'r1']) await status(a, 'stopped')
-    const noneShown = !!(await lib.until(async () => (await running.count()) === 0, HUNG_MS))
-    const presetsCalls = await app.evaluate(() => globalThis.__presetsCalls)
-    check('agents changing state don’t read the presets notice again, and it stays', twoShown && noneShown && presetsCalls === 0 && (await notice.count()) === 1, `two running shown: ${twoShown}, then none: ${noneShown}, calls: ${presetsCalls}`)
-    // The answer's board write held a while, and the workspace changed meanwhile (#1464): the notice's reload then reads
-    // the board before the answer is on it, and must not show it again.
-    await app.evaluate(() => { process.env.CW_TEST_SLOW_IPC = 'workflow:presetsNoticeSaid=3000*1' })
-    await notice.getByRole('button', { name: 'Choose…' }).click()
-    await inv('workspace:refresh')
+    // The project's Version Control tab at Workflow (the presets notice that opened it went with HI-3619).
+    await page.getByText('web', { exact: true }).first().click()
+    await page.locator('.tabs .tab', { hasText: 'Version Control' }).click()
+    await lib.vcSection(page, 'workflow')
     const workflowTab = page.locator('.git-sections [data-section="workflow"]')
-    check('Choose… opens the project’s Version Control tab at Workflow', !!(await lib.until(async () => (await section.count()) > 0 && (await workflowTab.getAttribute('aria-selected')) === 'true' && (await page.locator('.tab.active', { hasText: 'Version Control' }).count()) === 1, HUNG_MS)))
+    check('the project’s Version Control tab at Workflow', !!(await lib.until(async () => (await section.count()) > 0 && (await workflowTab.getAttribute('aria-selected')) === 'true' && (await page.locator('.tab.active', { hasText: 'Version Control' }).count()) === 1, HUNG_MS)))
     // The sections are tabs (HI-1837): the arrows select and focus the next, its page the tab panel it labels; only the
     // selected one in the Tab order.
     const sectionTabs = page.locator('.git-sections[role="tablist"] [role="tab"]')
@@ -186,8 +154,6 @@ async function theForm(page, app, inv) {
     // Its form read again (it remounts with the section), so the shots show it, not the page before its read answers.
     check('…ArrowLeft back to Workflow, its form shown again', !!(await lib.until(async () => (await workflowTab.getAttribute('aria-selected')) === 'true' && (await focusedSection()) === 'workflow' && (await panelFor()) === 'workflow' && (await section.locator('.workflow-group[data-group="presets"]').isVisible().catch(() => false)), HUNG_MS)))
     await themes('section-tabs', page.locator('.git-head'))
-    check('the notice is gone, and answered for good',!!(await lib.until(async () => (await notice.count()) === 0 && (await inv('workflow:presetsNotice')) === null, HUNG_MS)), `notice shown: ${await notice.count()}, presetsNotice: ${JSON.stringify(await inv('workflow:presetsNotice'))}`)
-    await app.evaluate(() => { delete process.env.CW_TEST_SLOW_IPC })
 
     // --- The form as the upgrade left it: in groups, no preset, each option worded as an outcome with its origin.
     // GitHub's host setting has its group between slots and loops (HI-2779); the GitHub tab's option groups come before

@@ -129,14 +129,11 @@ import { capturedText, englishError, CombworkError, combworkError, windowError }
 import { deleteJournalEntry, deleteWorkspaceJournal, editJournalEntry, forgetJournalEntries, forgetJournalPreview, journalEntry, journalStatus, setJournalSettings } from './journalService'
 import { browseJournal, journalProjects } from './journal'
 import { runActions } from './workflow/actionWorker'
-import { adoptWorkspace } from './workflow/adoption'
 import { repairStages } from './workflow/stageRepair'
 import { attachableSource, attachToCard, cardAttachmentGroups, cardAttachments, previewCardAttachment, recoverCardAttachments, removeCardAttachment, stageDrafts } from './cardAttachments'
-import { settleSlotsUpToDate } from './workflow/slotsUpToDateStep'
-import { settleCommitMessageDefault } from './workflow/commitMessageStep'
 import { migrateSlots, releaseCarried } from './slotMigration'
 import { boardSlots, heldWriter, releaseHeldWriter } from './agentFolders'
-import { checkWorkflowChange, chooseMerge, guardPreview, presetsNotice, settleMergeChoices, presetsNoticeSaid, projectStages, setWorkflowOptions, workflowForm } from './workflow/optionsForm'
+import { checkWorkflowChange, chooseMerge, guardPreview, settleMergeChoices, projectStages, setWorkflowOptions, workflowForm } from './workflow/optionsForm'
 import { checkPlatformSwitch, setPlatform } from './workflow/platformSwitch'
 import { presetNotNow } from './workflow/presetStep'
 import { checkLevelChange, levelForm, setLevelOptions } from './workflow/levels'
@@ -449,18 +446,12 @@ function boardSteps(ws: WorkspaceService, after?: AfterOpen): void {
   )
   // The cards' actions a crash or a close left pending (#1215, SPEC §16.4.5): run once, in the order written.
   void timed('pending card actions', runActions(ws)) // i18n-ignore: a part of a log line's timing
-  // The 1.0 upgrade's adoption (#1218, SPEC §16.17): each project's options and its old cards, until it has run once;
-  // then what changed in its projects while it was closed, recorded as observed facts (#1217): the cards adopted too.
-  // Then its agents' worktrees become slots (#1441), each project once, before what changed is observed.
-  // And G15 saved before P7 settled once (#1445), so a Pair or Team project gets its preset's On.
+  // Its agents' worktrees become slots (#1441), each project once, before what changed while it was closed is observed
+  // (recorded as observed facts, #1217). The 1.0 upgrade's adoption and its one-time steps are gone (HI-3619).
   // And a card the board has in Done while its stage isn't (HI-1674) brought into line, before what changed is observed.
   void timed(
-    'adoption, slots, repairs and what changed while closed', // i18n-ignore: a part of a log line's timing
-    adoptWorkspace(ws)
-      .then(() => settleSlotsUpToDate(ws))
-      // HI-1997: a commit message a preset stored as Combwork's, switched once to the branch's own (a proven choice kept).
-      .then(() => settleCommitMessageDefault(ws))
-      .then(() => migrateSlots(ws))
+    'slots, repairs and what changed while closed', // i18n-ignore: a part of a log line's timing
+    migrateSlots(ws)
       .then(() => repairStages(ws))
       // HI-1697: a merge choice the board recorded and a save stopped before writing to project.json, written there now.
       .then(() => settleMergeChoices(ws))
@@ -1092,8 +1083,6 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
     'workflow:checkPlatform': (p, to) => checkPlatformSwitch(workspace, workspace.assertProject(p), to),
     'workflow:setPlatform': (p, to, opts) => setPlatform(workspace, workspace.assertProject(p), to, { expected: opts?.expected }),
     'workflow:presetNotNow': (p, platform) => presetNotNow(workspace, workspace.assertProject(p), platform),
-    'workflow:presetsNotice': () => presetsNotice(workspace),
-    'workflow:presetsNoticeSaid': () => presetsNoticeSaid(workspace),
     'workflow:levelForm': (level, platform) => levelForm(workspace, level, platform),
     'workflow:levelCheck': (level, platform, change) => checkLevelChange(workspace, level, platform, change),
     'workflow:setLevel': (level, platform, change) => setLevelOptions(workspace, level, platform, change),

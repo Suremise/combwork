@@ -17,7 +17,6 @@ const gamma = path.join(ws, 'gamma')
 const beta = path.join(ws, 'beta')
 const delta = path.join(ws, 'delta')
 const site = path.join(ws, 'site')
-const tasksDir = path.join(ws, '.combwork', 'tasks')
 let failed = 0
 const check = (name, ok, extra = '') => {
   if (!ok) failed++
@@ -49,11 +48,12 @@ const project = (p, cfg = {}, sessions = []) => {
   fs.writeFileSync(path.join(p, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [], ...cfg }))
   fs.writeFileSync(path.join(p, '.combwork', 'sessions.json'), JSON.stringify({ version: 1, sessions }))
 }
-/** A card as Combwork saved them before projects had ids (no projectId). */
+/** A card as Combwork saved them before projects had ids (no projectId), saved on the board as another program would. */
 const oldCard = (n, proj, agent) =>
-  fs.writeFileSync(
-    path.join(tasksDir, `${n}.json`),
-    JSON.stringify({ number: n, title: `Website card ${n}`, description: '', project: proj, agent, ...(agent ? { agentName: 'Claude' } : {}), column: 'done', order: n, labels: [], blocked: null, blockedBy: [], links: [], comments: [], history: [{ at: '2026-10-01T00:00:00.000Z', by: 'You', what: 'Created in Todo' }], archived: true, archivedFor: 'user', createdAt: '2026-10-01T00:00:00.000Z', createdBy: 'You', updatedAt: '2026-10-01T00:00:00.000Z' })
+  lib.writeCard(
+    ws,
+    n,
+    ({ number: n, title: `Website card ${n}`, description: '', project: proj, agent, ...(agent ? { agentName: 'Claude' } : {}), column: 'done', order: n, labels: [], blocked: null, blockedBy: [], links: [], comments: [], history: [{ at: '2026-10-01T00:00:00.000Z', by: 'You', what: 'Created in Todo' }], archived: true, archivedFor: 'user', createdAt: '2026-10-01T00:00:00.000Z', createdBy: 'You', updatedAt: '2026-10-01T00:00:00.000Z' })
   )
 
 ;(async () => {
@@ -61,10 +61,6 @@ const oldCard = (n, proj, agent) =>
   project(alpha, { agents: [{ id: 'a-builder', name: 'Builder', provider: 'claude-code' }] })
   project(beta)
   project(site, { agents: [{ id: 'a-wb', name: 'WB', provider: 'claude-code' }] }, [{ id: 's1', provider: 'claude-code', agentId: 'a-claude', createdAt: '2026-10-01T00:00:00.000Z' }])
-  fs.mkdirSync(tasksDir, { recursive: true })
-  oldCard(1, 'old-site', 'a-claude')
-  oldCard(2, 'old-site', null)
-  fs.writeFileSync(path.join(tasksDir, 'board.json'), JSON.stringify({ version: 1, next: 3 }))
   // #514: a handover of alpha's, as Combwork writes them (its name's project slug and its header).
   fs.mkdirSync(path.join(ws, '.combwork', 'shared', 'handovers'), { recursive: true })
   fs.writeFileSync(path.join(ws, '.combwork', 'shared', 'handovers', '2026-10-01-alpha-plan.md'), '# Plan\n\n- **Project:** alpha\n- **Date:** 2026-10-01 10:00 (2026-10-01T10:00:00Z)\n\nWhere it stands.\n')
@@ -75,6 +71,9 @@ const oldCard = (n, proj, agent) =>
   let r = await lib.launch({ userData, env, viewport: { width: 1400, height: 850 } })
   r.page.on('pageerror', (e) => check('no page errors', false, e.message))
   await lib.openWorkspace(r.inv, r.page, ws)
+  // HI-3619: card files from before 0.9 are no longer imported, so the old cards are saved on the board as it is open.
+  oldCard(1, 'old-site', 'a-claude')
+  oldCard(2, 'old-site', null)
   const doing = await r.inv('tasks:create', { title: 'Builder is on this', project: 'alpha', agent: 'Builder', column: 'doing' })
   const todo = await r.inv('tasks:create', { title: 'Next for Builder', project: 'alpha', agent: 'Builder' })
   const old = await r.inv('tasks:create', { title: 'An archived one', project: 'alpha', agent: 'Builder' })
@@ -84,8 +83,6 @@ const oldCard = (n, proj, agent) =>
   check('its cards are saved with it', [doing, todo, old].every((c) => lib.readCard(ws, c.number).projectId === id))
   check('…and the board shows no id', !('projectId' in doing))
   check('cards saved before ids, by a project no longer there by that name, are left as they were', lib.readCard(ws, 1).projectId === undefined)
-  // #1017: the cards' files moved into the board's database as it opened, the folder kept as a backup.
-  check("the cards' files are in the board now, their folder kept as a backup", fs.readdirSync(path.join(ws, '.combwork')).some((f) => f.startsWith('tasks.imported-')) && !fs.existsSync(path.join(tasksDir, '1.json')))
   await r.app.close()
 
   // --- Renamed while Combwork was closed.

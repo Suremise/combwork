@@ -39,8 +39,6 @@
   "main.assistantQuestion.stop.state": "{status, select, working {正在工作} waiting {正在等你} signin {正在等你重新登录它的 CLI（登录已过期）} starting {正在启动} background {正在等待它启动的后台任务} watching {正在等待卡片变化（卡片监视：它的卡片循环将暂停，直到恢复）} ready {空闲} finished {空闲（任务已完成）} error {出错} stopped {已停止} other {{status}}}",
   "main.assistantQuestion.stop.title": "停止 {project} 中的 {agent}？",
   "main.assistantQuestion.stop.yes": "停止",
-  "main.board.damagedBody": "{files} 未进入看板。它们保存在 {folder} 中。",
-  "main.board.damagedTitle": "{n, plural, other {有 # 个卡片文件无法读取}}",
   "main.board.foundBody": "它们原样保存在 {folder} 中。看板没有因此做任何更改：点击“查看…”可将每张卡片添加到看板或丢弃。",
   "main.board.foundTitle": "{n, plural, other {发现 # 张旧版 Combwork 创建的卡片：请查看}}",
   "main.board.review": "查看…",

@@ -75,7 +75,6 @@ describe.skipIf(!SRC)("the slots migration on a copy of a workspace with 0.9's w
 
     const { createWorkspaceService, disposeWorkspaceService, inWorkspace, workspace } = await import('../../src/main/workspace')
     const { boardRead, boardWrite, boardWriteOp } = await import('../../src/main/boardStore')
-    const { adoptWorkspace } = await import('../../src/main/workflow/adoption')
     const { migrateSlots, keptFor, startSlotMigration, stopSlotMigration } = await import('../../src/main/slotMigration')
     const { folderAgent, folderFacts } = await import('../../src/main/agentFolders')
     const { canResumeNow, legacyWorktree } = await import('../../src/shared/agentFolders')
@@ -84,7 +83,6 @@ describe.skipIf(!SRC)("the slots migration on a copy of a workspace with 0.9's w
     try {
       await ws.open(dst)
       expect(under(ws.path!, base)).toBe(true)
-      await adoptWorkspace(ws)
       // The sessions' folders moved to the copy's (as Repair would after a move): both spellings Windows paths have.
       await boardWrite(ws, async () =>
         boardWriteOp(ws, (db) => {
