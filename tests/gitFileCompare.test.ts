@@ -143,6 +143,40 @@ describe('the panel', () => {
     expect(theirs.projectFolder).toBe(proj)
   })
 
+  describe("the project folder's copy of a slot's file", () => {
+    const slot = (): string => join(base, `slot${n}`)
+    const err = (code: string): Error => Object.assign(new Error(code), { code })
+    type Read = NonNullable<Parameters<typeof P.compareProjectAt>[3]>
+    const copy = (read: Read, rel = 'f.txt') => P.compareProjectAt(ws(proj), slot(), rel, read)
+    const content = (kind: 'text' | 'binary' | 'too-large' | 'not-utf8', text = '') => async () => ({ kind, text, bom: false, size: text.length, modified: '' })
+
+    it('reads it from the project folder, as text', async () => {
+      const seen: string[] = []
+      expect(await copy(async (p, rel) => (seen.push(`${p}|${rel}`), content('text', 'theirs\n')()))).toEqual({ state: 'text', text: 'theirs\n' })
+      expect(seen).toEqual([`${proj}|f.txt`])
+    })
+
+    it('says missing only when the file system says it is not there', async () => {
+      expect(await copy(async () => Promise.reject(err('ENOENT')))).toEqual({ state: 'missing' })
+      expect(await copy(async () => Promise.reject(err('ENOTDIR')))).toEqual({ state: 'missing' })
+      expect(await copy(async () => Promise.reject(err('EISDIR')))).toEqual({ state: 'notFile' })
+    })
+
+    it('fails a read that fails otherwise, never answering an empty file', async () => {
+      await expect(copy(async () => Promise.reject(err('EACCES')))).rejects.toThrow('EACCES')
+      await expect(copy(async () => Promise.reject(err('EBUSY')))).rejects.toThrow('EBUSY')
+    })
+
+    it('says which way a copy that is there is not text', async () => {
+      for (const kind of ['binary', 'too-large', 'not-utf8'] as const) expect(await copy(content(kind))).toEqual({ state: 'notText', kind })
+    })
+
+    it('is refused in the project folder itself, and for a path outside it', async () => {
+      await expect(P.compareProjectAt(ws(proj), proj, 'f.txt', content('text', 'x'))).rejects.toThrow(/asked for wrongly/)
+      await expect(copy(content('text', 'x'), '../f.txt')).rejects.toThrow(/asked for wrongly/)
+    })
+  })
+
   it('refuses an option-like or range ref, and a path outside the folder, before git sees them', async () => {
     commit(proj, { 'f.txt': 'one\n' }, 'start')
     for (const ref of ['--output=x', 'main..HEAD', 'HEAD~1']) await expect(P.compareWithAt(ws(), proj, 'f.txt', ref, null, gitRepoReads)).rejects.toThrow(/asked for wrongly/)

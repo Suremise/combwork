@@ -201,7 +201,7 @@ import type { FileCommits, FileRestored, FileRestorePlan, FileRestoreRequest, Re
 import type { CommitActionDone, CommitActionRequest, CommitDetail } from './gitCommitView'
 import type { CommitIntro, FileHistoryPage, FileSide, FileVersions } from './fileHistory'
 import type { BlameResult } from './fileBlame'
-import type { CompareChoices, CompareVersion } from './fileCompare'
+import type { CompareChoices, CompareVersion, ProjectCopy } from './fileCompare'
 import type { BoardFoldChange } from './tasks'
 import type { CardCost, CardRoundCosts, LaneCost } from './cardCosts'
 import type { ConsoleEvent, ConsoleRecordingInfo, ConsoleSource } from './devConsole'
@@ -1270,6 +1270,8 @@ export interface CombworkRequests {
   'files:compareChoices': (root: string) => CompareChoices
   /** HI-3478: `rel` at a branch, tag or commit (`path`: its path there when known, as History's row), its path found across renames. */
   'files:compareWith': (root: string, rel: string, ref: string, path: string | null) => CompareVersion
+  /** HI-3478: a slot's or worktree's file, the project folder's copy: text, missing (only when absent), a folder, or not text. */
+  'files:compareProject': (root: string, rel: string) => ProjectCopy
   /** Each action replies with what it did, in a sentence. Switching (and creating a branch to switch to) or pulling is refused while an agent works in the folder or its merge slot is held (`folderBusy`). */
   'git:switch': (projectPath: string, branch: string) => string
   /** Update from <target> (HI-1180): what it would do to a branch (its dialog), and the update, merge or rebase, saying what it did. */

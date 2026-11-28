@@ -74,6 +74,7 @@ interface CombworkMessageValues {
   'files.compare.notThere': { side: string | number }
   'files.compare.open': undefined
   'files.compare.projectCopy': undefined
+  'files.compare.projectNotText': { kind: string }
   'files.compare.projectSide': undefined
   'files.compare.refSide': { ref: string | number; commit: string | number }
   'files.compare.renamed': { path: string | number }

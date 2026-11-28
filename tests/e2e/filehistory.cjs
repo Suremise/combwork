@@ -215,6 +215,52 @@ const check = (name, ok, extra = '') => {
     await page.locator('[data-action="compare-back"]').click()
     await lib.until(async () => (await page.locator('[data-compare-diff]').count()) === 0, HUNG_MS)
 
+    // The project folder's copy, as a slot's file sees it (HR1's round 1 finding): main's answers are set here, one state
+    // at a time (this suite's folder is the project folder, which offers no copy of its own), each shown as it is.
+    await app.evaluate(({ ipcMain }) => {
+      const handlers = ipcMain._invokeHandlers
+      const choices = handlers.get('files:compareChoices')
+      const project = handlers.get('files:compareProject')
+      globalThis.__copy = { state: 'text', choices, project }
+      handlers.set('files:compareChoices', async (...x) => ({ ...(await choices(...x)), projectFolder: 'the project folder' }))
+      handlers.set('files:compareProject', async () => {
+        const s = globalThis.__copy.state
+        if (s === 'error') throw new Error("EACCES: permission denied, open 'doc.txt'")
+        return s === 'text' ? { state: 'text', text: 'ONE\ntwo\nfrom the project\n' } : s === 'notText' ? { state: 'notText', kind: 'binary' } : { state: s }
+      })
+    })
+    const copyAs = (state) => app.evaluate((s) => (globalThis.__copy.state = s), state)
+    const compareCopy = async () => {
+      await page.locator('[data-action="file-compare"]').click()
+      await page.locator('[data-compare-picker] [data-compare-choice="project"]').click()
+    }
+    try {
+      await compareCopy()
+      check("the project folder's copy compares as text", !!(await lib.until(async () => (await page.locator('[data-compare-diff="project"] .monaco').count()) === 1, HUNG_MS)))
+      await page.locator('[data-action="compare-back"]').click()
+      await copyAs('missing')
+      await compareCopy()
+      check('…one confirmed absent says it isn\'t there', !!(await lib.until(async () => (await page.locator('[data-compare-diff="project"] [data-compare-missing]').count()) === 1, HUNG_MS)))
+      await page.locator('[data-action="compare-back"]').click()
+      await copyAs('error')
+      await compareCopy()
+      const failedCopy = page.locator('[data-compare-diff]')
+      check('…a read that fails says so, never an empty file', !!(await lib.until(async () => /Couldn't compare: EACCES/.test(await text(failedCopy)), HUNG_MS)) && (await failedCopy.locator('[data-compare-missing]').count()) === 0, await text(failedCopy))
+      await page.locator('[data-action="compare-back"]').click()
+      await copyAs('notText')
+      await compareCopy()
+      check('…one that is binary says so, with no text diff', !!(await lib.until(async () => (await page.locator('[data-compare-not-text="binary"]').count()) === 1, HUNG_MS)) && (await page.locator('[data-compare-diff] .monaco').count()) === 0)
+      await page.locator('[data-action="compare-back"]').click()
+    } finally {
+      await app.evaluate(({ ipcMain }) => {
+        const c = globalThis.__copy
+        if (!c) return
+        ipcMain._invokeHandlers.set('files:compareChoices', c.choices)
+        ipcMain._invokeHandlers.set('files:compareProject', c.project)
+        globalThis.__copy = null
+      })
+    }
+
     // Another item selected: its history, never the last one's.
     await row('notes').click()
     const folder = page.locator('[data-file-history="notes"]')

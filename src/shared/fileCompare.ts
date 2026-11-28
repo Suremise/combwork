@@ -43,6 +43,13 @@ export interface CompareVersion {
   binary: boolean
 }
 
+/**
+ * `files:compareProject`'s answer (HR1's round 1 finding): the project folder's copy of a slot's file. Only a copy
+ * confirmed absent is `missing`; one that is there but not text (binary, too large, not UTF-8) says which, with no text;
+ * a read that fails otherwise is an error, never an empty side.
+ */
+export type ProjectCopy = { state: 'text'; text: string } | { state: 'missing' } | { state: 'notFile' } | { state: 'notText'; kind: 'binary' | 'too-large' | 'not-utf8' }
+
 /** Whether a ref the user typed or chose may be resolved: a name or hash, never an option or a revision expression's range. */
 export function compareRefOk(ref: unknown): ref is string {
   return typeof ref === 'string' && ref.length > 0 && ref.length <= 256 && !ref.startsWith('-') && !/[\s\0~^:?*[\\]|\.\.|@\{/.test(ref)

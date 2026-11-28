@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { compareRefOk, type CompareChoices, type CompareVersion } from '@shared/fileCompare'
+import { compareRefOk, type CompareChoices, type CompareVersion, type ProjectCopy } from '@shared/fileCompare'
 import { msg, tr } from '@shared/i18n'
 import { call, errorMessage } from '../api'
 import { languageFor } from '../monacoLang'
@@ -32,6 +32,7 @@ export const FILE_COMPARE_TEXT = {
   notThere: msg({ id: 'files.compare.notThere', defaultMessage: "This file isn't in {side} under its name or a rename git found: the left side is empty.", description: "HI-3478: under a comparison's heading: the other version ({side}) has no such file (deleted there, never there, or renamed in a way git didn't follow)." }),
   notFile: msg({ id: 'files.compare.notFile', defaultMessage: 'In {side} this path is a folder or submodule, not a file.', description: "HI-3478: under a comparison's heading: at the other version ({side}) the file's path is a folder or a submodule." }),
   unsaved: msg({ id: 'files.compare.unsaved', defaultMessage: 'Right: your edits (not saved)', description: "HI-3478: under a comparison's heading when the editor has unsaved edits: the right side is the editor's text, not the file on disk." }),
+  projectNotText: msg({ id: 'files.compare.projectNotText', defaultMessage: "The project folder's copy isn't text Combwork can compare: {kind, select, binary {it's binary} tooLarge {it's too large to open} other {it isn't UTF-8}}.", description: "HI-3478: in place of a comparison with the project folder's copy when that copy is there but isn't text (binary, too large, or in another encoding). Keep the select keys." }),
   binary: msg({ id: 'files.compare.binary', defaultMessage: 'Binary or too large to compare as text.', description: "HI-3478: in place of a comparison when the other version is binary or too large." })
 }
 const T = FILE_COMPARE_TEXT
@@ -98,7 +99,7 @@ export function ComparePicker({ root, name, onPick, onClose }: { root: string; n
   )
 }
 
-type Left = { kind: 'ref'; v: CompareVersion } | { kind: 'project'; text: string; there: boolean }
+type Left = { kind: 'ref'; v: CompareVersion } | { kind: 'project'; copy: ProjectCopy }
 
 /** HI-3478: the comparison over the editor: `source`'s version on the left, the editor's live `text` on the right. */
 export function CompareDiff({ root, rel, source, text, dirty, onBack }: { root: string; rel: string; source: CompareSource; text: string; dirty: boolean; onBack: () => void }) {
@@ -108,8 +109,8 @@ export function CompareDiff({ root, rel, source, text, dirty, onBack }: { root: 
     let live = true
     const read = async (): Promise<Left> => {
       if (source.kind === 'ref') return { kind: 'ref', v: await call('files:compareWith', root, rel, source.ref, source.path) }
-      const c = await call('files:read', source.folder, rel).catch(() => null)
-      return { kind: 'project', text: c?.kind === 'text' ? c.text : '', there: c?.kind === 'text' }
+      // HR1's round 1 finding: only a copy confirmed absent is "not there"; a failed read is the error it is.
+      return { kind: 'project', copy: await call('files:compareProject', root, rel) }
     }
     void read().then(
       (left) => live && setGot({ for: key, left }),
@@ -125,10 +126,10 @@ export function CompareDiff({ root, rel, source, text, dirty, onBack }: { root: 
   const side = !left ? '' : left.kind === 'ref' ? tr(T.refSide, { ref: left.v.ref.length === 40 ? left.v.short : left.v.ref, commit: left.v.short }) : tr(T.projectSide)
   const notes: React.ReactNode[] = []
   if (left?.kind === 'ref' && left.v.how === 'renamed' && left.v.path) notes.push(<div key="renamed" className="faint small">{tr(T.renamed, { path: left.v.path })}</div>)
-  if ((left?.kind === 'ref' && left.v.state === 'missing') || (left?.kind === 'project' && !left.there)) notes.push(<div key="missing" className="faint small" data-compare-missing="">{tr(T.notThere, { side })}</div>)
-  if (left?.kind === 'ref' && left.v.state === 'notFile') notes.push(<div key="notFile" className="faint small">{tr(T.notFile, { side })}</div>)
+  if ((left?.kind === 'ref' && left.v.state === 'missing') || (left?.kind === 'project' && left.copy.state === 'missing')) notes.push(<div key="missing" className="faint small" data-compare-missing="">{tr(T.notThere, { side })}</div>)
+  if ((left?.kind === 'ref' && left.v.state === 'notFile') || (left?.kind === 'project' && left.copy.state === 'notFile')) notes.push(<div key="notFile" className="faint small">{tr(T.notFile, { side })}</div>)
   if (dirty) notes.push(<div key="unsaved" className="faint small" data-compare-unsaved="">{tr(T.unsaved)}</div>)
-  const original = !left ? '' : left.kind === 'ref' ? left.v.text : left.text
+  const original = !left ? '' : left.kind === 'ref' ? left.v.text : left.copy.state === 'text' ? left.copy.text : ''
   return (
     <div className="history-diff compare-diff" data-compare-diff={left?.kind === 'ref' ? left.v.commit : left?.kind ?? ''}>
       <div className="history-diff-head">
@@ -148,6 +149,10 @@ export function CompareDiff({ root, rel, source, text, dirty, onBack }: { root: 
         </div>
       ) : left.kind === 'ref' && left.v.binary ? (
         <div className="empty-state">{tr(T.binary)}</div>
+      ) : left.kind === 'project' && left.copy.state === 'notText' ? (
+        <div className="empty-state" data-compare-not-text={left.copy.kind}>
+          {tr(T.projectNotText, { kind: left.copy.kind === 'too-large' ? 'tooLarge' : left.copy.kind })}
+        </div>
       ) : (
         <div className="editor-host">
           <DiffView original={original} modified={text} language={languageFor(rel)} inline={false} />

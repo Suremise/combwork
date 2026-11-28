@@ -72,6 +72,7 @@
   "files.compare.notThere": "Diese Datei ist in {side} weder unter ihrem Namen noch unter einer Umbenennung, die git gefunden hat: Die linke Seite ist leer.",
   "files.compare.open": "Vergleichen mit …",
   "files.compare.projectCopy": "Die Kopie im Projektordner",
+  "files.compare.projectNotText": "Die Kopie im Projektordner ist kein Text, den Combwork vergleichen kann: {kind, select, binary {Sie ist binär} tooLarge {Sie ist zu groß zum Öffnen} other {Sie ist nicht UTF-8}}.",
   "files.compare.projectSide": "die Kopie im Projektordner",
   "files.compare.refSide": "{ref} · {commit}",
   "files.compare.renamed": "Dort hieß sie {path}.",

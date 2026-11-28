@@ -291,6 +291,10 @@
     "defaultMessage": "The project folder's copy",
     "description": "HI-3478: Compare with…'s choice in an agent's slot or worktree: the same file in the project folder, as it is on disk there."
   },
+  "files.compare.projectNotText": {
+    "defaultMessage": "The project folder's copy isn't text Combwork can compare: {kind, select, binary {it's binary} tooLarge {it's too large to open} other {it isn't UTF-8}}.",
+    "description": "HI-3478: in place of a comparison with the project folder's copy when that copy is there but isn't text (binary, too large, or in another encoding). Keep the select keys."
+  },
   "files.compare.projectSide": {
     "defaultMessage": "the project folder's copy",
     "description": "HI-3478: the left side's name in a comparison with the project folder's copy (used inside files.compare.heading)."

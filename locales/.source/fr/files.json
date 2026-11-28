@@ -72,6 +72,7 @@
   "files.compare.notThere": "This file isn't in {side} under its name or a rename git found: the left side is empty.",
   "files.compare.open": "Compare with…",
   "files.compare.projectCopy": "The project folder's copy",
+  "files.compare.projectNotText": "The project folder's copy isn't text Combwork can compare: {kind, select, binary {it's binary} tooLarge {it's too large to open} other {it isn't UTF-8}}.",
   "files.compare.projectSide": "the project folder's copy",
   "files.compare.refSide": "{ref} · {commit}",
   "files.compare.renamed": "There it was {path}.",

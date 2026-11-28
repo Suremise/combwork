@@ -72,6 +72,7 @@
   "files.compare.notThere": "此文件不在 {side} 中，既不在其名称下，也不在 git 找到的重命名下：左侧为空。",
   "files.compare.open": "比较…",
   "files.compare.projectCopy": "项目文件夹中的副本",
+  "files.compare.projectNotText": "项目文件夹中的副本不是 Combwork 能比较的文本：{kind, select, binary {它是二进制文件} tooLarge {它太大，无法打开} other {它不是 UTF-8}}。",
   "files.compare.projectSide": "项目文件夹中的副本",
   "files.compare.refSide": "{ref} · {commit}",
   "files.compare.renamed": "在那里它是 {path}。",
