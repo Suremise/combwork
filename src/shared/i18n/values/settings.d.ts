@@ -506,6 +506,8 @@ interface CombworkMessageValues {
   'settings.advanced.cw.focused.pickSeconds.title': undefined
   'settings.advanced.cw.git.commitMinutes.desc': undefined
   'settings.advanced.cw.git.commitMinutes.title': undefined
+  'settings.advanced.cw.git.historySeconds.desc': undefined
+  'settings.advanced.cw.git.historySeconds.title': undefined
   'settings.advanced.cw.git.networkMinutes.desc': undefined
   'settings.advanced.cw.git.networkMinutes.title': undefined
   'settings.advanced.cw.git.processNames.desc': undefined

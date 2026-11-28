@@ -50,6 +50,7 @@
   "service.fileHistory.failed": "Git no pudo leer el historial: {why}",
   "service.fileHistory.invalid": "Se pidió de forma incorrecta: no se leyó nada.",
   "service.fileHistory.noCommit": "Git no tiene el commit {commit}: puede que ya no exista. Actualiza el historial.",
+  "service.fileHistory.timedOut": "Git seguía leyendo el historial tras {seconds, number} segundos, así que Combwork lo detuvo. Vuelve a intentarlo, o aumenta Configuración → Avanzado → Git: duración máxima de una lectura del historial.",
   "service.fileHistory.unsupported": "El control de versiones de esta carpeta no tiene historial que mostrar.",
   "service.files.badName": "“{name}” no es un nombre válido",
   "service.files.exists": "Ya existe “{name}”",

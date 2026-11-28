@@ -143,6 +143,25 @@ const check = (name, ok, extra = '') => {
     check('back on the file, its history again and its editor (the diff left with the folder)', !!(await lib.until(async () => (await panel.locator('[data-history-row]').count()) === 3 && (await page.locator('[data-history-diff]').count()) === 0, HUNG_MS)))
     check('…its edit still unsaved', (await editorText()).includes('unsaved line'))
 
+    // A later page whose pinned commit is gone (amended, then pruned): refused, the list kept as it was until Refresh.
+    for (let i = 0; i <= 50; i++) {
+      write('many.txt', `${i}\n`)
+      g('add', 'many.txt')
+      g('commit', '-qm', `many ${i}`)
+    }
+    await lib.until(async () => (await row('many.txt').count()) === 1, HUNG_MS)
+    await row('many.txt').click()
+    const many = page.locator('[data-file-history="many.txt"]')
+    check('a long history shows its first page, with Show more', !!(await lib.until(async () => (await many.locator('[data-history-row]').count()) === 50 && (await many.locator('[data-action="history-more"]').count()) === 1, HUNG_MS)))
+    g('commit', '--amend', '-qm', 'many 50, amended')
+    g('reflog', 'expire', '--expire=now', '--all')
+    g('gc', '-q', '--prune=now')
+    await many.locator('[data-action="history-more"]').click()
+    check('Show more from a pruned commit says it is gone', !!(await lib.until(async () => /no commit .* Refresh the history/.test(await text(many)), HUNG_MS)), await text(many.locator('.banner')))
+    check('…and keeps the page shown', (await many.locator('[data-history-row]').count()) === 50)
+    await many.locator('.file-history-head [aria-label="Refresh"], .file-history-head .icon-btn').first().click()
+    check('Refresh reads it again from the branch now', !!(await lib.until(async () => (await many.locator('.history-subject').first().innerText().catch(() => '')) === 'many 50, amended', HUNG_MS)))
+
     await page.locator('[data-file-history] .file-history-head .icon-btn').last().click()
     check('closing hides the panel', !!(await lib.until(async () => (await page.locator('[data-file-history]').count()) === 0, HUNG_MS)))
     // Saved, so quitting has no unsaved file to ask about.

@@ -12,6 +12,8 @@ export const platformLimits = {
   queueNetworkMs: (): number => 30 * 60_000,
   /** One of the merge queue's checks, which a follow-mode pre-push hook is too (`cw.queue.checkMinutes`, 90 min). */
   queueCheckMs: (): number => 90 * 60_000,
+  /** HI-3475: one read of the Files tab's History (a page with its cards, a commit's diff, its merge), git ended at it (`cw.git.historySeconds`, 60 s). */
+  gitHistoryMs: (): number => 60_000,
   /** HI-3473: how old a lock file of git's must be before Repository health calls it stale (`cw.git.staleLockSeconds`, 60 s). */
   staleLockMs: (): number => 60_000,
   /** HI-3473: the program names that count as a git that may hold a lock (`cw.git.processNames`). */

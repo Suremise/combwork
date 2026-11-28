@@ -50,6 +50,7 @@
   "service.fileHistory.failed": "Git 无法读取历史：{why}",
   "service.fileHistory.invalid": "请求有误：未读取任何内容。",
   "service.fileHistory.noCommit": "Git 中没有提交 {commit}：它可能已不存在。请刷新历史。",
+  "service.fileHistory.timedOut": "Git 读取历史 {seconds, number} 秒后仍未结束，因此 Combwork 停止了它。请重试，或在“设置”→“高级”中调高“Git：读取历史的最长时间”。",
   "service.fileHistory.unsupported": "此文件夹的版本控制没有可显示的历史。",
   "service.files.badName": "“{name}”不是有效的名称",
   "service.files.exists": "“{name}”已存在",

@@ -1193,6 +1193,12 @@
   "settings.advanced.cw.git.commitMinutes.title": {
     "placeholders": {}
   },
+  "settings.advanced.cw.git.historySeconds.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.git.historySeconds.title": {
+    "placeholders": {}
+  },
   "settings.advanced.cw.git.networkMinutes.desc": {
     "placeholders": {}
   },

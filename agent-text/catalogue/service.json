@@ -249,6 +249,11 @@
     "note": "HI-3475: an error in the Files tab's History panel: a commit the panel showed ({commit}, a short id) isn't in the repository any more.",
     "audience": "both"
   },
+  "service.fileHistory.timedOut": {
+    "text": "Git was still reading the history after {seconds, number} seconds, so Combwork stopped it. Try again, or raise Settings → Advanced → Git: longest a history read takes.",
+    "note": "HI-3475: an error in the Files tab's History panel: reading a page of history, a commit's diff or its merge ran past the advanced setting's time ({seconds}) and git was ended. Keep the setting's name as Settings → Advanced shows it.",
+    "audience": "both"
+  },
   "service.fileHistory.unsupported": {
     "text": "This folder's version control has no history to show.",
     "note": "HI-3475: an error from the Files tab's History panel: the folder's version control can't read a file's history.",

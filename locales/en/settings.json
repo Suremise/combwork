@@ -2019,6 +2019,14 @@
     "defaultMessage": "Git: longest a commit or set aside takes",
     "description": "An advanced setting's title (Settings → Advanced), listed under Combwork, followed by its value in minutes. Commit and Set aside are the buttons that commit or stash a folder's uncommitted changes (HI-3372)."
   },
+  "settings.advanced.cw.git.historySeconds.desc": {
+    "defaultMessage": "How long the Files tab's History may spend reading one page of a file's commits (with their cards), one commit's changes, or the merge that brought a commit in, before Combwork stops git and says so. A page usually takes well under a second; raise this for a very large repository whose history git reads slowly.",
+    "description": "What the advanced setting \"Git: longest a history read takes\" does (Settings → Advanced, HI-3475)."
+  },
+  "settings.advanced.cw.git.historySeconds.title": {
+    "defaultMessage": "Git: longest a history read takes",
+    "description": "An advanced setting's title (Settings → Advanced), listed under Combwork, followed by its value in seconds: the Files tab's History panel (HI-3475)."
+  },
   "settings.advanced.cw.git.networkMinutes.desc": {
     "defaultMessage": "How long Fetch, Pull and Push in Version Control (and Push to…, pushing a tag, deleting remote branches) may run, a sign-in window included, before Combwork ends git as stuck. You can cancel one from the window at any time; raise it for a large first fetch or push on a slow connection.",
     "description": "What the advanced setting \"Git: longest a fetch, pull or push takes\" does, and when to change it (Settings → Advanced, HI-3372). Push to… is an action's name."

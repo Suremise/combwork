@@ -50,6 +50,7 @@
   "service.fileHistory.failed": "Git konnte den Verlauf nicht lesen: {why}",
   "service.fileHistory.invalid": "Das wurde falsch angefragt: Nichts wurde gelesen.",
   "service.fileHistory.noCommit": "Git hat keinen Commit {commit}: Er ist vielleicht weg. Aktualisiere den Verlauf.",
+  "service.fileHistory.timedOut": "Git las den Verlauf nach {seconds, number} Sekunden noch, also hat Combwork es beendet. Versuche es erneut, oder erhöhe Einstellungen → Erweitert → Git: längste Dauer eines Verlaufs-Lesevorgangs.",
   "service.fileHistory.unsupported": "Die Versionsverwaltung dieses Ordners hat keinen Verlauf zum Anzeigen.",
   "service.files.badName": "„{name}“ ist kein gültiger Name",
   "service.files.exists": "„{name}“ existiert bereits",

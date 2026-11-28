@@ -67,16 +67,17 @@ export interface RepoReads {
   signing?(root: string, force?: boolean): Promise<SigningInfo>
   /**
    * HI-3475: the Files tab's History of a file (following its renames) or a folder in a working folder, a page at a
-   * time from the commit pinned on page 1 (`pinned`; null reads the folder's head and pins it). Optional, as the members
-   * below: a platform without them offers no History.
+   * time from the commit pinned on page 1 (`pinned`; null reads the folder's head and pins it; a pin no longer there is
+   * refused). Optional, as the members below: a platform without them offers no History. Each is bounded by `at` (ms
+   * since the epoch; default now plus `cw.git.historySeconds`), refused once it has run out, the tool ended.
    */
-  fileLog?(root: string, rel: string, isDir: boolean, pinned: string | null, page: number): Promise<FileLog>
+  fileLog?(root: string, rel: string, isDir: boolean, pinned: string | null, page: number, at?: number): Promise<FileLog>
   /** HI-3475: a file at two commits, each side at its own path (null: no side); a side confirmed absent is `missing`. */
-  fileVersions?(root: string, left: FileSide | null, right: FileSide | null): Promise<FileVersions>
+  fileVersions?(root: string, left: FileSide | null, right: FileSide | null, at?: number): Promise<FileVersions>
   /** HI-3475: the merge that introduced `commit` on `head`'s first-parent line, or null when none can be said. */
-  introducedBy?(root: string, head: string, commit: string): Promise<MergeIntro | null>
-  /** HI-3475: the commits in `revision` and not in `base` (a submission's own). */
-  rangeCommits?(root: string, base: string, revision: string): Promise<Set<string>>
+  introducedBy?(root: string, head: string, commit: string, at?: number): Promise<MergeIntro | null>
+  /** HI-3475: the commits in `revision` and not in `base` (a submission's own); null when they can't be read here. */
+  rangeCommits?(root: string, base: string, revision: string, at?: number): Promise<Set<string> | null>
   /** A line's history, a page at a time, and the tags. */
   history(root: string, o: { ref?: string | null; page?: number; workTarget?: string | null }): Promise<GitHistory>
   /** What can be compared: the lines, main, the integration line and the slots with a line. */

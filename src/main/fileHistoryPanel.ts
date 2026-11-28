@@ -15,6 +15,7 @@ import { msg } from '../shared/i18n'
 import type { Submission } from '../shared/workflow/facts'
 import { combworkError } from './combworkError'
 import { createLogger, userText } from './logger'
+import { platformLimits } from './platform/limits'
 import type { RepoReads } from './platform/repoReads'
 import type { WorkspaceService } from './workspace'
 import type { Workflow } from './workflow/runtime'
@@ -66,8 +67,11 @@ function ownCard(wf: Workflow, project: string, c: Pick<LoggedCommit, 'hash' | '
   return s ? cardNamed(wf, s, 'subject') : null
 }
 
-/** The builder of the first of the card's submissions holding `commit`, or null: none holds it, or its range can't be read. */
-async function submitter(reads: Reads, root: string, submissions: readonly Submission[], commit: string): Promise<string | null> {
+/**
+ * The builder of the first of the card's submissions holding `commit`, or null: none holds it, or its range can't be read
+ * here (its commits gone). A range read past the page's deadline `at` is refused, as the page is.
+ */
+async function submitter(reads: Reads, root: string, submissions: readonly Submission[], commit: string, at: number): Promise<string | null> {
   for (const s of submissions) {
     if (!s.by) continue
     if (s.commits) {
@@ -75,11 +79,7 @@ async function submitter(reads: Reads, root: string, submissions: readonly Submi
       continue
     }
     if (!s.base || !s.revision) continue
-    try {
-      if ((await reads.rangeCommits(root, s.base, s.revision)).has(commit)) return s.by
-    } catch {
-      // A submission whose commits are gone from this repository (pruned, another clone's) says nothing of it.
-    }
+    if ((await reads.rangeCommits(root, s.base, s.revision, at))?.has(commit)) return s.by
   }
   return null
 }
@@ -96,12 +96,17 @@ function rootOf(ws: WorkspaceService, root: unknown): { folder: string; project:
   return ws.changesRootProject(root)
 }
 
-/** `files:history`: a page of a file's (following renames) or folder's commits, pinned to page 1's head. */
+/**
+ * `files:history`: a page of a file's (following renames) or folder's commits, pinned to page 1's head (a pin is a full
+ * commit id, or none for page 1). The page's git reads, its commits' and its submissions' ranges, share one deadline
+ * (Settings → Advanced's `cw.git.historySeconds`): past it the page is refused and its git ended.
+ */
 export async function fileHistoryAt(ws: WorkspaceService, rootRaw: unknown, rel: unknown, isDir: unknown, pinned: unknown, page: unknown, reads: RepoReads): Promise<FileHistoryPage> {
   const r = readsOf(reads)
   const { folder, project } = rootOf(ws, rootRaw)
-  if (!historyPathOk(rel) || (rel === '' && isDir !== true)) throw combworkError(T.invalid, undefined, { kind: 'invalid' })
-  const got = await r.fileLog(folder, rel, isDir === true || rel === '', isCommitId(pinned) ? pinned : null, Number(page) || 1)
+  if (!historyPathOk(rel) || (rel === '' && isDir !== true) || (pinned != null && !isCommitId(pinned))) throw combworkError(T.invalid, undefined, { kind: 'invalid' })
+  const at = Date.now() + platformLimits.gitHistoryMs()
+  const got = await r.fileLog(folder, rel, isDir === true || rel === '', pinned ?? null, Number(page) || 1, at)
   const wf = got.commits.length ? await workflowOrNull(ws, project) : null
   const name = wf ? await agentNames(ws, project) : (id: string): string => id
   const submissions = new Map<number, readonly Submission[]>()
@@ -112,7 +117,7 @@ export async function fileHistoryAt(ws: WorkspaceService, rootRaw: unknown, rel:
     if (wf && card) {
       let subs = submissions.get(card.number)
       if (!subs) submissions.set(card.number, (subs = wf.state(card.number).submissions))
-      const agent = await submitter(r, folder, subs, c.hash)
+      const agent = await submitter(r, folder, subs, c.hash, at)
       if (agent) submittedBy = { agent, name: name(agent) }
     }
     rows.push({ hash: c.hash, short: c.short, parent: c.parent, author: c.author, email: c.email, date: c.date, subject: c.subject, files: c.files, card, submittedBy })

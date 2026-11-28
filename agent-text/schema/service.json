@@ -216,6 +216,11 @@
       "commit": "plain"
     }
   },
+  "service.fileHistory.timedOut": {
+    "placeholders": {
+      "seconds": "number"
+    }
+  },
   "service.fileHistory.unsupported": {
     "placeholders": {}
   },

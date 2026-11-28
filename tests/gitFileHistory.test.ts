@@ -30,12 +30,21 @@ const fakeWorkflow = {
   state: (n: number) => ({ submissions: board.submissions.get(n) ?? [] })
 }
 vi.mock('../src/main/workflow/service', () => ({ workflowFor: async () => (board.none ? null : fakeWorkflow) }))
+/** Git as History runs it: a test may answer in its place (`gitHook`), seeing each call's options; else the real one. */
+type GitArgs = [cwd: string, args: string[], maxBuffer?: number, input?: string, opts?: { timeout?: number }]
+let gitHook: ((...a: GitArgs) => Promise<unknown> | null) | null = null
+vi.mock('../src/main/git', async (original) => {
+  const m = await original<typeof import('../src/main/git')>()
+  return { ...m, git: (...a: GitArgs) => gitHook?.(...a) ?? m.git(...a) }
+})
 
 vi.setConfig({ testTimeout: timing('test.hang') })
 
 const H = await import('../src/main/platform/git/gitFileHistory')
 const P = await import('../src/main/fileHistoryPanel')
 const { gitRepoReads } = await import('../src/main/platform/git/gitRepoReads')
+const { platformLimits } = await import('../src/main/platform/limits')
+const historyMs = platformLimits.gitHistoryMs
 
 const base = tempDir('cw-filehistory-')
 afterAll(() => rmSync(base, { recursive: true, force: true }))
@@ -62,6 +71,8 @@ beforeEach(() => {
   board.attributed = new Map()
   board.submissions = new Map()
   board.none = false
+  gitHook = null
+  platformLimits.gitHistoryMs = historyMs
 })
 
 describe('parsing', () => {
@@ -213,7 +224,58 @@ describe('git reads', () => {
     const b = commit(proj, { 'a.txt': '1\n' }, 'base')
     const x = commit(proj, { 'a.txt': '2\n' }, 'x')
     const y = commit(proj, { 'a.txt': '3\n' }, 'y')
-    expect([...(await H.rangeCommits(proj, b, y))].sort()).toEqual([x, y].sort())
+    expect([...((await H.rangeCommits(proj, b, y)) ?? [])].sort()).toEqual([x, y].sort())
+  })
+
+  it("says nothing of a range whose commits aren't here, rather than failing", async () => {
+    const b = commit(proj, { 'a.txt': '1\n' }, 'base')
+    expect(await H.rangeCommits(proj, 'e'.repeat(40), b)).toBeNull()
+  })
+
+  it('refuses a later page whose pinned commit is gone, never reading it from the head now', async () => {
+    commit(proj, { 'f.txt': '1\n' }, 'one')
+    await expect(H.fileLog(proj, 'f.txt', false, 'f'.repeat(40), 2)).rejects.toThrow(/no commit fffffff/)
+  })
+
+  it("fails a read git can't do, rather than answering empty", async () => {
+    const plain = join(base, `plain${n}`)
+    mkdirSync(plain, { recursive: true })
+    await expect(H.fileLog(plain, 'x.txt', false, null, 1)).rejects.toThrow(/couldn't read the history/)
+  })
+
+  describe('bounded by Settings → Advanced', () => {
+    const ended = () => Promise.resolve({ ok: false, out: '', buf: Buffer.alloc(0), err: '', code: -1, timedOut: true })
+
+    it('gives each git what is left of the deadline, and refuses one git ended at it', async () => {
+      commit(proj, { 'f.txt': '1\n' }, 'one')
+      platformLimits.gitHistoryMs = () => 5000
+      const timeouts: number[] = []
+      gitHook = (_cwd, args, _max, _input, opts) => {
+        timeouts.push(opts?.timeout ?? -1)
+        // The log itself runs past its bound: git ends it.
+        return args.includes('log') ? ended() : null
+      }
+      await expect(H.fileLog(proj, 'f.txt', false, null, 1)).rejects.toThrow(/still reading the history after 5 seconds/)
+      expect(timeouts.length).toBeGreaterThan(1)
+      expect(timeouts.every((t) => t > 0 && t <= 5000)).toBe(true)
+    })
+
+    it('starts no git once the deadline has passed', async () => {
+      commit(proj, { 'f.txt': '1\n' }, 'one')
+      let ran = 0
+      gitHook = () => (ran++, null)
+      await expect(H.fileLog(proj, 'f.txt', false, null, 1, Date.now() - 1)).rejects.toThrow(/still reading the history/)
+      await expect(H.rangeCommits(proj, 'a'.repeat(40), 'b'.repeat(40), Date.now() - 1)).rejects.toThrow(/still reading the history/)
+      expect(ran).toBe(0)
+    })
+
+    it("refuses the page when its submissions' ranges run past it, never showing it without its agents", async () => {
+      const b = commit(proj, { 'f.txt': '0\n' }, 'start')
+      const r = commit(proj, { 'f.txt': '1\n' }, 'HI-12: one')
+      board.submissions.set(12, [{ id: 1, by: 'a-1', base: b, revision: r, head: null, key: null, files: [], round: 1, generation: 0, sameRevision: false, summary: '' } as Submission])
+      gitHook = (_cwd, args) => (args[0] === 'rev-list' && args[1]?.includes('..') ? ended() : null)
+      await expect(history('f.txt')).rejects.toThrow(/still reading the history/)
+    })
   })
 })
 
@@ -282,9 +344,11 @@ describe('the panel', () => {
     expect((await history('f.txt')).rows[0]).toMatchObject({ card: null, submittedBy: null })
   })
 
-  it('refuses a path outside the folder and a malformed side', async () => {
+  it('refuses a path outside the folder, a pin that is no commit id, and a malformed side', async () => {
     const a = commit(proj, { 'f.txt': '1\n' }, 'one')
     await expect(history('../x')).rejects.toThrow()
+    await expect(history('f.txt', false, 'HEAD', 2)).rejects.toThrow(/asked for wrongly/)
+    await expect(history('f.txt', false, 'f'.repeat(40), 2)).rejects.toThrow(/no commit fffffff/)
     await expect(history('')).rejects.toThrow()
     await expect(P.fileHistoryDiffAt(ws as unknown as Ws, proj, { commit: 'HEAD', path: 'f.txt' }, { commit: a, path: 'f.txt' }, gitRepoReads)).rejects.toThrow()
     await expect(P.fileHistoryDiffAt(ws as unknown as Ws, proj, null, null, gitRepoReads)).rejects.toThrow()

@@ -149,6 +149,8 @@ export const GITHUB_GH_MINUTES = 'cw.github.ghMinutes'
 export const GITHUB_PR_FOLLOW_MINUTES = 'cw.github.prFollowMinutes'
 /** HI-3473: how old a lock file of git's must be before Repository health calls it stale. */
 export const GIT_STALE_LOCK_SECONDS = 'cw.git.staleLockSeconds'
+/** HI-3475: the longest one read of the Files tab's History takes before Combwork ends git. */
+export const GIT_HISTORY_SECONDS = 'cw.git.historySeconds'
 /** HI-3473: the programs that count as a git that may hold a lock (Windows' process names). */
 export const GIT_PROCESS_NAMES = 'cw.git.processNames'
 /** HI-3372: the merge queue's own fetches and pushes. */
@@ -1074,6 +1076,20 @@ const SOURCES: readonly AdvancedSource[] = [
     kind: 'number',
     default: 60,
     min: 10,
+    max: 3600,
+    unit: 's',
+    applies: 'now'
+  },
+  // HI-3475: the Files tab's History: one page (its commits, their cards and who submitted them), a commit's diff of a
+  // file or the merge that brought one in, each read under this bound, git ended at it.
+  {
+    id: GIT_HISTORY_SECONDS,
+    group: 'cw',
+    title: msg({ id: 'settings.advanced.cw.git.historySeconds.title', defaultMessage: 'Git: longest a history read takes', description: "An advanced setting's title (Settings → Advanced), listed under Combwork, followed by its value in seconds: the Files tab's History panel (HI-3475)." }),
+    desc: msg({ id: 'settings.advanced.cw.git.historySeconds.desc', defaultMessage: "How long the Files tab's History may spend reading one page of a file's commits (with their cards), one commit's changes, or the merge that brought a commit in, before Combwork stops git and says so. A page usually takes well under a second; raise this for a very large repository whose history git reads slowly.", description: 'What the advanced setting "Git: longest a history read takes" does (Settings → Advanced, HI-3475).' }),
+    kind: 'number',
+    default: 60,
+    min: 5,
     max: 3600,
     unit: 's',
     applies: 'now'

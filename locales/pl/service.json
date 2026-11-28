@@ -50,6 +50,7 @@
   "service.fileHistory.failed": "Git nie mógł odczytać historii: {why}",
   "service.fileHistory.invalid": "Żądanie było nieprawidłowe: nic nie odczytano.",
   "service.fileHistory.noCommit": "Git nie ma commita {commit}: mógł zniknąć. Odśwież historię.",
+  "service.fileHistory.timedOut": "Git nadal odczytywał historię po {seconds, number} s, więc Combwork go zatrzymał. Spróbuj ponownie lub zwiększ Ustawienia → Zaawansowane → Git: najdłuższy czas odczytu historii.",
   "service.fileHistory.unsupported": "Kontrola wersji tego folderu nie ma historii do pokazania.",
   "service.files.badName": "„{name}” nie jest poprawną nazwą",
   "service.files.exists": "„{name}” już istnieje",

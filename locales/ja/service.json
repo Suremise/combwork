@@ -50,6 +50,7 @@
   "service.fileHistory.failed": "Git が履歴を読み取れませんでした：{why}",
   "service.fileHistory.invalid": "要求が正しくありません。何も読み取っていません。",
   "service.fileHistory.noCommit": "Git にコミット {commit} がありません。消えた可能性があります。履歴を更新してください。",
+  "service.fileHistory.timedOut": "Gitが{seconds, number}秒たっても履歴を読み取り中だったため、Combworkが停止しました。もう一度試すか、「設定」→「詳細」→「Git：履歴の読み取りの最長時間」を上げてください。",
   "service.fileHistory.unsupported": "このフォルダーのバージョン管理には表示できる履歴がありません。",
   "service.files.badName": "「{name}」は有効な名前ではありません",
   "service.files.exists": "「{name}」はすでに存在します",

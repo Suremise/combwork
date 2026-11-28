@@ -2294,7 +2294,7 @@ Each commit shows its message, its author and how long ago it was made (hover fo
 
 Click a file's commit to see what it changed in the file, in place of the editor. A renamed file's diff compares the file at its old path with the new one. **Back to file** shows the editor again, as you left it: unsaved edits and undo are kept. **Open commit** shows the commit's whole message, its other files and its actions (project folder only; see [A commit's details](#a-commits-details)).
 
-The list is read in pages of 50 (**Show more**) from the commit checked out when it was first read. If the branch moves meanwhile (a commit, a switch), a bar says so, and **Refresh** reads it again.
+The list is read in pages of 50 (**Show more**) from the commit checked out when it was first read. If the branch moves meanwhile (a commit, a switch), a bar says so, and **Refresh** reads it again. If that commit is gone altogether (after a reset, say), **Show more** says so and keeps the list as it is until you **Refresh**. Each read stops after a minute (**Settings → Advanced → Git: longest a history read takes**), saying so, with **Try again**. It takes well under a second even in a large repository.
 
 ### Viewing and editing files <a id="viewing-and-editing-files"></a>
 
