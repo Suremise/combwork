@@ -12,6 +12,7 @@ import type { RepoReads } from '../repoReads'
 import { viewSigning } from './gitSigning'
 import { operationState } from './gitOperationSteps'
 import { stashConflictIn } from './gitStashes'
+import * as fileHistory from './gitFileHistory'
 
 export const gitRepoReads: RepoReads = {
   changes: (root, base) => G.gitStatus(root, base),
@@ -25,6 +26,10 @@ export const gitRepoReads: RepoReads = {
   leftovers: (root, workTarget) => repo.leftoverInfo(root, workTarget),
   signing: (root, force) => viewSigning(root, force),
   history: (root, o) => repo.repoHistory(root, o),
+  fileLog: (root, rel, isDir, pinned, page, at) => fileHistory.fileLog(root, rel, isDir, pinned, page, at),
+  fileVersions: (root, left, right, at) => fileHistory.fileVersions(root, left, right, at),
+  introducedBy: (root, head, commit, at) => fileHistory.introducedBy(root, head, commit, at),
+  rangeCommits: (root, base, revision, at) => fileHistory.rangeCommits(root, base, revision, at),
   compareLines: (root, workTarget, slots) => compare.compareLines(root, workTarget, slots),
   compare: (root, base, head, page, pinned) => compare.compareBranches(root, base, head, page, pinned),
   compareDiff: (root, base, head, file, pinned) => compare.compareDiff(root, base, head, file, pinned),

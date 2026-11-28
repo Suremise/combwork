@@ -250,6 +250,8 @@ interface CombworkMessageValues {
   'tips.editTemplates.title': undefined
   'tips.externalTerminal.text': undefined
   'tips.externalTerminal.title': undefined
+  'tips.fileHistory.text': undefined
+  'tips.fileHistory.title': undefined
   'tips.fileLinks.text': undefined
   'tips.fileLinks.title': undefined
   'tips.fileRestore.text': undefined

@@ -26,6 +26,9 @@
 ### Added
 
 - **Preview: Combwork runs a web project's dev server, on a port of its own** (HI-3614). Off by default: turn on **Settings → Advanced → Preview: run projects' dev servers**, then set the command in **Project Settings → Preview**, which suggests one from your `package.json` scripts for you to confirm. Each preview runs in one place (the project folder, a slot or a review copy), only when asked, on a free port given in `PORT` from a range shared by all your projects and windows; Combwork checks the server it started is the one listening, and stops it with its slot's lease or review, its project or Combwork itself. It records the source it was started from. The Preview tab and the agents' tool come next.
+### Added
+
+- **A file's history in the Files tab** (HI-3475). **History**, above a file or in its right-click menu, opens a panel listing the commits that changed the file, following its renames, or every commit that changed a folder. Each shows the card its commit names (click it to open the card), the agent that submitted it for review, its author and when it was made. Click one to see what it changed in the file. **Back to file** returns to the editor with your unsaved edits kept. A commit naming no card can show which card's merge brought it in. It works in the project folder and in an agent's slot or worktree.
 
 ## 1.7.1 — 2026-11-26
 

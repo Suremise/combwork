@@ -53,6 +53,7 @@
   "shell.command.assistant.toggle": "Mostrar u ocultar el Asistente",
   "shell.command.console.showCapture": "Mostrar la captura en la carpeta",
   "shell.command.files.commitIgnore": "Hacer commit de .gitignore",
+  "shell.command.files.toggleHistory": "Mostrar u ocultar el historial del archivo",
   "shell.command.folderChanges.settle": "Hacer commit o apartar cambios",
   "shell.command.folderChanges.show": "Mostrar cambios sin commit",
   "shell.command.git.cancelRun": "Cancelar acción de Git",

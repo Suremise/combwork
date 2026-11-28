@@ -55,6 +55,7 @@ interface CombworkMessageValues {
   'shell.command.assistant.toggle': undefined
   'shell.command.console.showCapture': undefined
   'shell.command.files.commitIgnore': undefined
+  'shell.command.files.toggleHistory': undefined
   'shell.command.folderChanges.settle': undefined
   'shell.command.folderChanges.show': undefined
   'shell.command.git.cancelRun': undefined

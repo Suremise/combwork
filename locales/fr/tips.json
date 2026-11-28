@@ -228,6 +228,8 @@
   "tips.dialectsNewModel.title": "Un fichier de dialecte pour n’importe quel modèle",
   "tips.editTemplates.text": "Sélectionne un modèle dans la vue Modèles et choisis Modifier… : ajoute, copie, réordonne ou retire ses agents, modifie chacun dans la boîte de dialogue Paramètres de l’agent (son bouton Enregistrer enregistre aussi le modèle), renomme-le et choisis sa disposition.",
   "tips.editTemplates.title": "Modifier un modèle sur place",
+  "tips.fileHistory.text": "Historique, au-dessus d’un fichier dans l’onglet Fichiers, liste les commits qui l’ont modifié, en suivant ses renommages : chacun avec la carte que nomme son commit et l’agent qui l’a soumis. Cliquez sur l’un d’eux pour voir ce qu’il a changé ; Revenir au fichier conserve vos modifications.",
+  "tips.fileHistory.title": "Quelle carte a modifié ce fichier ?",
   "tips.fileLinks.text": "Les chemins de fichiers qu’affiche un agent, comme src/app.ts:42, sont des liens : fais Ctrl+clic sur l’un d’eux pour ouvrir le fichier dans l’onglet Fichiers à cette ligne.",
   "tips.fileLinks.title": "Ctrl+clic sur un chemin dans le terminal",
   "tips.fileRestore.text": "Fais un clic droit sur un fichier modifié dans l’onglet Fichiers : Abandonner les modifications… le ramène au commit extrait, et Restaurer depuis prend sa version sur la branche cible ou dans l’un de ses commits. Les deux montrent d’abord le diff et gardent ses modifications dans un stash.",

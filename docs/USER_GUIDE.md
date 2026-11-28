@@ -2283,6 +2283,20 @@ Two more entries of the Git section put one file back to another version. Each a
 
 They act on one file at a time, and refuse while an agent or its session is working in the project folder, a run is going there, git is in the middle of a merge or rebase, or the file is in conflict.
 
+### A file's history <a id="file-history"></a>
+
+**History** (the clock button above a file, **History** in a file's or folder's right-click menu, or **Toggle File History** in the command palette) opens a panel on the right listing the commits that changed the file or folder selected, newest first. With nothing selected, it's the history of the whole folder shown. It works in the project folder and in an agent's slot or worktree, each on the branch it has checked out. A file's history follows its renames: a commit that renamed it says **Renamed from** its old path. A folder's history lists every commit that changed a file under it. Click a folder's commit to see those files.
+
+Each commit shows its message, its author and how long ago it was made (hover for the exact time), and its short hash (click to copy the full one).
+
+- **Its card** shows as the card's key. Click it to open the card. Combwork takes the card only from the commit itself: its `Combwork-Card` trailer, else Combwork's own record of whose commit it was when it was made in the project folder, else a key at the start of its message (`HI-12: …`). A key elsewhere in the message, such as "fixes HI-12's bug", isn't a link, and neither is another project's card.
+- **submitted by** names the agent that submitted the commit for review, in one of its card's submissions. It doesn't say who wrote it. Git records one author for everyone in a Combwork project, so a commit of yours that an agent submitted says the same.
+- **Find its merge**, on a commit naming no card, looks for the merge that brought it into the branch, and shows **Came in with HI-12's merge** when that merge names a card. That card merged the commit; it didn't necessarily make it. When it isn't clear (the commit was made on the branch itself, or several branches were merged at once), nothing is said.
+
+Click a file's commit to see what it changed in the file, in place of the editor. A renamed file's diff compares the file at its old path with the new one. **Back to file** shows the editor again, as you left it: unsaved edits and undo are kept. **Open commit** shows the commit's whole message, its other files and its actions (project folder only; see [A commit's details](#a-commits-details)).
+
+The list is read in pages of 50 (**Show more**) from the commit checked out when it was first read. If the branch moves meanwhile (a commit, a switch), a bar says so, and **Refresh** reads it again. If that commit is gone altogether (after a reset, say), **Show more** says so and keeps the list as it is until you **Refresh**. Each read stops after a minute (**Settings → Advanced → Git: longest a history read takes**), saying so, with **Try again**. It takes well under a second even in a large repository.
+
 ### Viewing and editing files <a id="viewing-and-editing-files"></a>
 
 Select a file and it opens on the right, ready to edit, with syntax highlighting for code, SQL, XML, JSON, YAML and many more. **Ctrl+S** (or **Save**) saves it. Some file types also get a nicer view, and the buttons above the file switch between them:

@@ -199,6 +199,7 @@ import type { StashApplied, StashFile, StashList, StashRef, StashRequest } from 
 import type { BranchMoves, RestorePlan, RestoreRequest } from './gitMoves'
 import type { FileCommits, FileRestored, FileRestorePlan, FileRestoreRequest, RestoreSource } from './gitFileRestore'
 import type { CommitActionDone, CommitActionRequest, CommitDetail } from './gitCommitView'
+import type { CommitIntro, FileHistoryPage, FileSide, FileVersions } from './fileHistory'
 import type { BoardFoldChange } from './tasks'
 import type { CardCost, CardRoundCosts, LaneCost } from './cardCosts'
 import type { ConsoleEvent, ConsoleRecordingInfo, ConsoleSource } from './devConsole'
@@ -1254,6 +1255,12 @@ export interface CombworkRequests {
   'git:deleteRemoteBranches': (projectPath: string, remote: string, branches: BranchAt[], op?: string) => string
   'git:branchDrops': (projectPath: string, branch: string) => BranchDrops
   'git:history': (projectPath: string, ref?: string | null, page?: number) => GitHistory
+  /** HI-3475: the Files tab's History of a file (following renames) or folder in the folder shown, a page at a time from `pinned` (page 1's head). */
+  'files:history': (root: string, rel: string, isDir: boolean, pinned: string | null, page: number) => FileHistoryPage
+  /** HI-3475: a file at two commits, each side at its own path from the repository's top (null: no side). */
+  'files:historyDiff': (root: string, left: FileSide | null, right: FileSide | null) => FileVersions
+  /** HI-3475: the merge that brought `commit` into `head`'s line, and its card ("came in with"); null when none can be said. */
+  'files:historyIntro': (root: string, head: string, commit: string) => CommitIntro | null
   /** Each action replies with what it did, in a sentence. Switching (and creating a branch to switch to) or pulling is refused while an agent works in the folder or its merge slot is held (`folderBusy`). */
   'git:switch': (projectPath: string, branch: string) => string
   /** Update from <target> (HI-1180): what it would do to a branch (its dialog), and the update, merge or rebase, saying what it did. */

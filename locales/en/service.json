@@ -235,6 +235,26 @@
     "defaultMessage": "git rm --cached failed: {why}",
     "description": "An error untracking the project's .combwork folder from git: the git command (git rm --cached: keep it) failed; {why} is git's own first line, or why git can't run."
   },
+  "service.fileHistory.failed": {
+    "defaultMessage": "Git couldn't read the history: {why}",
+    "description": "HI-3475: an error in the Files tab's History panel: git's own command failed; {why} is git's error line, in English."
+  },
+  "service.fileHistory.invalid": {
+    "defaultMessage": "That was asked for wrongly: nothing was read.",
+    "description": "HI-3475: an error from the Files tab's History panel: the request was malformed (not reached from the window)."
+  },
+  "service.fileHistory.noCommit": {
+    "defaultMessage": "Git has no commit {commit}: it may be gone. Refresh the history.",
+    "description": "HI-3475: an error in the Files tab's History panel: a commit the panel showed ({commit}, a short id) isn't in the repository any more."
+  },
+  "service.fileHistory.timedOut": {
+    "defaultMessage": "Git was still reading the history after {seconds, number} seconds, so Combwork stopped it. Try again, or raise Settings → Advanced → Git: longest a history read takes.",
+    "description": "HI-3475: an error in the Files tab's History panel: reading a page of history, a commit's diff or its merge ran past the advanced setting's time ({seconds}) and git was ended. Keep the setting's name as Settings → Advanced shows it."
+  },
+  "service.fileHistory.unsupported": {
+    "defaultMessage": "This folder's version control has no history to show.",
+    "description": "HI-3475: an error from the Files tab's History panel: the folder's version control can't read a file's history."
+  },
   "service.files.badName": {
     "defaultMessage": "\"{name}\" is not a valid name",
     "description": "An error making or renaming a file or folder: {name} is empty, . or .., or has a character Windows can't have in a name."

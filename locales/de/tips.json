@@ -228,6 +228,8 @@
   "tips.dialectsNewModel.title": "Eine Dialektdatei für jedes Modell",
   "tips.editTemplates.text": "Wähle in der Ansicht „Vorlagen“ eine Vorlage und dann „Bearbeiten…“: Füge Agenten hinzu, kopiere, sortiere oder entferne sie, ändere jeden im Dialog „Agent-Einstellungen“ (sein „Speichern“ speichert auch die Vorlage), benenne sie um und wähle ihr Layout.",
   "tips.editTemplates.title": "Eine Vorlage direkt bearbeiten",
+  "tips.fileHistory.text": "„Verlauf“ über einer Datei im Tab „Dateien“ listet die Commits, die sie geändert haben, auch über Umbenennungen hinweg: jeder mit der Karte, die sein Commit nennt, und dem Agent, der ihn eingereicht hat. Klicke auf einen, um zu sehen, was er geändert hat; „Zurück zur Datei“ behält deine Änderungen.",
+  "tips.fileHistory.title": "Welche Karte hat diese Datei geändert?",
   "tips.fileLinks.text": "Dateipfade, die ein Agent ausgibt, etwa src/app.ts:42, sind Links: Strg+Klick öffnet die Datei im Tab „Dateien“ an dieser Zeile.",
   "tips.fileLinks.title": "Strg+Klick auf einen Pfad im Terminal",
   "tips.fileRestore.text": "Klicke im Tab Dateien mit der rechten Maustaste auf eine geänderte Datei: Änderungen verwerfen… setzt sie auf den ausgecheckten Commit zurück, und Wiederherstellen aus holt ihre Version auf dem Zielbranch oder in einem ihrer Commits. Beide zeigen zuerst den Diff und bewahren ihre Änderungen in einem Stash auf.",

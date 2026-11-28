@@ -248,6 +248,8 @@
   "tips.editTemplates.title": "Edit a template in place",
   "tips.externalTerminal.text": "Open External Terminal Here opens Windows Terminal in the project's folder, or Command Prompt where Windows Terminal doesn't open. To always get Command Prompt or PowerShell, choose it in Settings → General → External terminal.",
   "tips.externalTerminal.title": "Choose your external terminal",
+  "tips.fileHistory.text": "History, above a file in the Files tab, lists the commits that changed it, following its renames: each with the card its commit names and the agent that submitted it. Click one to see what it changed; Back to file keeps your edits.",
+  "tips.fileHistory.title": "Which card changed this file?",
   "tips.fileLinks.text": "File paths an agent prints, like src/app.ts:42, are links: Ctrl+click one to open the file in the Files tab at that line.",
   "tips.fileLinks.title": "Ctrl+click a path in the terminal",
   "tips.fileRestore.text": "Right-click a changed file in the Files tab: Discard Changes… puts it back to the commit checked out, and Restore From takes its version on the target branch or in one of its commits. Both show the diff first, and keep its changes in a stash.",

@@ -789,6 +789,11 @@ export class FactStore {
     return this.conn.read((db) => db.prepare('SELECT sha, card, how FROM folder_commits WHERE folder = ? ORDER BY id').all(folder) as { sha: string; card: number | null; how: string }[])
   }
 
+  /** HI-3475: the card a commit seen in a shared folder was attributed to (null: none), or undefined when it wasn't seen there. */
+  folderCommitCard(folder: string, sha: string): number | null | undefined {
+    return this.conn.read((db) => (db.prepare('SELECT card FROM folder_commits WHERE folder = ? AND sha = ?').get(folder, sha) as { card: number | null } | undefined)?.card)
+  }
+
   recordFolderCommit(folder: string, sha: string, card: number | null, how: string): boolean {
     return this.conn.write((db) => Number(db.prepare('INSERT OR IGNORE INTO folder_commits (folder, sha, card, how) VALUES (?, ?, ?, ?)').run(folder, sha, card, how).changes) > 0)
   }

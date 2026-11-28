@@ -1892,6 +1892,10 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
       }) }
     },
     'git:branchDrops': (p, name) => lineRepoReads().lineDrops(p, String(name ?? '')),
+    // HI-3475: the Files tab's History, in the folder it shows (the project folder, a slot, a worktree): reads only.
+    'files:history': async (root, rel, isDir, pinned, page) => (await import('./fileHistoryPanel')).fileHistoryAt(workspace, root, rel, isDir, pinned, page, lineRepoReads()),
+    'files:historyDiff': async (root, left, right) => (await import('./fileHistoryPanel')).fileHistoryDiffAt(workspace, root, left, right, lineRepoReads()),
+    'files:historyIntro': async (root, head, commit) => (await import('./fileHistoryPanel')).fileHistoryIntroAt(workspace, root, head, commit, lineRepoReads()),
     'git:history': async (p, ref, page) => {
       p = workspace.assertProject(p)
       const reads = lineRepoReads()

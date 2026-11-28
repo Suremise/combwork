@@ -60,6 +60,11 @@ interface CombworkMessageValues {
   'service.combworkVcs.exitCode': { code: string | number }
   'service.combworkVcs.noRepo': undefined
   'service.combworkVcs.rmFailed': { why: string | number }
+  'service.fileHistory.failed': { why: string | number }
+  'service.fileHistory.invalid': undefined
+  'service.fileHistory.noCommit': { commit: string | number }
+  'service.fileHistory.timedOut': { seconds: number }
+  'service.fileHistory.unsupported': undefined
   'service.files.badName': { name: string | number }
   'service.files.exists': { name: string | number }
   'service.files.existsIn': { root: string; name: string | number; folder: string | number }

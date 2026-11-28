@@ -17113,3 +17113,128 @@ button.progress-lane-retry {
 .file-restore-commits > .git-row.current {
   background: var(--accent-soft);
 }
+
+/* HI-3475: the Files tab's History panel, right of the file or folder shown, and a commit's diff opened from it over
+   the editor (which stays beneath, hidden, its edits kept). */
+.editor-host[hidden] {
+  display: none !important;
+}
+.files-main {
+  flex-direction: row;
+  min-height: 0;
+}
+.files-main-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.file-history {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-left: 1px solid var(--border);
+}
+.file-history-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--border);
+}
+.file-history-head .path {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.file-history-head .spacer {
+  flex: 1;
+}
+.file-history-list {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 4px 0;
+}
+.history-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 2px 6px;
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--border);
+}
+.history-row.selected {
+  background: var(--accent-soft);
+}
+.history-main {
+  min-width: 0;
+  cursor: pointer;
+}
+.history-subject {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.history-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 6px;
+}
+.history-card {
+  padding: 0 4px;
+  font-weight: 600;
+}
+.history-side {
+  display: flex;
+  align-items: flex-start;
+  gap: 2px;
+}
+.history-intro,
+.history-files {
+  grid-column: 1 / -1;
+}
+.history-files .row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  padding: 2px 4px 2px 18px;
+}
+.history-files .row .label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.history-files .row.selected {
+  background: var(--accent-soft);
+}
+.history-more {
+  margin: 6px 8px;
+}
+.history-diff {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.history-diff-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  min-width: 0;
+}
+.history-diff-head strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.history-diff > .faint.small {
+  padding: 0 8px;
+}

@@ -155,6 +155,7 @@ export const SUITES = [
   { name: 'donemove' },
   { name: 'drafts' },
   { name: 'editor' },
+  { name: 'filehistory' },
   { name: 'filelinks' },
   { name: 'files' },
   { name: 'flightrecorder' },

@@ -228,6 +228,8 @@
   "tips.dialectsNewModel.title": "Um arquivo de dialeto para qualquer modelo",
   "tips.editTemplates.text": "Selecione um modelo na visualização Modelos e escolha Editar…: adicione, copie, reordene ou remova os agentes dele, altere cada um no diálogo Configurações do agente (o Salvar dele também salva o modelo), renomeie o modelo e escolha o layout.",
   "tips.editTemplates.title": "Edite um modelo ali mesmo",
+  "tips.fileHistory.text": "Histórico, acima de um arquivo na guia Arquivos, lista os commits que o mudaram, seguindo suas renomeações: cada um com o cartão que seu commit indica e o agente que o enviou. Clique em um para ver o que ele mudou; Voltar ao arquivo mantém suas edições.",
+  "tips.fileHistory.title": "Qual cartão mudou este arquivo?",
   "tips.fileLinks.text": "Caminhos de arquivo que um agente imprime, como src/app.ts:42, são links: use Ctrl+clique em um para abrir o arquivo na aba Arquivos, naquela linha.",
   "tips.fileLinks.title": "Ctrl+clique em um caminho no terminal",
   "tips.fileRestore.text": "Clique com o botão direito em um arquivo alterado na aba Arquivos: Descartar alterações… o volta ao commit atual, e Restaurar de pega a versão dele no branch de destino ou em um dos commits dele. Os dois mostram o diff primeiro e guardam as alterações dele em um stash.",
