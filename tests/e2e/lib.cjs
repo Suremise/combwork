@@ -2568,26 +2568,70 @@ async function workflowTab(scope, optionOrTab, ms = timing('hang.ui')) {
  * HI-3591: a tab (a Tabs button) chosen with one click, unless it is chosen already; resolves once it is selected. A click
  * that doesn't choose it is never clicked again: it throws, saying what the row shows instead, what is at the tab's centre
  * and whether the tab is still the node clicked (a replaced one loses a click pressed on the old), so a lost click is
- * seen rather than retried.
+ * seen rather than retried. HI-3623: it also says what the click's events reached and where the tab was at each (a press
+ * and a release on different elements make no click), and what changed in the page between the press and the click (a
+ * node removed around the tab drops the press; Playwright checks only the press's target). A click that chose its tab
+ * after such a change logs it, so a near miss is seen too.
  */
 async function chooseTab(tab, what, ms = timing('hang.ui')) {
   if ((await tab.getAttribute('aria-selected')) === 'true') return
-  await tab.evaluate((el) => (window.__cwTabClicked = el))
+  await tab.evaluate((el) => {
+    window.__cwTabClick?.stop()
+    const seen = []
+    const t0 = performance.now()
+    const name = (n) => (n instanceof Element ? `${n.tagName.toLowerCase()}${n.getAttribute('data-tab') ? `[${n.getAttribute('data-tab')}]` : ''}.${String(n.className).slice(0, 40)}` : String(n))
+    const at = () => Math.round(performance.now() - t0)
+    let pressed = false
+    const onEvent = (e) => {
+      if (e.type === 'pointerdown') pressed = true
+      if (e.type === 'click') pressed = false
+      const r = el.getBoundingClientRect()
+      seen.push(`${at()} ${e.type} at ${e.clientX},${e.clientY} on ${name(e.target)}, tab at ${Math.round(r.x)},${Math.round(r.y)}${el.isConnected ? '' : ', tab detached'}`)
+    }
+    const TYPES = ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click']
+    for (const type of TYPES) window.addEventListener(type, onEvent, { capture: true })
+    // The tab's own panel and the section's body change as a section is chosen: not what moves the tab row.
+    const mo = new MutationObserver((records) => {
+      for (const r of records) {
+        const around = [...r.removedNodes].some((n) => n === el || n.contains(el))
+        if (around || (pressed && !r.target.closest?.('[role="tabpanel"]'))) seen.push(`${at()} ${around ? 'removed around the tab: ' : ''}${r.type} ${name(r.target)}${r.attributeName ? ` @${r.attributeName}` : ''} +${[...r.addedNodes].map(name).join('|')} -${[...r.removedNodes].map(name).join('|')}`)
+      }
+    })
+    mo.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['class', 'style', 'hidden'] })
+    window.__cwTabClick = {
+      el,
+      seen,
+      stop: () => {
+        for (const type of TYPES) window.removeEventListener(type, onEvent, { capture: true })
+        mo.disconnect()
+      }
+    }
+  })
   await tab.click()
-  if (await until(async () => (await tab.getAttribute('aria-selected')) === 'true', ms)) return
+  const chosen = await until(async () => (await tab.getAttribute('aria-selected')) === 'true', ms)
   const seen = await tab
     .evaluate((el) => {
+      const click = window.__cwTabClick
+      click?.stop()
       const r = el.getBoundingClientRect()
       const hit = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2)
       return {
         chosen: el.closest('[role="tablist"]')?.querySelector('[aria-selected="true"]')?.getAttribute('data-tab') ?? null,
         box: [Math.round(r.x), Math.round(r.y), Math.round(r.width), Math.round(r.height)],
         atCentre: hit?.closest('[role="tab"]')?.getAttribute('data-tab') ?? hit?.className ?? null,
-        sameNode: window.__cwTabClicked === el,
-        modal: document.querySelectorAll('[aria-modal="true"]').length
+        sameNode: click?.el === el,
+        modal: document.querySelectorAll('[aria-modal="true"]').length,
+        events: (click?.seen ?? []).slice(0, 40)
       }
     })
     .catch((e) => String(e))
+  if (chosen) {
+    // A near miss: the tab moved under the press, or the page changed between the press and the click.
+    const events = typeof seen === 'string' ? [] : seen.events
+    const where = new Set(events.filter((l) => / (pointerdown|mouseup) /.test(l)).map((l) => l.split(', tab at ')[1]))
+    if (where.size > 1 || events.some((l) => !/^\d+ (pointerdown|mousedown|pointerup|mouseup|click) /.test(l))) console.log(`INFO ${what} was chosen, but its click saw changes (HI-3623, ${waitCaller(new Error().stack)}): ${JSON.stringify(events)}`)
+    return
+  }
   throw new Error(`${what} wasn't chosen by its click: ${JSON.stringify(seen)}`)
 }
 
