@@ -153,9 +153,19 @@ const check = (name, ok, extra = '') => {
     await row('many.txt').click()
     const many = page.locator('[data-file-history="many.txt"]')
     check('a long history shows its first page, with Show more', !!(await lib.until(async () => (await many.locator('[data-history-row]').count()) === 50 && (await many.locator('[data-action="history-more"]').count()) === 1, HUNG_MS)))
+    // The commit the list was pinned to, replaced and then gone: its loose object removed (no gc, which the app would
+    // meet mid-run).
+    const pinned = g('rev-parse', 'HEAD')
     g('commit', '--amend', '-qm', 'many 50, amended')
-    g('reflog', 'expire', '--expire=now', '--all')
-    g('gc', '-q', '--prune=now')
+    fs.rmSync(path.join(alpha, '.git', 'objects', pinned.slice(0, 2), pinned.slice(2)))
+    check('the pinned commit is gone from the repository', (() => {
+      try {
+        g('cat-file', '-e', `${pinned}^{commit}`)
+        return false
+      } catch {
+        return true
+      }
+    })())
     await many.locator('[data-action="history-more"]').click()
     check('Show more from a pruned commit says it is gone', !!(await lib.until(async () => /no commit .* Refresh the history/.test(await text(many)), HUNG_MS)), await text(many.locator('.banner')))
     check('…and keeps the page shown', (await many.locator('[data-history-row]').count()) === 50)
