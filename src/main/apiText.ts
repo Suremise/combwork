@@ -242,6 +242,7 @@ export const API = {
     hidden: agentMsg({ id: 'api.doc.hidden', text: '{path} is in Combwork\'s or git\'s own folder: read shared notes as shared:<path>' }),
     noHeadings: agentMsg({ id: 'api.doc.noHeadings', text: '{doc} has no headings.' }),
     noSection: agentMsg({ id: 'api.doc.noSection', text: 'No section "{asked}" in {doc}. Closest: {list}.' }),
+    notBundled: agentMsg({ id: 'api.doc.notBundled', text: 'Combwork ships no {path}: its own guide is combwork:USER_GUIDE.md', note: 'HI-3622: a combwork: path that names no document Combwork ships (only its user guide).' }),
     notFound: agentMsg({ id: 'api.doc.notFound', text: 'Not found: {path}' }),
     notMarkdown: agentMsg({ id: 'api.doc.notMarkdown', text: '{path} isn\'t a Markdown file (.md)' }),
     outside: agentMsg({ id: 'api.doc.outside', text: '{path} isn\'t inside {where, select, shared {the shared notes} other {the project}}: give a path relative to it' }),

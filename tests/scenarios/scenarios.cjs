@@ -7,7 +7,7 @@
 // commands: those runs check the harness, the board rules and Combwork's own costs (benchmarks) for free. The real CLIs are the model trials (opt-in, see README.md).
 //
 // Fixture version: bump when a scenario's setup or checks change, so results can be compared across versions.
-const FIXTURES_VERSION = 144
+const FIXTURES_VERSION = 145
 
 /**
  * long-doc-section's design document (#817): about 40,000 characters in 36 sections, one of which (Retry policy) holds
@@ -1336,6 +1336,40 @@ module.exports.SCENARIOS = [
         ["named the window's route (Clean Up Merged Branches…)", route >= 0, reply.slice(0, 300)],
         ['named it before any git command', route >= 0 && (command < 0 || route < command), `route at ${route}, command at ${command}`],
         ['deleted no branch itself', (o.branches ?? []).includes('old-login') && (o.branches ?? []).includes('old-search'), JSON.stringify(o.branches)]
+      ]
+    }
+  },
+  // HI-3622: a route that isn't the rule's example (Close Shipped Issues…, in the Task Board's From GitHub… → Issues),
+  // looked up in the guide Combwork ships (combwork:USER_GUIDE.md) and given in full, never guessed: HI-3595's first
+  // trial had Claude Code search the disk for the guide and Codex guess a wrong path.
+  {
+    id: 'assistant-guide-route',
+    title: "HI-3622: asked to close the issues a release shipped, the Assistant reads the window's route in Combwork's own user guide (combwork:USER_GUIDE.md) and gives it in full (Task Board → From GitHub… → Issues → Close Shipped Issues…), before any gh command, and closes none itself",
+    role: 'assistant',
+    control: 'agents',
+    async setup(c) {
+      c.git('remote', 'add', 'origin', 'https://github.com/acme/app.git')
+    },
+    prompt: "alpha's 1.7.0 release is published on GitHub now. Close the issues it shipped, please.",
+    fake: () =>
+      'cw cw_doc_outline {"path":"combwork:USER_GUIDE.md","depth":3} then cw cw_read_section {"path":"combwork:USER_GUIDE.md","heading":"#github-issues"} then say In Combwork, open alpha’s Task Board → From GitHub… → Issues → Close Shipped Issues…, and choose 1.7.0: it lists the Done cards linked to an issue whose work that release shipped, and closes the ones you tick. By hand it would be gh issue close for each.',
+    expect: (o) => {
+      const reply = String(o.finalReply ?? '')
+      const guideReads = ran(o, 'cw_read_section').filter((x) => /^combwork:user_guide\.md$/i.test(String(argsOf(x).path ?? '').trim()))
+      // Each step of the route after the one before it.
+      let at = 0
+      for (const step of [/Task Board/i, /From GitHub/i, /Issues/, /Close Shipped Issues/i]) {
+        const i = at === null ? -1 : reply.slice(at).search(step)
+        at = i < 0 ? null : at + i + 1
+      }
+      const route = reply.search(/Close Shipped Issues/i)
+      const command = reply.search(/gh\s+issue\s+close/i)
+      const closing = (o.tools ?? []).filter((t) => /gh(\.exe)?\s+issue\s+close|issues\/\d+.*state.*closed/i.test(JSON.stringify(t.input ?? '')))
+      return [
+        ["read a section of Combwork's own guide (combwork:USER_GUIDE.md)", guideReads.length > 0, o.combworkCalls.map((x) => `${x.tool}${x.ok ? '' : '!'} ${String(argsOf(x).path ?? '')}`).join(', ')],
+        ['gave the route in full, in order (Task Board → From GitHub… → Issues → Close Shipped Issues…)', at !== null, reply.slice(0, 400)],
+        ['named it before any gh command', route >= 0 && (command < 0 || route < command), `route at ${route}, command at ${command}`],
+        ['closed no issue itself', closing.length === 0, JSON.stringify(closing.map((t) => t.input)).slice(0, 300)]
       ]
     }
   },

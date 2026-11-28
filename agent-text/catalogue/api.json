@@ -677,6 +677,10 @@
   "api.doc.noSection": {
     "text": "No section \"{asked}\" in {doc}. Closest: {list}."
   },
+  "api.doc.notBundled": {
+    "text": "Combwork ships no {path}: its own guide is combwork:USER_GUIDE.md",
+    "note": "HI-3622: a combwork: path that names no document Combwork ships (only its user guide)."
+  },
   "api.doc.notFound": {
     "text": "Not found: {path}"
   },

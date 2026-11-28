@@ -385,7 +385,7 @@ Returns `{ ok: true, path }`. Combwork shows a notification with a link to the n
 
 ### Documents by section
 
-For long plans and notes (#817): a Markdown document's outline, then only the sections needed. `path` is a project file, relative to the project (`docs/PLAN.md`), or a shared note as `shared:<path>` (`shared:plans/i18n.md`).
+For long plans and notes (#817): a Markdown document's outline, then only the sections needed. `path` is a project file, relative to the project (`docs/PLAN.md`), or a shared note as `shared:<path>` (`shared:plans/i18n.md`), or Combwork's own user guide as `combwork:USER_GUIDE.md` (HI-3622): the copy this build ships, as its Docs view shows it, read by anyone, whatever `project` or `from` says; any other `combwork:` name is refused (404).
 
 `GET /v1/docs/outline?path=docs/PLAN.md&project=api` — `{ path, size, headings: [{ level, text, slug, line, size }] }`: every heading in order, with its level (1–6), its text as shown, its slug, its line (from 1) and its section's size in characters (the heading to the next heading of its level or higher, so subsections included). `size` is the document's.
 
