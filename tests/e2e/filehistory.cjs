@@ -181,7 +181,12 @@ const check = (name, ok, extra = '') => {
     await page.keyboard.press('Control+S')
     check('the edit saves to the file', !!(await lib.until(async () => fs.readFileSync(path.join(alpha, 'doc.txt'), 'utf8').includes('unsaved line'), HUNG_MS)))
   } finally {
-    await app.close()
+    // Bounded, and a check: a close that hangs fails here, saying what was open, rather than holding the run.
+    const open = await page.locator('.dialog, .modal').allInnerTexts().catch(() => [])
+    let timer
+    const closed = await Promise.race([app.close().then(() => true), new Promise((r) => (timer = setTimeout(() => r(false), lib.timing('app.closeMs'))))])
+    clearTimeout(timer)
+    check('the app closes', closed, `open as it closed: ${JSON.stringify(open)}`)
   }
   console.log(failed ? `${failed} check(s) failed` : 'all checks passed')
   process.exit(failed ? 1 : 0)
