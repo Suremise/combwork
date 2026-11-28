@@ -428,6 +428,36 @@ describe("a preview's lifetime and its ports' owners (HI-3614 round 1)", () => {
     expect(r.at(folder)).toMatchObject({ held: true })
   })
 
+  it("a page whose guard's end isn't proved keeps the place held whatever its server did: a new lease's start is refused, a pool's question answered no, until the guard is proved gone (round 2)", async () => {
+    let guardGone = false
+    let teardowns = 0
+    const { r, table, launches } = fakeRunner({ teardown: async () => (teardowns++, guardGone) })
+    const log: string[] = []
+    const folder = place('slot-a').folder
+    const first = r.start('P', place('slot-a', 'old', folder), { command: 'x' })
+    await waitUntil(() => launches.length === 1)
+    table.push({ port: 53000, pid: 101 })
+    launches[0].answer({ ...fakeServer(101, log, 'old'), job: 'preview-0a1b' })
+    const v = await first
+    // Its server's end is proved; its page's guard's isn't.
+    expect(await r.stopWhere((x) => x.place.generation === 'old', { kind: 'placeEnded' })).toEqual({ stopped: 1, held: ['preview-0a1b'] })
+    expect(r.at(folder)).toMatchObject({ id: v.id, held: true })
+    expect(r.heldPorts()).toEqual([53000])
+    // A pool's settle of the job it keeps: the server's job is gone, but the hold isn't cleared.
+    expect(await r.retryHeldJob('preview-0a1b')).toBe(false)
+    // The slot's next lease in the same folder: refused, nothing launched.
+    table.length = 0
+    expect(await r.start('P', place('slot-a', 'new', folder), { command: 'x' })).toMatchObject({ state: 'stopped', end: { kind: 'placeHeld', preview: v.id } })
+    expect(launches.length).toBe(1)
+    // The guard proved gone at last: the pool's question says so, and the place and port are free.
+    guardGone = true
+    expect(await r.retryHeldJob('preview-0a1b')).toBe(true)
+    expect(r.heldPorts()).toEqual([])
+    expect(r.at(folder)).toMatchObject({ held: false })
+    expect(await r.retryHeldJob('preview-0a1b')).toBe(true)
+    expect(teardowns).toBeGreaterThanOrEqual(4)
+  })
+
   it("keeps its place and ports held when its server's end can't be proved: a new lease's start there is refused until it is", async () => {
     const { r, table, launches } = fakeRunner()
     const log: string[] = []

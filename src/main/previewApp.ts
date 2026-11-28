@@ -26,7 +26,7 @@ import { PreviewGuard } from './previewGuard'
 import { PreviewShows } from './previewShown'
 import { openableUrl } from '../shared/previewPolicy'
 import { createLogger, userText } from './logger'
-import { onPlaceEnded } from './placeEnds'
+import { onPlaceEnded, setPreviewHoldCheck } from './placeEnds'
 import { samePlace } from './places'
 import { bindFree, readListeners } from './previewPorts'
 import { PreviewRunner, rangeOf, type Launched } from './previewRunner'
@@ -490,6 +490,8 @@ export function startPreviews(): void {
     if (!previewOn() && runner) void runner.stopWhere(() => true, { kind: 'turnedOff' })
   })
   WorkspaceService.closingTasks.add(closeWorkspace)
+  // A slot's or copy's hold for a preview is cleared only once that preview's server and page are proved gone (round 2).
+  setPreviewHoldCheck(async (job) => (runner ? runner.retryHeldJob(job) : true))
 }
 
 /** Combwork quitting: every preview's server ended. */
@@ -498,5 +500,6 @@ export async function stopPreviews(): Promise<void> {
   offAdvanced?.()
   offEnds = offAdvanced = null
   WorkspaceService.closingTasks.delete(closeWorkspace)
+  setPreviewHoldCheck(null)
   if (runner) await runner.stopWhere(() => true, { kind: 'quitting' })
 }

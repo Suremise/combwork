@@ -33,3 +33,24 @@ export async function placeEnded(e: PlaceEnd): Promise<string[]> {
   for (const r of await Promise.allSettled(work)) if (r.status === 'fulfilled' && r.value) held.push(...r.value.held)
   return held
 }
+
+/** A job a preview holds a place for (its server's job, or its own id when it has none): HI-3614/HI-3615. */
+export const isPreviewHold = (job: string): boolean => /^(preview|pv)-[0-9a-f]+$/.test(job)
+
+let previewHeld: ((job: string) => Promise<boolean>) | null = null
+
+/** The Preview's check of a hold (HI-3615 round 2): whether everything of that preview is proved gone, its page's guard too. */
+export function setPreviewHoldCheck(fn: ((job: string) => Promise<boolean>) | null): void {
+  previewHeld = fn
+}
+
+/**
+ * A pool's settle of a job it keeps on a slot or copy (HI-3615 round 2): its processes proved ended (`settle`), and, for a
+ * preview's hold, the preview's own proof too: its server's job ending doesn't prove its page's proxy (a process of its
+ * own) gone. True only with both.
+ */
+export async function settleHeld(job: string, settle: (job: string) => Promise<boolean>): Promise<boolean> {
+  if (!(await settle(job))) return false
+  if (!isPreviewHold(job) || !previewHeld) return true
+  return previewHeld(job).catch(() => false)
+}

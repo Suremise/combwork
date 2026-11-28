@@ -241,16 +241,30 @@ export class PreviewGuard {
    * tunnel opened before, included), whatever the page or the partition does. Then the page, and the partition's
    * connections closed (bounded: nothing here waits on Chromium for long). The partition is in memory and never used again.
    */
+  /**
+   * Ends it: one operation shared by every caller while it runs. Its answer is cached only once proved; one that couldn't
+   * prove its proxy gone is tried again by the next call (the proxy ended again by its handle, its exit awaited).
+   */
   close(): Promise<boolean> {
-    return (this.closing ??= this.closeOnce())
+    if (this.closing) return this.closing
+    const run = this.closeOnce()
+    this.closing = run
+    void run.then((proved) => {
+      if (!proved && this.closing === run) this.closing = null
+    })
+    return run
   }
+
+  /** The proxy's process, kept until its exit is seen (a later close ends it again). */
+  private ending: UtilityProcess | null = null
 
   /** close's one run: true once the proxy is seen exited (asked, then ended by its handle) and the page closed. */
   private async closeOnce(): Promise<boolean> {
     this.closed = true
     if (this.ping) clearInterval(this.ping)
-    const p = this.proxy
+    const p = this.proxy ?? this.ending
     this.proxy = null
+    this.ending = p
     const view = this.viewNow
     this.viewNow = null
     /** Whether the work finished within the bound. */
@@ -267,10 +281,11 @@ export class PreviewGuard {
         p.kill()
         proxyGone = await bounded(this.proxyExit)
       }
+      if (proxyGone) this.ending = null
     }
     if (view && !view.webContents.isDestroyed()) view.webContents.close({ waitForBeforeUnload: false })
     if (this.ses) await bounded(this.ses.closeAllConnections())
-    if (!proxyGone) log.warn("A preview's network guard couldn't be proved ended")
+    if (!proxyGone) log.warn("A preview's network guard couldn't be proved ended: tried again at its place's next use")
     return proxyGone
   }
 }

@@ -124,4 +124,23 @@ describe("a preview's shown page (HI-3615 round 1)", () => {
     expect(await shows.close('pv-1')).toBe(false)
     expect(log).toEqual(['detach a', 'guard close'])
   })
+
+  it("keeps a close whose guard's end isn't proved, never shows it again, and tries the guard again at the next close (round 2)", async () => {
+    const log: string[] = []
+    const answers = [false, false, true]
+    let closes = 0
+    const guard: ShownGuard = { view: {}, load: async () => undefined, close: async () => answers[closes++] }
+    const shows = new PreviewShows<Win, ShownGuard>({ open: async () => guard, attach: (w) => void log.push(`attach ${w.name}`), detach: () => undefined, place: () => undefined, owned: async () => true })
+    const a = new Win('a')
+    expect(await shows.show('pv-1', a, {}, 'u')).toBe('shown')
+    expect(await shows.close('pv-1')).toBe(false)
+    expect(shows.has('pv-1')).toBe(true)
+    expect(await shows.show('pv-1', a, {}, 'u')).toBe('cancelled')
+    expect(await shows.close('pv-1')).toBe(false)
+    expect(shows.has('pv-1')).toBe(true)
+    expect(await shows.close('pv-1')).toBe(true)
+    expect(shows.has('pv-1')).toBe(false)
+    expect(closes).toBe(3)
+    expect(log).toEqual(['attach a'])
+  })
 })

@@ -43,6 +43,8 @@ interface Entry<W, G> {
   intent: number
   loaded: boolean
   closing: Promise<boolean> | null
+  /** Closed (its preview ended): never shown again, kept while its guard's end isn't proved (round 2). */
+  ended: boolean
 }
 
 export type ShowAnswer = 'shown' | 'cancelled' | 'notOwned'
@@ -69,13 +71,13 @@ export class PreviewShows<W extends ShownWindow, G extends ShownGuard> {
    */
   async show(id: string, win: W, bounds: unknown, url: string): Promise<ShowAnswer> {
     let e = this.entries.get(id)
-    if (e?.closing) return 'cancelled'
+    if (e?.closing || e?.ended) return 'cancelled'
     if (!e) {
-      e = { guard: this.deps.open(id), attached: null, wanted: null, intent: 0, loaded: false, closing: null }
+      e = { guard: this.deps.open(id), attached: null, wanted: null, intent: 0, loaded: false, closing: null, ended: false }
       // A guard that fails to open leaves no entry (a later show tries again); the failure is this show's to throw.
       const made = e
       made.guard.catch(() => {
-        if (this.entries.get(id) === made && !made.closing) this.entries.delete(id)
+        if (this.entries.get(id) === made && !made.closing && !made.ended) this.entries.delete(id)
       })
       this.entries.set(id, e)
     }
@@ -91,7 +93,7 @@ export class PreviewShows<W extends ShownWindow, G extends ShownGuard> {
         if (entry.attached === win) entry.attached = null
       })
     }
-    const current = (): boolean => this.entries.get(id) === entry && !entry.closing && entry.intent === token && entry.wanted === win && !win.isDestroyed()
+    const current = (): boolean => this.entries.get(id) === entry && !entry.closing && !entry.ended && entry.intent === token && entry.wanted === win && !win.isDestroyed()
     const guard = await entry.guard
     if (!current()) return 'cancelled'
     if (entry.attached !== win) {
@@ -133,8 +135,9 @@ export class PreviewShows<W extends ShownWindow, G extends ShownGuard> {
 
   /**
    * Closes a preview's page (its preview ended): every show cancelled, a guard still opening awaited, its view taken out,
-   * its guard closed. Shared by concurrent callers; the entry stays until it is over. True when the guard's end is proved
-   * (or it had none).
+   * its guard closed. Shared by concurrent callers while it runs. True once the guard's end is proved (or it had none):
+   * then the entry goes. Unproved (round 2), the entry stays, never shown again, and the next close tries the guard's end
+   * again; it never answers true without that proof.
    */
   close(id: string): Promise<boolean> {
     const e = this.entries.get(id)
@@ -142,14 +145,19 @@ export class PreviewShows<W extends ShownWindow, G extends ShownGuard> {
     if (e.closing) return e.closing
     e.intent++
     e.wanted = null
-    e.closing = (async () => {
+    e.ended = true
+    const run = (async () => {
       const guard = await e.guard.catch(() => null)
       if (guard && e.attached && !e.attached.isDestroyed()) this.deps.detach(e.attached, guard)
       e.attached = null
       const proved = guard ? await guard.close().catch(() => false) : true
-      if (this.entries.get(id) === e) this.entries.delete(id)
+      if (proved && this.entries.get(id) === e) this.entries.delete(id)
       return proved
     })()
-    return e.closing
+    e.closing = run
+    void run.then(() => {
+      if (e.closing === run) e.closing = null
+    })
+    return run
   }
 }
