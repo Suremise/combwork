@@ -502,6 +502,8 @@
   "settings.advanced.cw.disableHardwareAcceleration.title": "Disable hardware acceleration",
   "settings.advanced.cw.focused.pickSeconds.desc": "How long the project’s command that chooses a card’s focused tests may run, when it is submitted and at its merge. Past it, the command is ended and no tests count as chosen: the builder then names them itself.",
   "settings.advanced.cw.focused.pickSeconds.title": "Focused tests: longest the choice of tests runs",
+  "settings.advanced.cw.git.blameAskLines.desc": "Blame in the Files tab reads which commit last changed each line, which takes git longer the longer the file and its history. For a file with more lines than this it asks first. Each read still stops at Git: longest a history read takes.",
+  "settings.advanced.cw.git.blameAskLines.title": "Git: ask before blaming a file longer than",
   "settings.advanced.cw.git.commitMinutes.desc": "How long Commit and Set aside of a folder's changes may run, the repository's pre-commit hook, filters and signer included, before Combwork ends git as stuck. You can cancel one from the window at any time: this is a last resort for one nobody is watching. Raise it if a hook really runs longer.",
   "settings.advanced.cw.git.commitMinutes.title": "Git: longest a commit or set aside takes",
   "settings.advanced.cw.git.historySeconds.desc": "How long the Files tab's History may spend reading one page of a file's commits (with their cards), one commit's changes, or the merge that brought a commit in, before Combwork stops git and says so. A page usually takes well under a second; raise this for a very large repository whose history git reads slowly.",

@@ -19,6 +19,7 @@ const log = createLogger('file-history')
 export const FILE_HISTORY_TEXT = {
   failed: msg({ id: 'service.fileHistory.failed', defaultMessage: "Git couldn't read the history: {why}", description: "HI-3475: an error in the Files tab's History panel: git's own command failed; {why} is git's error line, in English." }),
   noCommit: msg({ id: 'service.fileHistory.noCommit', defaultMessage: "Git has no commit {commit}: it may be gone. Refresh the history.", description: "HI-3475: an error in the Files tab's History panel: a commit the panel showed ({commit}, a short id) isn't in the repository any more." }),
+  cancelled: msg({ id: 'service.fileHistory.cancelled', defaultMessage: 'Stopped: the file or its text changed meanwhile.', description: "HI-3476: why a blame of a file in the Files tab stopped: the file shown, or its text in the editor, changed, so its answer was no longer wanted (the window drops it; rarely seen)." }),
   timedOut: msg({ id: 'service.fileHistory.timedOut', defaultMessage: 'Git was still reading the history after {seconds, number} seconds, so Combwork stopped it. Try again, or raise Settings → Advanced → Git: longest a history read takes.', description: "HI-3475: an error in the Files tab's History panel: reading a page of history, a commit's diff or its merge ran past the advanced setting's time ({seconds}) and git was ended. Keep the setting's name as Settings → Advanced shows it." })
 }
 const M = FILE_HISTORY_TEXT
@@ -31,10 +32,12 @@ export const historyDeadline = (): number => Date.now() + platformLimits.gitHist
 const timedOut = (): Error => combworkError(M.timedOut, { seconds: Math.max(1, Math.round(platformLimits.gitHistoryMs() / 1000)) })
 
 /** Runs git with what is left of `at` as its timeout: refused, git ended, once it has run out. */
-async function run(root: string, args: string[], at: number, maxBuffer?: number): Promise<GitResult> {
+export async function run(root: string, args: string[], at: number, maxBuffer?: number, o: { input?: string; signal?: AbortSignal } = {}): Promise<GitResult> {
   const left = at - Date.now()
   if (left <= 0) throw timedOut()
-  const r = await git(root, args, maxBuffer, undefined, { timeout: left })
+  const r = await git(root, args, maxBuffer, o.input, { timeout: left, ...(o.signal ? { signal: o.signal } : {}) })
+  // HI-3476: stopped by its caller (blame of a text the editor has moved on from): its answer is no one's.
+  if (r.cancelled) throw combworkError(M.cancelled)
   if (r.timedOut) {
     log.warn(`git ${args.find((a) => !a.startsWith('-'))} for History in ${userText(root)} ran past its bound and was ended`)
     throw timedOut()

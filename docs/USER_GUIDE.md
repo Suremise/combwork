@@ -2297,6 +2297,21 @@ Click a file's commit to see what it changed in the file, in place of the editor
 
 The list is read in pages of 50 (**Show more**) from the commit checked out when it was first read. If the branch moves meanwhile (a commit, a switch), a bar says so, and **Refresh** reads it again. If that commit is gone altogether (after a reset, say), **Show more** says so and keeps the list as it is until you **Refresh**. Each read stops after a minute (**Settings → Advanced → Git: longest a history read takes**), saying so, with **Try again**. It takes well under a second even in a large repository.
 
+### Blame by card <a id="blame-by-card"></a>
+
+**Blame by card** (the button above a file's editor, beside History, the file's right-click menu, or **Toggle Blame by Card** in the command palette) adds a column beside the editor. For each run of lines, it shows which commit last changed them, in Combwork's terms:
+
+- **The card** that commit names, by the same rules as History: its `Combwork-Card` trailer, Combwork's record of the commit, or a key at the start of its message. Click the card to open it.
+- **The agent** that submitted the commit for review in one of that card's submissions. As in History, this isn't necessarily who wrote it.
+- Without a card, the commit's short hash and author.
+- How long ago it was made. Older commits are fainter.
+
+Hover an entry for the commit's message, author, date and hash. Click it (anywhere but the card) to see what that commit changed in the file, in place of the editor. **Back to file** returns with your edits kept.
+
+It blames the file as it is in the editor: lines you've typed or changed and not committed say **Not committed yet**. It reads again a moment after you stop typing. Lines are followed across the file's renames and moves within it. A line copied in from another file is put down to the commit that brought it here.
+
+It works in the project folder and in an agent's slot or worktree. A file git has no committed version of has nothing to blame. For a file longer than 20,000 lines it asks first (**Settings → Advanced → Git: ask before blaming a file longer than**). Each read stops after a minute, like History's (**Git: longest a history read takes**).
+
 ### Viewing and editing files <a id="viewing-and-editing-files"></a>
 
 Select a file and it opens on the right, ready to edit, with syntax highlighting for code, SQL, XML, JSON, YAML and many more. **Ctrl+S** (or **Save**) saves it. Some file types also get a nicer view, and the buttons above the file switch between them:

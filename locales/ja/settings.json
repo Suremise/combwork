@@ -463,6 +463,8 @@
   "settings.advanced.copilotFooter.title": "フッター：{mode}",
   "settings.advanced.cw.db.busySeconds.desc": "ほかのプログラム（このワークスペースのほかのCombwork、スクリプト）がデータベースのロックを持っている間、ボード、アシスタントのジャーナル、使用履歴への書き込みが拒否されるまでに待つ時間です。速度ではなく待ち時間の上限です。ボードへの書き込みはCombworkのメインスレッドで待つため、待っている間はウィンドウが応答しません。Combworkの再起動後に反映されます。",
   "settings.advanced.cw.db.busySeconds.title": "データベース：ほかのプログラムのロックを待つ時間",
+  "settings.advanced.cw.git.blameAskLines.desc": "［ファイル］タブの Blame は、各行を最後に変更したコミットを読み取ります。ファイルと履歴が長いほど git の時間がかかります。この行数を超えるファイルでは先に確認します。各読み取りは「Git：履歴の読み取りの最長時間」で止まります。",
+  "settings.advanced.cw.git.blameAskLines.title": "Git：Blame の前に確認するファイルの行数",
   "settings.advanced.cw.git.historySeconds.desc": "［ファイル］タブの［履歴］が、ファイルのコミット1ページ分（カードを含む）、1つのコミットの変更、またはコミットを取り込んだマージを読み取るのにかけられる時間です。これを過ぎると Combwork は git を停止し、そのことを表示します。1ページは通常1秒よりずっと短くかかります。git が履歴を読むのに時間がかかる非常に大きなリポジトリでは値を上げてください。",
   "settings.advanced.cw.git.historySeconds.title": "Git：履歴の読み取りの最長時間",
   "settings.advanced.cw.input.hiddenSeconds.desc": "エージェントの入力欄が画面に表示されないことでCombworkが初めて入力できなかったときから、Combworkが試すのをやめてエージェントをあなたの対応待ちとして表示するまでの、入力欄が表示されないままでよい時間です（HI-3411）。CLIが入力欄の代わりに表示したもの（Combworkが認識しない質問など）がキーを受け取っています。入力欄が再び表示されると、待っていた内容が入力されます。",

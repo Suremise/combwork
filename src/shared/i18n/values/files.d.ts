@@ -50,6 +50,18 @@ interface CombworkMessageValues {
   'files.attachments.totalWithCards': { total: number; cards: number; sessions: number; groups: number }
   'files.attachments.unnamed': { host: string; id: string | number }
   'files.attachments.view': undefined
+  'files.blame.blameAnyway': undefined
+  'files.blame.commitTip': { subject: string | number; author: string | number; when: string | number; commit: string | number }
+  'files.blame.failed': { error: string | number }
+  'files.blame.large': { lines: number }
+  'files.blame.loading': undefined
+  'files.blame.openCard': { card: string | number; title: string | number }
+  'files.blame.retry': undefined
+  'files.blame.submittedByTip': { agent: string | number; card: string | number }
+  'files.blame.toggle': undefined
+  'files.blame.toggleTip': undefined
+  'files.blame.uncommitted': undefined
+  'files.blame.untracked': undefined
   'files.collapseAll': undefined
   'files.csv.firstRows': { count: number }
   'files.delete': undefined

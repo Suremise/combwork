@@ -228,6 +228,8 @@
   "tips.dialectsNewModel.title": "Plik dialektu dla dowolnego modelu",
   "tips.editTemplates.text": "Zaznacz szablon w widoku Szablony i wybierz Edytuj…: dodawaj, kopiuj, zmieniaj kolejność lub usuwaj jego agentów, zmieniaj każdego w oknie Ustawienia agenta (jego Zapisz zapisuje też szablon), zmień nazwę szablonu i wybierz jego układ.",
   "tips.editTemplates.title": "Edytuj szablon na miejscu",
+  "tips.fileBlame.text": "Blame według kart, nad plikiem w zakładce Pliki, pokazuje obok każdego bloku wierszy kartę, której commit ostatnio go zmienił, i agenta, który go przesłał. Kliknij kartę, aby ją otworzyć, albo resztę, aby zobaczyć, co ten commit zmienił.",
+  "tips.fileBlame.title": "Która karta zmieniła ten wiersz?",
   "tips.fileHistory.text": "Historia, nad plikiem w zakładce Pliki, wymienia commity, które go zmieniły, śledząc zmiany jego nazwy: każdy z kartą wskazaną przez commit i agentem, który go przesłał. Kliknij jeden, aby zobaczyć, co zmienił; Wróć do pliku zachowuje twoje edycje.",
   "tips.fileHistory.title": "Która karta zmieniła ten plik?",
   "tips.fileLinks.text": "Ścieżki plików wypisywane przez agenta, np. src/app.ts:42, są linkami: kliknij z Ctrl, żeby otworzyć plik w tym wierszu w zakładce Pliki.",

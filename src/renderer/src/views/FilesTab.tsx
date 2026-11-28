@@ -24,6 +24,7 @@ import { FILES_GIT_TEXT, gitMenuEntries, ignoredByText } from '../components/Fil
 import { CodeEditor } from '../components/Editors'
 import { CommitDialog } from '../components/CommitDialog'
 import { FILE_HISTORY_TEXT, FileHistoryPanel, HistoryDiff, type HistoryPick } from '../components/FileHistory'
+import { FILE_BLAME_TEXT } from '../components/FileBlame'
 import { offered } from '../repoOps'
 import type { FileGitRuleText } from '@shared/types'
 
@@ -584,6 +585,7 @@ function FilesBrowser({ project, selector, jump, mainCheckout }: { project: Proj
         : []),
       ...(!e.isDir && single ? [{ label: tr(M.openInDefaultApp), icon: 'link-external', onClick: () => open(e) }] : []),
       ...(single ? [{ label: tr(FILE_HISTORY_TEXT.toggle), icon: 'history', onClick: () => set({ filesHistory: true }) }] : []),
+      ...(!e.isDir && single ? [{ label: tr(FILE_BLAME_TEXT.toggle), icon: 'list-flat', onClick: () => set({ filesBlame: true }) }] : []),
       { label: tr(FILES_TEXT.revealInExplorer), icon: 'folder-opened', onClick: () => void call('files:reveal', project.path, e.relPath) },
       ...(project.live ? [{ label: tr(M.insertPath), icon: 'terminal', onClick: () => void insertIntoSession(project, abs) }] : []),
       { separator: true },
@@ -734,11 +736,11 @@ function FilesBrowser({ project, selector, jump, mainCheckout }: { project: Proj
   const cutSet = fileClipboard?.mode === 'cut' && fileClipboard.project === project.path ? new Set(fileClipboard.rels) : null
   const one = selEntries.length === 1 ? selEntries[0] : null
   // HI-3475: History of the one item selected, or of the folder shown when nothing is; a commit's diff opened from it
-  // shows only while that item stays selected.
+  // (or from HI-3476's blame column) shows only while that item stays selected.
   const historyShown = useStore((s) => s.filesHistory)
   const historyItem = !selEntries.length ? { rel: '', isDir: true } : one ? { rel: one.relPath, isDir: one.isDir } : null
   const [historyPick, setHistoryPick] = useState<{ rel: string; pick: HistoryPick } | null>(null)
-  const shownPick = historyShown && historyItem && historyPick?.rel === historyItem.rel ? historyPick.pick : null
+  const shownPick = historyItem && historyPick?.rel === historyItem.rel ? historyPick.pick : null
   const [commitShown, setCommitShown] = useState<{ hash: string; focus: { path: string; oldPath: string | null } | null } | null>(null)
   const historyDiff = shownPick ? <HistoryDiff root={project.path} pick={shownPick} onBack={() => setHistoryPick(null)} /> : undefined
 
@@ -838,6 +840,7 @@ function FilesBrowser({ project, selector, jump, mainCheckout }: { project: Proj
             onOpenRel={reveal}
             goto={goto?.rel === one.relPath && goto.line ? { line: goto.line, col: goto.col, nonce: goto.nonce } : undefined}
             overlay={historyDiff}
+            blame={{ onOpenCommit: (pick) => setHistoryPick({ rel: one.relPath, pick }) }}
             toolbarExtra={
               <>
                 <IconButton icon="history" title={tr(FILE_HISTORY_TEXT.toggleTip)} active={historyShown} action="file-history" onClick={() => set({ filesHistory: !historyShown })} />

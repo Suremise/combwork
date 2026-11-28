@@ -235,6 +235,18 @@
     "defaultMessage": "git rm --cached failed: {why}",
     "description": "An error untracking the project's .combwork folder from git: the git command (git rm --cached: keep it) failed; {why} is git's own first line, or why git can't run."
   },
+  "service.fileBlame.invalid": {
+    "defaultMessage": "That was asked for wrongly: nothing was read.",
+    "description": "HI-3476: an error from the Files tab's Blame: the request was malformed (not reached from the window)."
+  },
+  "service.fileBlame.unsupported": {
+    "defaultMessage": "This folder's version control can't say who changed each line.",
+    "description": "HI-3476: an error from the Files tab's Blame: the folder's version control has no blame."
+  },
+  "service.fileHistory.cancelled": {
+    "defaultMessage": "Stopped: the file or its text changed meanwhile.",
+    "description": "HI-3476: why a blame of a file in the Files tab stopped: the file shown, or its text in the editor, changed, so its answer was no longer wanted (the window drops it; rarely seen)."
+  },
   "service.fileHistory.failed": {
     "defaultMessage": "Git couldn't read the history: {why}",
     "description": "HI-3475: an error in the Files tab's History panel: git's own command failed; {why} is git's error line, in English."

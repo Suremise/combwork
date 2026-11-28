@@ -200,6 +200,7 @@ import type { BranchMoves, RestorePlan, RestoreRequest } from './gitMoves'
 import type { FileCommits, FileRestored, FileRestorePlan, FileRestoreRequest, RestoreSource } from './gitFileRestore'
 import type { CommitActionDone, CommitActionRequest, CommitDetail } from './gitCommitView'
 import type { CommitIntro, FileHistoryPage, FileSide, FileVersions } from './fileHistory'
+import type { BlameResult } from './fileBlame'
 import type { BoardFoldChange } from './tasks'
 import type { CardCost, CardRoundCosts, LaneCost } from './cardCosts'
 import type { ConsoleEvent, ConsoleRecordingInfo, ConsoleSource } from './devConsole'
@@ -1261,6 +1262,9 @@ export interface CombworkRequests {
   'files:historyDiff': (root: string, left: FileSide | null, right: FileSide | null) => FileVersions
   /** HI-3475: the merge that brought `commit` into `head`'s line, and its card ("came in with"); null when none can be said. */
   'files:historyIntro': (root: string, head: string, commit: string) => CommitIntro | null
+  /** HI-3476: who last changed each line of `rel` with `text` (the editor's) as its content, with their cards; `large` blames a file over the advanced limit. `id`: the window's, so a later request or `files:blameCancel` stops it. */
+  'files:blame': (root: string, rel: string, text: string, large: boolean, id: string) => BlameResult
+  'files:blameCancel': (id: string) => void
   /** Each action replies with what it did, in a sentence. Switching (and creating a branch to switch to) or pulling is refused while an agent works in the folder or its merge slot is held (`folderBusy`). */
   'git:switch': (projectPath: string, branch: string) => string
   /** Update from <target> (HI-1180): what it would do to a branch (its dialog), and the update, merge or rebase, saying what it did. */

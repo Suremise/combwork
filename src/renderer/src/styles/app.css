@@ -17238,3 +17238,82 @@ button.progress-lane-retry {
 .history-diff > .faint.small {
   padding: 0 8px;
 }
+
+/* HI-3476: Blame by card: a column beside the editor, one entry per run of lines a commit last changed, aligned to the
+   editor's lines as it scrolls; the older the commit, the fainter. */
+.blame-wrap {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+}
+.blame-wrap.on {
+  display: grid;
+  grid-template-columns: min(240px, 40%) minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
+}
+.blame-wrap > .blame-bar {
+  grid-column: 1 / -1;
+  grid-row: 1;
+  margin: 0;
+}
+.blame-wrap.on > .blame-column,
+.blame-wrap.on > .blame-editor {
+  grid-row: 2;
+}
+.blame-editor {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+}
+.blame-editor > .monaco {
+  position: absolute;
+  inset: 0;
+}
+.blame-column {
+  position: relative;
+  overflow: hidden;
+  border-right: 1px solid var(--border);
+  font-size: 12px;
+}
+.blame-loading {
+  position: absolute;
+  top: 2px;
+  right: 6px;
+}
+.blame-block {
+  position: absolute;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 0 6px;
+  overflow: hidden;
+  border-top: 1px solid var(--border);
+  opacity: calc(1 - var(--blame-age, 0) * 0.55);
+}
+.blame-block.uncommitted {
+  opacity: 0.8;
+}
+.blame-card {
+  padding: 0 3px;
+  min-height: 0;
+  height: 16px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 14px;
+}
+.blame-who {
+  all: unset;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+  line-height: 18px;
+}
+.blame-who:hover {
+  text-decoration: underline;
+}

@@ -203,6 +203,15 @@
       "why": "plain"
     }
   },
+  "service.fileBlame.invalid": {
+    "placeholders": {}
+  },
+  "service.fileBlame.unsupported": {
+    "placeholders": {}
+  },
+  "service.fileHistory.cancelled": {
+    "placeholders": {}
+  },
   "service.fileHistory.failed": {
     "placeholders": {
       "why": "plain"

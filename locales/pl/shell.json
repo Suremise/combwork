@@ -53,6 +53,7 @@
   "shell.command.assistant.toggle": "Pokaż/ukryj Asystenta",
   "shell.command.console.showCapture": "Pokaż zrzut w folderze",
   "shell.command.files.commitIgnore": "Zrób commit .gitignore",
+  "shell.command.files.toggleBlame": "Pokaż lub ukryj Blame według kart",
   "shell.command.files.toggleHistory": "Pokaż lub ukryj historię pliku",
   "shell.command.folderChanges.settle": "Zrób commit lub odłóż zmiany",
   "shell.command.folderChanges.show": "Pokaż zmiany bez commita",

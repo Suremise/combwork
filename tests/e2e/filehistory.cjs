@@ -4,7 +4,9 @@
 // (opening the card), "Renamed from"; a click shows the commit's diff in place of the editor, the rename's from its old
 // path, and Back to file returns to the editor with its unsaved edit and its undo kept; Find its merge on the side commit
 // says it came in with the card's merge; a folder's History lists its commits; switching file shows that file's history.
-// Screenshots of the panel and a diff in both themes. Git's global config the suite's own. Dev build, throwaway profile
+// HI-3476's Blame by card: the column names the card on its commit's lines, the unsaved and newly typed lines as not
+// committed, the side commit by its hash; an entry opens its commit's diff (Back keeps the edit), the card opens it.
+// Screenshots of the panel, a diff and the blame column in both themes. Git's global config the suite's own. Dev build, throwaway profile
 // and workspace.
 const lib = require('./lib.cjs')
 const { execFileSync } = require('child_process')
@@ -86,7 +88,7 @@ const check = (name, ok, extra = '') => {
     await shown(page.locator('.split-main .monaco .view-lines'))
 
     // An unsaved edit, before History is opened: it must outlive a diff and Back to file.
-    await page.locator('.split-main .monaco').first().click({ position: { x: 200, y: 10 } })
+    await page.locator('.split-main .monaco').first().click({ position: { x: 90, y: 10 } })
     await page.keyboard.press('Control+End')
     await page.keyboard.type('unsaved line')
     check('the edit marks the file unsaved', !!(await lib.until(async () => (await page.locator('.editor-toolbar .dirty-dot').count()) === 1, HUNG_MS)))
@@ -116,7 +118,7 @@ const check = (name, ok, extra = '') => {
     // Monaco draws a space as a no-break space.
     const editorText = () => page.evaluate(() => (document.querySelector('.split-main .monaco .view-lines')?.textContent ?? '').replace(/\u00a0/g, ' '))
     check('…with the unsaved edit kept', (await editorText()).includes('unsaved line') && (await page.locator('.editor-toolbar .dirty-dot').count()) === 1)
-    await page.locator('.split-main .monaco').first().click({ position: { x: 200, y: 10 } })
+    await page.locator('.split-main .monaco').first().click({ position: { x: 90, y: 10 } })
     await page.keyboard.press('Control+Z')
     check('…and its undo too', !!(await lib.until(async () => !(await editorText()).includes('unsaved line'), HUNG_MS)))
     await page.keyboard.press('Control+Y')
@@ -130,6 +132,35 @@ const check = (name, ok, extra = '') => {
     check('…and opens that card', !!(await lib.until(async () => (await cardDialog.locator('.task-title-input').inputValue().catch(() => '')) === 'Rename the doc', HUNG_MS)))
     await cardDialog.locator('.dialog-header button[aria-label^="Close"]').click()
     await lib.until(async () => (await cardDialog.count()) === 0, HUNG_MS)
+
+    // HI-3476: Blame by card beside the editor, of the text as the editor has it.
+    await page.locator('[data-action="file-blame"]').click()
+    const column = page.locator('.blame-column')
+    check('blame shows a column of the lines\' commits', !!(await lib.until(async () => Number((await column.getAttribute('data-blame-column').catch(() => '')) || 0) > 0, HUNG_MS)))
+    check("…the card's key on the line its commit changed", (await column.locator(`.blame-block[data-blame-line="1"] [data-blame-card="${key}"]`).count()) === 1, await text(column))
+    check('…the unsaved line as not committed yet', (await column.locator('.blame-block.uncommitted').count()) >= 1)
+    check('…the side commit by its hash, naming no card', (await column.locator(`.blame-block[data-blame-commit="${sideCommit}"] [data-blame-card]`).count()) === 0 && (await column.locator(`.blame-block[data-blame-commit="${sideCommit}"]`).count()) === 1)
+    await shoot(page.locator('.split-main'), 'blame')
+    await column.locator(`.blame-block[data-blame-commit="${sideCommit}"] [data-action="blame-commit"]`).click()
+    const sideDiff = page.locator(`[data-history-diff="${sideCommit}:doc.txt"]`)
+    check("a commit's entry opens its diff of the file", await shown(sideDiff.locator('.monaco')))
+    await sideDiff.locator('[data-action="history-back"]').click()
+    check('…and Back to file keeps the edit', !!(await lib.until(async () => (await sideDiff.count()) === 0 && (await editorText()).includes('unsaved line'), HUNG_MS)))
+    await column.locator(`[data-blame-card="${key}"]`).first().click()
+    check('the card in the column opens it', !!(await lib.until(async () => (await cardDialog.locator('.task-title-input').inputValue().catch(() => '')) === 'Rename the doc', HUNG_MS)))
+    await cardDialog.locator('.dialog-header button[aria-label^="Close"]').click()
+    await lib.until(async () => (await cardDialog.count()) === 0, HUNG_MS)
+    // Typing is blamed a moment later: a new line is not committed yet.
+    await page.locator('.split-main .monaco').first().click({ position: { x: 90, y: 10 } })
+    await page.keyboard.press('Control+Home')
+    await page.keyboard.type('top line\n')
+    check('a line typed is blamed as not committed', !!(await lib.until(async () => (await column.locator('.blame-block.uncommitted[data-blame-line="1"]').count()) === 1, HUNG_MS)))
+    await page.keyboard.press('Control+Home')
+    await page.keyboard.press('Shift+ArrowDown')
+    await page.keyboard.press('Delete')
+    check('…and deleted again, its card again', !!(await lib.until(async () => (await column.locator(`.blame-block[data-blame-line="1"] [data-blame-card="${key}"]`).count()) === 1, HUNG_MS)))
+    await page.locator('[data-action="file-blame"]').click()
+    check('Blame by card turns off', !!(await lib.until(async () => (await column.count()) === 0, HUNG_MS)))
 
     // Another item selected: its history, never the last one's.
     await row('notes').click()
@@ -177,7 +208,7 @@ const check = (name, ok, extra = '') => {
     // Saved, so quitting has no unsaved file to ask about.
     await row('doc.txt').click()
     await lib.until(async () => (await page.locator('.editor-toolbar .dirty-dot').count()) === 1, HUNG_MS)
-    await page.locator('.split-main .monaco').first().click({ position: { x: 200, y: 10 } })
+    await page.locator('.split-main .monaco').first().click({ position: { x: 90, y: 10 } })
     await page.keyboard.press('Control+S')
     check('the edit saves to the file', !!(await lib.until(async () => fs.readFileSync(path.join(alpha, 'doc.txt'), 'utf8').includes('unsaved line'), HUNG_MS)))
   } finally {

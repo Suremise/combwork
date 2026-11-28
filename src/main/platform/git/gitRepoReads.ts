@@ -13,6 +13,7 @@ import { viewSigning } from './gitSigning'
 import { operationState } from './gitOperationSteps'
 import { stashConflictIn } from './gitStashes'
 import * as fileHistory from './gitFileHistory'
+import { fileBlame } from './gitFileBlame'
 
 export const gitRepoReads: RepoReads = {
   changes: (root, base) => G.gitStatus(root, base),
@@ -30,6 +31,7 @@ export const gitRepoReads: RepoReads = {
   fileVersions: (root, left, right, at) => fileHistory.fileVersions(root, left, right, at),
   introducedBy: (root, head, commit, at) => fileHistory.introducedBy(root, head, commit, at),
   rangeCommits: (root, base, revision, at) => fileHistory.rangeCommits(root, base, revision, at),
+  fileBlame: (root, rel, text, at, signal) => fileBlame(root, rel, text, at, signal),
   compareLines: (root, workTarget, slots) => compare.compareLines(root, workTarget, slots),
   compare: (root, base, head, page, pinned) => compare.compareBranches(root, base, head, page, pinned),
   compareDiff: (root, base, head, file, pinned) => compare.compareDiff(root, base, head, file, pinned),

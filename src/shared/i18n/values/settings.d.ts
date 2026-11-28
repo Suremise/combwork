@@ -504,6 +504,8 @@ interface CombworkMessageValues {
   'settings.advanced.cw.disableHardwareAcceleration.title': undefined
   'settings.advanced.cw.focused.pickSeconds.desc': undefined
   'settings.advanced.cw.focused.pickSeconds.title': undefined
+  'settings.advanced.cw.git.blameAskLines.desc': undefined
+  'settings.advanced.cw.git.blameAskLines.title': undefined
   'settings.advanced.cw.git.commitMinutes.desc': undefined
   'settings.advanced.cw.git.commitMinutes.title': undefined
   'settings.advanced.cw.git.historySeconds.desc': undefined

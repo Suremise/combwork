@@ -1896,6 +1896,9 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
     'files:history': async (root, rel, isDir, pinned, page) => (await import('./fileHistoryPanel')).fileHistoryAt(workspace, root, rel, isDir, pinned, page, lineRepoReads()),
     'files:historyDiff': async (root, left, right) => (await import('./fileHistoryPanel')).fileHistoryDiffAt(workspace, root, left, right, lineRepoReads()),
     'files:historyIntro': async (root, head, commit) => (await import('./fileHistoryPanel')).fileHistoryIntroAt(workspace, root, head, commit, lineRepoReads()),
+    // HI-3476: blame by card, in the same folders as History; a later request with the same id, or blameCancel, stops it.
+    'files:blame': async (root, rel, text, large, id) => (await import('./fileBlamePanel')).fileBlameAt(workspace, root, rel, text, large, id, lineRepoReads()),
+    'files:blameCancel': async (id) => (await import('./fileBlamePanel')).fileBlameCancel(id),
     'git:history': async (p, ref, page) => {
       p = workspace.assertProject(p)
       const reads = lineRepoReads()

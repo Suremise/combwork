@@ -53,6 +53,7 @@
   "shell.command.assistant.toggle": "Assistent ein-/ausblenden",
   "shell.command.console.showCapture": "Mitschnitt im Ordner anzeigen",
   "shell.command.files.commitIgnore": ".gitignore committen",
+  "shell.command.files.toggleBlame": "Blame nach Karte ein-/ausblenden",
   "shell.command.files.toggleHistory": "Dateiverlauf ein-/ausblenden",
   "shell.command.folderChanges.settle": "Änderungen committen oder beiseitelegen",
   "shell.command.folderChanges.show": "Nicht committete Änderungen anzeigen",

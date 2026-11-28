@@ -151,6 +151,8 @@ export const GITHUB_PR_FOLLOW_MINUTES = 'cw.github.prFollowMinutes'
 export const GIT_STALE_LOCK_SECONDS = 'cw.git.staleLockSeconds'
 /** HI-3475: the longest one read of the Files tab's History takes before Combwork ends git. */
 export const GIT_HISTORY_SECONDS = 'cw.git.historySeconds'
+/** HI-3476: blame by card asks before blaming a file longer than this many lines. */
+export const GIT_BLAME_ASK_LINES = 'cw.git.blameAskLines'
 /** HI-3473: the programs that count as a git that may hold a lock (Windows' process names). */
 export const GIT_PROCESS_NAMES = 'cw.git.processNames'
 /** HI-3372: the merge queue's own fetches and pushes. */
@@ -1099,6 +1101,19 @@ const SOURCES: readonly AdvancedSource[] = [
     min: 5,
     max: 3600,
     unit: 's',
+    applies: 'now'
+  },
+  // HI-3476: blame by card in the Files tab: a file longer than this is blamed only once the user says so.
+  {
+    id: GIT_BLAME_ASK_LINES,
+    group: 'cw',
+    title: msg({ id: 'settings.advanced.cw.git.blameAskLines.title', defaultMessage: 'Git: ask before blaming a file longer than', description: "An advanced setting's title (Settings → Advanced), listed under Combwork, followed by its value in lines: the Files tab's Blame (HI-3476)." }),
+    desc: msg({ id: 'settings.advanced.cw.git.blameAskLines.desc', defaultMessage: "Blame in the Files tab reads which commit last changed each line, which takes git longer the longer the file and its history. For a file with more lines than this it asks first. Each read still stops at Git: longest a history read takes.", description: 'What the advanced setting "Git: ask before blaming a file longer than" does (Settings → Advanced, HI-3476). Git: longest a history read takes is another setting’s name: keep it as Settings → Advanced shows it.' }),
+    kind: 'number',
+    default: 20000,
+    min: 1000,
+    max: 1000000,
+    unit: 'lines',
     applies: 'now'
   },
   {
