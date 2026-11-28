@@ -233,7 +233,7 @@ describe("Combwork's tools' replies", () => {
 describe("Combwork's own documents (combwork:)", async () => {
   const { readFileSync } = await import('fs')
   const { join } = await import('path')
-  const { bundledDoc } = await import('../src/main/docSections')
+  const { bundledDoc } = await import('../src/main/bundledDocs')
   it('combwork:USER_GUIDE.md is the user guide the app ships, its name in any case', () => {
     const guide = readFileSync(join(__dirname, '..', 'docs', 'USER_GUIDE.md'), 'utf8').replace(/^\uFEFF/, '')
     for (const p of ['combwork:USER_GUIDE.md', 'combwork:user_guide.md', 'combwork: USER_GUIDE.md ']) expect(bundledDoc(p), p).toEqual({ ref: 'combwork:USER_GUIDE.md', text: guide })

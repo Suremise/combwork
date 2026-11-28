@@ -9,24 +9,9 @@ import { docOutline, findHeading, sectionText } from '../shared/docSections'
 import type { ContextProblem } from '../shared/types'
 import { CW_DIR } from '../shared/defaults'
 import { METADATA_DIRS } from '../shared/platform/metadataDirs'
-import userGuideDoc from '../../docs/USER_GUIDE.md?raw'
 
 /** A shared note's reference starts with this: `shared:plans/i18n.md`. */
 export const SHARED_PREFIX = 'shared:'
-
-/**
- * Combwork's own documents, read by section as `combwork:<name>` (HI-3622): the copy the app ships, as its Docs view shows
- * it, never a file on disk. Only these names: any other `combwork:` path is refused, never looked for in a folder.
- */
-export const BUNDLED_PREFIX = 'combwork:'
-const BUNDLED = [{ name: 'USER_GUIDE.md', text: userGuideDoc }]
-
-/** A `combwork:` document's reference and text (its name in any case), or null for a name Combwork doesn't ship. */
-export function bundledDoc(path: string): { ref: string; text: string } | null {
-  const name = path.slice(BUNDLED_PREFIX.length).trim().toLowerCase()
-  const doc = BUNDLED.find((d) => d.name.toLowerCase() === name)
-  return doc ? { ref: `${BUNDLED_PREFIX}${doc.name}`, text: doc.text.replace(/^﻿/, '') } : null
-}
 
 /** The largest document read by section. */
 export const DOC_MAX = 4 * 1024 * 1024
