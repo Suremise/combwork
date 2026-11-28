@@ -327,6 +327,7 @@
   "main.removal.notHidden": "{project} isn't hidden or removed.",
   "main.removal.notProject": "Not a project in the open workspace: {path}",
   "main.removal.notTrashed": "{path} couldn't be moved to the Recycle Bin: {why}",
+  "main.removal.previewHeld": "A Preview dev server in {project} couldn't be ended, so the project was left as it is. Try again once it has stopped.",
   "main.removal.refusedTree": "{agent}'s worktree {path} ({why})",
   "main.removal.stillThere": "{project} is still in the workspace: restore it instead.",
   "main.removal.stopFailed": "Could not stop {project}'s agents. Stop them, then try again.",

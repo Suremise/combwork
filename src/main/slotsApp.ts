@@ -329,8 +329,10 @@ export function poolFor(ws: WorkspaceService, projectPath: string): Promise<Slot
         stopLeaseSession(projectPath, lease, slot, { ws, pool: made })
         // Where its agent works changes (#1442: an idle builder's "in slot-b" goes): the window reads it again.
         if (!ws.lifetime.aborted) ws.scheduleRefresh()
-        // HI-3614: a preview running in the slot under this lease stops with it, its server gone before the slot settles.
-        await placeEnded({ kind: 'generation', id: lease.id })
+        // HI-3614: a preview running in the slot under this lease stops with it, its server gone before the slot settles;
+        // one not proved gone keeps the slot held for its job (round 2).
+        const held = await placeEnded({ kind: 'generation', id: lease.id })
+        return held.length ? { holdJob: held[0] } : undefined
       },
       writerOver: (w) => writerOver(w),
       overCleared: (run) => writerCleared(run),

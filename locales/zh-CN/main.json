@@ -327,6 +327,7 @@
   "main.removal.notHidden": "{project} 未被隐藏或移除。",
   "main.removal.notProject": "不是打开的工作区中的项目：{path}",
   "main.removal.notTrashed": "无法将 {path} 移到回收站：{why}",
+  "main.removal.previewHeld": "无法结束 {project} 中预览的开发服务器，因此项目保持原样。请在它停止后重试。",
   "main.removal.refusedTree": "{agent} 的工作树 {path}（{why}）",
   "main.removal.stillThere": "{project} 仍在工作区中：请改为恢复它。",
   "main.removal.stopFailed": "无法停止 {project} 的智能体。请先停止它们，然后重试。",

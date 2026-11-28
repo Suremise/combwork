@@ -32,7 +32,7 @@ import { combworkPorts } from './servers'
 import { END_WAIT_MS, settleSlotJob } from './slotJobs'
 import { jobSpawn, journalsOf, poolIfMade, retireSealOf } from './slotsApp'
 import { BoundedLog, checkEnv, execCommand, FILE_IO } from './workflow/queueChecks'
-import { journalPath, LeaseJob } from './workflow/queueJobs'
+import { endLeaseJob, journalPath, LeaseJob } from './workflow/queueJobs'
 import { defaultProbe } from './workflow/queueProcs'
 import { workspaceFor, WorkspaceService } from './workspace'
 import { msg } from '../shared/i18n'
@@ -112,8 +112,30 @@ async function launch(o: { id: string; place: PreviewPlace; projectPath: string;
       return { code: null }
     }
   )
-  let ended: Promise<boolean> | null = null
+  /** Its stop under way: one at a time; one that couldn't prove its end is tried again when asked again. */
+  let ending: Promise<boolean> | null = null
+  let tries = 0
+  const endOnce = async (): Promise<boolean> => {
+    let settled: boolean
+    if (tries++ === 0) {
+      await opened.end().catch(() => false)
+      settled = await settleSlotJob({ endJob: () => opened.end().catch(() => false), probe, root, dir: journalsOf(root) }, job).catch(() => false)
+      await opened.close().catch(() => undefined)
+    } else {
+      // Its handle let go after the first try: by its name, and what its journal names (as a pool settles a job).
+      settled = await settleSlotJob({ endJob: (name) => endLeaseJob(host, name), probe, root, dir: journalsOf(root) }, job).catch(() => false)
+    }
+    if (settled) retireSealOf(root, job)
+    else log.warn(`Preview ${o.id} in ${userText(o.place.folder)} left processes that could not be ended (try ${tries})`)
+    // Its command's end, bounded: a quit never waits on a server its job couldn't end.
+    let bound: NodeJS.Timeout | undefined
+    const over = await Promise.race([exited.then(() => true), new Promise<boolean>((res) => (bound = setTimeout(() => res(false), END_WAIT_MS)))])
+    clearTimeout(bound)
+    // Proved only when its job is settled and its command has ended: otherwise its place and ports stay held (the runner).
+    return settled && over
+  }
   return {
+    job,
     exited,
     tree: async () => {
       const r = (await host.request('list', job)) as JobList | string | null
@@ -122,20 +144,12 @@ async function launch(o: { id: string; place: PreviewPlace; projectPath: string;
       if (r.total > r.processes.length) return null
       return r.processes.map((p) => p.pid)
     },
-    stop: () =>
-      (ended ??= (async () => {
-        await opened.end().catch(() => false)
-        const settled = await settleSlotJob({ endJob: () => opened.end().catch(() => false), probe, root, dir: journalsOf(root) }, job).catch(() => false)
-        await opened.close().catch(() => undefined)
-        if (settled) retireSealOf(root, job)
-        else log.warn(`Preview ${o.id} in ${userText(o.place.folder)} left processes that could not be ended`)
-        // Its command's end, bounded: a quit never waits on a server its job couldn't end.
-        let bound: NodeJS.Timeout | undefined
-        const over = await Promise.race([exited.then(() => true), new Promise<boolean>((res) => (bound = setTimeout(() => res(false), END_WAIT_MS)))])
-        clearTimeout(bound)
-        // Proved only when its job is settled and its command has ended: otherwise its ports stay held (the runner).
-        return settled && over
-      })())
+    stop: async () => {
+      const mine = (ending ??= endOnce())
+      const ok = await mine
+      if (ending === mine) ending = ok ? mine : null
+      return ok
+    }
   }
 }
 
@@ -293,7 +307,9 @@ export async function setPreviewConfig(ws: WorkspaceService, projectPath: string
 function closeWorkspace(path: string): Promise<void> {
   if (!runner) return Promise.resolve()
   const key = path.toLowerCase()
-  return runner.stopWhere((_v, owner) => owner === key, { kind: 'projectClosed' }).then(() => undefined)
+  return runner.stopWhere((_v, owner) => owner === key, { kind: 'projectClosed' }).then(({ held }) => {
+    if (held.length) log.warn(`The workspace closed with preview servers not proved ended (jobs ${held.join(', ')}): their journals settle them when a pool next looks`)
+  })
 }
 
 let offEnds: (() => void) | null = null
@@ -305,8 +321,9 @@ export function startPreviews(): void {
   // Awaited by the pools and the project's removal: the slot or copy is settled only once its preview's server is gone.
   offEnds = onPlaceEnded((e) => {
     if (!runner) return
-    if (e.kind === 'generation') return runner.stopWhere((v) => v.place.generation === e.id, { kind: 'placeEnded' })
-    return runner.stopWhere((v) => v.projectPath.toLowerCase() === e.path.toLowerCase(), { kind: 'projectClosed' })
+    // Its answer, the jobs not proved ended: the pool keeps the slot or copy held for them; the removal refuses.
+    if (e.kind === 'generation') return runner.stopWhere((v) => v.place.generation === e.id, { kind: 'placeEnded' }).then(({ held }) => ({ held }))
+    return runner.stopWhere((v) => v.projectPath.toLowerCase() === e.path.toLowerCase(), { kind: 'projectClosed' }).then(({ held }) => ({ held }))
   })
   offAdvanced = advanced.onChange(() => {
     if (!previewOn() && runner) void runner.stopWhere(() => true, { kind: 'turnedOff' })

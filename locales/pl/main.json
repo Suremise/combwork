@@ -327,6 +327,7 @@
   "main.removal.notHidden": "Projekt {project} nie jest ukryty ani usunięty.",
   "main.removal.notProject": "To nie jest projekt w otwartym obszarze roboczym: {path}",
   "main.removal.notTrashed": "Nie udało się przenieść {path} do Kosza: {why}",
+  "main.removal.previewHeld": "Nie udało się zatrzymać serwera deweloperskiego Podglądu w projekcie {project}, więc projekt pozostawiono bez zmian. Spróbuj ponownie, gdy się zatrzyma.",
   "main.removal.refusedTree": "worktree agenta {agent} {path} ({why})",
   "main.removal.stillThere": "Projekt {project} wciąż jest w obszarze roboczym: przywróć go.",
   "main.removal.stopFailed": "Nie udało się zatrzymać agentów projektu {project}. Zatrzymaj ich i spróbuj ponownie.",

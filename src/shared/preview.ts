@@ -127,6 +127,8 @@ export type PreviewEnd =
   | { kind: 'otherPort'; port: number; listening: number[] }
   | { kind: 'notListening'; port: number; seconds: number }
   | { kind: 'noStart'; detail: string }
+  /** Another preview's server in the same place couldn't be proved ended: nothing starts there until it is (HI-3614 round 2). */
+  | { kind: 'placeHeld'; preview: string }
 
 export type PreviewState = 'starting' | 'running' | 'stopped'
 
@@ -150,6 +152,8 @@ export interface PreviewView {
   source: PreviewSource
   /** When the place's files last changed after its start, as its watcher saw (null: not since). */
   changedAt: string | null
+  /** Its server couldn't be proved ended: its place and ports stay held until a later try proves it. */
+  held: boolean
   /** Its server's log (Combwork's own folder, logs\preview). */
   logPath: string | null
 }

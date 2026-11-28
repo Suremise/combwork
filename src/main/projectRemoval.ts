@@ -28,6 +28,9 @@ import { endOwnedWork } from './platform/ownedWork'
 
 const log = createLogger('projects')
 
+/** HI-3614 round 2: a preview's server in the project couldn't be proved ended, so nothing of it is removed. */
+const PREVIEW_HELD = msg({ id: 'main.removal.previewHeld', defaultMessage: "A Preview dev server in {project} couldn't be ended, so the project was left as it is. Try again once it has stopped.", description: "An error: removing, hiding or deleting the project was refused, because a development server Combwork's Preview started in it (its folder, a slot or a review copy) couldn't be proved stopped. {project} is the project's name." })
+
 /**
  * A project leaving Combwork (Project → Remove Project…), three ways:
  * - Hide: nothing moves; Combwork leaves the folder out until it's restored (Settings → Workspace).
@@ -171,8 +174,8 @@ export async function removeProject(projectPath: string, how: ProjectRemoval): P
   const unfence = sessions.fenceStarts(p)
   try {
     await stopAgents(p)
-    // HI-3614: its previews' servers stop with it.
-    await placeEnded({ kind: 'project', path: p })
+    // HI-3614: its previews' servers stop with it; one not proved ended (round 2) keeps the project: nothing of it is removed.
+    if ((await placeEnded({ kind: 'project', path: p })).length) throw new Error(tr(PREVIEW_HELD, { project: name }))
     // HI-1185: a signing check of its Version Control view given up (its signer and temp folder gone first).
     await endOwnedWork((owner) => owner.toLowerCase() === key)
     // Looked at again now nothing runs there: a stopping agent may have written to its worktree at the last moment.

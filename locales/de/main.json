@@ -327,6 +327,7 @@
   "main.removal.notHidden": "Projekt {project} ist weder ausgeblendet noch entfernt.",
   "main.removal.notProject": "Kein Projekt im geöffneten Arbeitsbereich: {path}",
   "main.removal.notTrashed": "{path} konnte nicht in den Papierkorb verschoben werden: {why}",
+  "main.removal.previewHeld": "Ein Dev-Server der Vorschau in {project} konnte nicht beendet werden, daher wurde das Projekt so gelassen, wie es ist. Versuche es erneut, sobald er beendet ist.",
   "main.removal.refusedTree": "Worktree {path} von {agent} ({why})",
   "main.removal.stillThere": "Projekt {project} ist noch im Arbeitsbereich: Stelle es stattdessen wieder her.",
   "main.removal.stopFailed": "Die Agenten von {project} konnten nicht gestoppt werden. Stoppe sie und versuche es dann erneut.",

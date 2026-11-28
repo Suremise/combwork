@@ -215,7 +215,7 @@ describe.skipIf(process.platform !== 'win32')('the preview runner (HI-3614)', ()
     expect(second.id).not.toBe(first.id)
     // The old one stopped (its place ended), and only the new one is known for the place.
     expect(r.views().map((x) => [x.place.generation, x.state])).toEqual([['lease-2', 'running']])
-    expect(await r.stopWhere((x) => x.place.generation === 'lease-2', { kind: 'placeEnded' })).toBe(1)
+    expect((await r.stopWhere((x) => x.place.generation === 'lease-2', { kind: 'placeEnded' })).stopped).toBe(1)
     expect(r.at(folder)?.end).toEqual({ kind: 'placeEnded' })
   })
 
@@ -308,14 +308,14 @@ describe("a preview's lifetime and its ports' owners (HI-3614 round 1)", () => {
     const { r, launches } = fakeRunner({ source: () => new Promise((res) => answers.push(res)) })
     // Stopped before its turn has begun: it reads nothing at all.
     const early = r.start('P', place('a'), { command: 'x' }, { owner: 'ws-1' })
-    expect(await r.stopWhere((_v, owner) => owner === 'ws-1', { kind: 'projectClosed' })).toBe(1)
+    expect((await r.stopWhere((_v, owner) => owner === 'ws-1', { kind: 'projectClosed' })).stopped).toBe(1)
     expect((await early).end).toEqual({ kind: 'projectClosed' })
     expect(answers.length).toBe(0)
     // Stopped while it reads its stamp.
     const started = r.start('P', place('a'), { command: 'x' }, { owner: 'ws-1' })
     await waitUntil(() => answers.length === 1)
-    expect(await r.stopWhere((_v, owner) => owner === 'ws-2', { kind: 'projectClosed' })).toBe(0)
-    expect(await r.stopWhere((_v, owner) => owner === 'ws-1', { kind: 'projectClosed' })).toBe(1)
+    expect((await r.stopWhere((_v, owner) => owner === 'ws-2', { kind: 'projectClosed' })).stopped).toBe(0)
+    expect((await r.stopWhere((_v, owner) => owner === 'ws-1', { kind: 'projectClosed' })).stopped).toBe(1)
     answers[0]({ kind: 'clean', commit: 'c0ffee' })
     expect((await started).end).toEqual({ kind: 'projectClosed' })
     await settle()
@@ -392,22 +392,41 @@ describe("a preview's lifetime and its ports' owners (HI-3614 round 1)", () => {
     expect(r.at(place('a').folder)?.state).toBe('stopped')
   })
 
-  it("keeps its ports held when its server's end can't be proved", async () => {
+  it("keeps its place and ports held when its server's end can't be proved: a new lease's start there is refused until it is", async () => {
     const { r, table, launches } = fakeRunner()
     const log: string[] = []
-    const started = r.start('P', place('a'), { command: 'x' })
+    const folder = place('slot-a').folder
+    const started = r.start('P', place('slot-a', 'old', folder), { command: 'x' })
     await waitUntil(() => launches.length === 1)
     table.push({ port: 53000, pid: 101 })
-    launches[0].answer(fakeServer(101, log, 'a', { proved: false }))
+    const proof = { proved: false }
+    const server = fakeServer(101, log, 'old')
+    launches[0].answer({ ...server, job: 'preview-old', stop: async () => (await server.stop(), proof.proved) })
     const v = await started
-    await r.stop(v.id)
+    expect(v.state).toBe('running')
+    // Its lease ends: the stop can't prove its server gone. The place and its port stay held, and the job is named.
+    const ended = await r.stopWhere((x) => x.place.generation === 'old', { kind: 'placeEnded' })
+    expect(ended).toEqual({ stopped: 1, held: ['preview-old'] })
     expect(r.heldPorts()).toEqual([53000])
+    expect(r.at(folder)).toMatchObject({ id: v.id, held: true })
+    // The slot's next lease: its start in the SAME folder tries the old server's end again, still unproved: refused, nothing launched.
+    const refused = await r.start('P', place('slot-a', 'new', folder), { command: 'x' })
+    expect(refused).toMatchObject({ state: 'stopped', end: { kind: 'placeHeld', preview: v.id } })
+    expect(launches.length).toBe(1)
+    expect(log).toEqual(['stop old', 'stop old'])
+    // The old record is kept (never forgotten while held), and asked again it still names its job.
+    expect((await r.stopWhere((x) => x.place.generation === 'old', { kind: 'placeEnded' })).held).toEqual(['preview-old'])
+    // Once its end is proved (a later try), the next start goes ahead there, and the old port is free again.
+    proof.proved = true
     table.length = 0
-    const next = r.start('P', place('b'), { command: 'x' })
+    const next = r.start('P', place('slot-a', 'new', folder), { command: 'x' })
     await waitUntil(() => launches.length === 2)
-    expect(launches[1].o.env.PORT).toBe('53001')
-    launches[1].answer({ problem: 'no' })
-    expect((await next).end).toEqual({ kind: 'noStart', detail: 'no' })
+    expect(r.heldPorts()).toEqual([53000])
+    expect(r.views().some((x) => x.id === v.id)).toBe(false)
+    table.push({ port: 53000, pid: 202 })
+    launches[1].answer(fakeServer(202, log, 'new'))
+    expect(await next).toMatchObject({ state: 'running', port: 53000, place: { generation: 'new' } })
+    await r.stopWhere(() => true, { kind: 'stopped' })
   })
 })
 

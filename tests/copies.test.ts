@@ -182,6 +182,26 @@ describe('copies: leasing at a revision (#1435)', { timeout: timing('test.hang')
     expect(readFileSync(join(again.folder, 'b.txt'), 'utf8')).toBe('b\n')
   })
 
+  it("a return that can't prove a preview's server gone keeps the copy held for its job until a settle proves it (HI-3614 round 2)", async () => {
+    const w = world({ size: 1 })
+    const pool = new CopyPool({ ...w.pool.deps, returned: async () => ({ holdJob: 'preview-held' }) })
+    const l = await leased(w, { kind: 'review', card: 7 }, pool)
+    w.set.jobs.set('preview-held', false)
+    expect(await pool.returnCopy(l.lease.id, 'over')).toBe(true)
+    expect(w.store.copy(l.name)?.job).toBe('preview-held')
+    // Not leased again while the job isn't proved ended, refresh or not: the pool of one has no copy to give.
+    await pool.refresh()
+    expect(w.store.copy(l.name)?.job).toBe('preview-held')
+    expect(await pool.leaseCopy({ kind: 'review', card: 8, revision: head(w.project) })).toEqual({ ok: false, refusal: { why: 'noCopy', size: 1 } })
+    // Proved by a later settle: cleared, and the copy is leased again.
+    w.set.jobs.set('preview-held', true)
+    await pool.refresh()
+    expect(w.store.copy(l.name)?.job).toBeNull()
+    const again = await leased(w, { kind: 'review', card: 8 }, pool)
+    expect(again.name).toBe(l.name)
+    await pool.close()
+  })
+
   it('a dirty copy is cleaned at its next lease: tracked changes and untracked files go, ignored ones stay', async () => {
     const w = world()
     const l = await leased(w)

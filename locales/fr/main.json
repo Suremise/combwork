@@ -327,6 +327,7 @@
   "main.removal.notHidden": "Le projet {project} n’est ni masqué ni retiré.",
   "main.removal.notProject": "Ce n’est pas un projet de l’espace de travail ouvert : {path}",
   "main.removal.notTrashed": "Impossible de placer {path} dans la Corbeille : {why}",
+  "main.removal.previewHeld": "Un serveur de développement de l’Aperçu dans {project} n’a pas pu être arrêté : le projet a donc été laissé tel quel. Réessayez une fois qu’il s’est arrêté.",
   "main.removal.refusedTree": "le worktree {path} de l’agent {agent} ({why})",
   "main.removal.stillThere": "Le projet {project} est toujours dans l’espace de travail : restaure-le plutôt.",
   "main.removal.stopFailed": "Impossible d’arrêter les agents du projet {project}. Arrête-les, puis réessaie.",

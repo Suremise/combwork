@@ -329,6 +329,7 @@ interface CombworkMessageValues {
   'main.removal.notHidden': { project: string | number }
   'main.removal.notProject': { path: string | number }
   'main.removal.notTrashed': { path: string | number; why: string | number }
+  'main.removal.previewHeld': { project: string | number }
   'main.removal.refusedTree': { agent: string | number; path: string | number; why: string | number }
   'main.removal.stillThere': { project: string | number }
   'main.removal.stopFailed': { project: string | number }

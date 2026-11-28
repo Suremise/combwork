@@ -327,6 +327,7 @@
   "main.removal.notHidden": "O projeto {project} não está oculto nem removido.",
   "main.removal.notProject": "Não é um projeto do espaço de trabalho aberto: {path}",
   "main.removal.notTrashed": "Não foi possível mover {path} para a Lixeira: {why}",
+  "main.removal.previewHeld": "Não foi possível encerrar um servidor de desenvolvimento da Pré-visualização em {project}, então o projeto ficou como estava. Tente de novo quando ele tiver parado.",
   "main.removal.refusedTree": "o worktree {path} do agente {agent} ({why})",
   "main.removal.stillThere": "O projeto {project} ainda está no espaço de trabalho: restaure-o em vez disso.",
   "main.removal.stopFailed": "Não foi possível parar os agentes do projeto {project}. Pare-os e tente de novo.",

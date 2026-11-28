@@ -412,6 +412,11 @@ export class CopyStore {
     await this.conn.write((db) => db.prepare(`UPDATE copies SET state = 'gone' WHERE project = ? AND name = ? AND state = 'free' AND ${FREE}`).run(this.project, name))
   }
 
+  /** HI-3614 round 2: a job kept on a copy that holds none (a preview's server not proved ended): whether it was. */
+  async holdJob(name: string, job: string): Promise<boolean> {
+    return this.conn.write((db) => Number(db.prepare('UPDATE copies SET job = ? WHERE project = ? AND name = ? AND job IS NULL').run(job, this.project, name).changes) === 1)
+  }
+
   /** A copy-level job (a warming's) settled since: cleared, only while no operation holds the copy. */
   async jobSettled(name: string, job: string): Promise<void> {
     await this.conn.write((db) => db.prepare('UPDATE copies SET job = NULL WHERE project = ? AND name = ? AND job = ? AND op IS NULL').run(this.project, name, job))
@@ -442,8 +447,11 @@ interface CopyPoolDeps {
   reviewOn: () => boolean
   /** How long a returning copy is held back before it shows as still in use (Settings → Advanced). */
   quietWaitMs: () => number
-  /** HI-3614: a lease was returned (a preview running in its copy stops with it, awaited before the copy is freed). */
-  returned?: (lease: CopyLease) => void | Promise<void>
+  /**
+   * HI-3614: a lease was returned (a preview running in its copy stops with it, awaited before the copy is freed). Round 2:
+   * `holdJob`, a job whose processes may still run in the copy: kept on it, so it isn't freed or leased until settled.
+   */
+  returned?: (lease: CopyLease) => void | Promise<void | { holdJob?: string }>
   now?: () => number
 }
 
@@ -723,9 +731,17 @@ export class CopyPool {
   async returnCopy(lease: string, why: string): Promise<boolean> {
     const l = await this.store.returnLease(lease, why)
     if (!l) return false
-    await this.deps.returned?.(l)
+    await this.holdFor(l.copy, await this.deps.returned?.(l))
     if (await this.tryFree(l.copy)) this.soon(l.copy)
     return true
+  }
+
+  /** HI-3614 round 2: a job a return couldn't prove ended kept on the copy, until the refresh's settle proves it. */
+  private async holdFor(name: string, answer: void | { holdJob?: string }): Promise<void> {
+    const job = answer && answer.holdJob
+    if (!job) return
+    if (await this.store.holdJob(name, job)) log.warn(`Copy ${userText(name)} is held for job ${job}, whose processes couldn't be proved ended: it isn't freed until they are`)
+    else log.warn(`Copy ${userText(name)} already holds a job: job ${job}, whose processes couldn't be proved ended, isn't recorded on it`)
   }
 
   /** The copies being tried again soon (soon), with their timers. */
@@ -804,7 +820,7 @@ export class CopyPool {
       const over = mine ? await this.deps.leaseOver(l) : (await this.deps.holder.alive(l.pid, l.started)) === false
       if (over === true) {
         const r = await this.store.returnLease(l.id, mine ? 'over' : 'combworkGone')
-        if (r) await this.deps.returned?.(r)
+        if (r) await this.holdFor(r.copy, await this.deps.returned?.(r))
       }
     }
     for (const c of this.store.copies()) {

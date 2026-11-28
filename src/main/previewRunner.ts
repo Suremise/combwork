@@ -32,8 +32,10 @@ export interface Launched {
   exited: Promise<{ code: number | null }>
   /** The process ids in its tree now; null when they can't be told. */
   tree: () => Promise<number[] | null>
-  /** Ends its whole tree and waits until it has gone: true once that is proved, false when it can't be. */
+  /** Ends its whole tree and waits until it has gone: true once that is proved, false when it can't be (asked again later, it tries again). */
   stop: () => Promise<boolean>
+  /** Its job on the process supervisor, by name: what a pool keeps on the slot or copy while its end isn't proved. */
+  job?: string
 }
 
 export interface RunnerDeps {
@@ -84,6 +86,13 @@ interface Running {
   started: Promise<PreviewView>
   /** Ending it now: its stop under way, or over. */
   stopping: Promise<void> | null
+  /** Its server, once known to its stop (a launch it awaited included). */
+  server: Launched | null
+  /**
+   * Its server's end couldn't be proved (HI-3614 round 2): its place stays held. Its ports stay taken, no other preview
+   * starts there until a later try proves it, and it is never forgotten meanwhile.
+   */
+  unproved: boolean
 }
 
 const placeKey = (folder: string): string => folder.replace(/[\\/]+$/, '').toLowerCase()
@@ -157,15 +166,20 @@ export class PreviewRunner {
       if (placeKey(r.view.place.folder) === key && r.view.state !== 'stopped' && !r.stopping && r.view.place.generation === place.generation && r.view.projectPath.toLowerCase() === projectPath.toLowerCase()) return r.started
     }
     const id = `pv-${randomBytes(6).toString('hex')}`
-    const view: PreviewView = { id, projectPath, place, state: 'starting', port: 0, hmrPort: null, url: null, startedAt: this.iso(), readyAt: null, stoppedAt: null, end: null, source: { kind: 'unknown', commit: null, why: 'not read yet' }, changedAt: null, logPath: null } // i18n-ignore: a stamp's reason, until it is read
-    const r: Running = { view, config, owner: opts.owner ?? null, launched: null, launching: null, unwatch: null, ports: [], started: Promise.resolve(view), stopping: null }
+    const view: PreviewView = { id, projectPath, place, state: 'starting', port: 0, hmrPort: null, url: null, startedAt: this.iso(), readyAt: null, stoppedAt: null, end: null, source: { kind: 'unknown', commit: null, why: 'not read yet' }, changedAt: null, logPath: null, held: false } // i18n-ignore: a stamp's reason, until it is read
+    const r: Running = { view, config, owner: opts.owner ?? null, launched: null, launching: null, unwatch: null, ports: [], started: Promise.resolve(view), stopping: null, server: null, unproved: false }
     this.previews.set(id, r)
     this.forgetOld()
     const turn = (this.placeTurn.get(key) ?? Promise.resolve()).catch(() => undefined).then(async () => {
-      // Whatever else is at this place stops first, and is gone, before this one does anything there.
+      // Whatever else is at this place stops first, and is gone, before this one does anything there. One whose server
+      // can't be proved ended (tried again now) keeps the place: this start is refused, and nothing runs beside it.
       for (const o of [...this.previews.values()]) {
         if (o === r || placeKey(o.view.place.folder) !== key) continue
         await this.stop(o.view.id, { kind: 'placeEnded' })
+        if (o.unproved && !(await this.retryHeld(o))) {
+          await this.stop(r.view.id, { kind: 'placeHeld', preview: o.view.id })
+          return { ...r.view }
+        }
         this.previews.delete(o.view.id)
       }
       try {
@@ -345,12 +359,34 @@ export class PreviewRunner {
         const got = await r.launching.catch(() => null)
         server = got && !('problem' in got) ? got : null
       }
+      r.server = server
       const proved = server ? await server.stop().catch(() => false) : true
       if (proved) this.release(r)
-      else this.deps.log?.warn(`Preview ${id}'s server could not be proved ended: its ports ${r.ports.join(', ')} stay held`)
+      else this.hold(r)
     })()
     this.finish(r, end)
     return r.stopping
+  }
+
+  /** Its server's end not proved: its place and ports stay held until a later try proves it (retryHeld). */
+  private hold(r: Running): void {
+    r.unproved = true
+    r.view.held = true
+    this.deps.log?.warn(`Preview ${r.view.id}'s server could not be proved ended: its place and its ports ${r.ports.join(', ')} stay held`)
+    this.changed(r)
+  }
+
+  /** Tries again to end a held preview's server: true once proved (its place and ports then given back). */
+  private async retryHeld(r: Running): Promise<boolean> {
+    if (!r.unproved) return true
+    const proved = r.server ? await r.server.stop().catch(() => false) : true
+    if (!proved) return false
+    r.unproved = false
+    r.view.held = false
+    this.release(r)
+    this.deps.log?.info(`Preview ${r.view.id}'s server is now proved ended: its place is free`)
+    this.changed(r)
+    return true
   }
 
   private release(r: Running): void {
@@ -376,15 +412,17 @@ export class PreviewRunner {
    * Stops every preview that matches (a place's generation ended, a project or a workspace closed, the switch turned off),
    * starting ones included, and waits until each stop is over.
    */
-  async stopWhere(match: (v: PreviewView, owner: string | null) => boolean, end: PreviewEnd): Promise<number> {
+  async stopWhere(match: (v: PreviewView, owner: string | null) => boolean, end: PreviewEnd): Promise<{ stopped: number; held: string[] }> {
     const due = [...this.previews.values()].filter((r) => (r.view.state !== 'stopped' || r.stopping) && match(r.view, r.owner))
     await Promise.all(due.map((r) => this.stop(r.view.id, end)))
-    return due.filter((r) => r.view.end === end).length
+    // Those whose server's end isn't proved (now, or before): their jobs, for whoever must keep the place held.
+    const held = [...this.previews.values()].filter((r) => r.unproved && match(r.view, r.owner)).map((r) => r.server?.job ?? r.view.id)
+    return { stopped: due.filter((r) => r.view.end === end).length, held }
   }
 
   /** Forgets the oldest stopped previews past KEPT_STOPPED (only those whose stop is over). */
   private forgetOld(): void {
-    const stopped = [...this.previews.values()].filter((r) => r.view.state === 'stopped' && !r.launching)
+    const stopped = [...this.previews.values()].filter((r) => r.view.state === 'stopped' && !r.launching && !r.unproved)
     for (const r of stopped.slice(0, Math.max(0, stopped.length - KEPT_STOPPED))) this.previews.delete(r.view.id)
   }
 

@@ -1311,6 +1311,10 @@
     "defaultMessage": "{path} couldn't be moved to the Recycle Bin: {why}",
     "description": "A warning after Delete: a worktree or handover note of the project couldn't go to the Recycle Bin. {path} is it, {why} the system's message."
   },
+  "main.removal.previewHeld": {
+    "defaultMessage": "A Preview dev server in {project} couldn't be ended, so the project was left as it is. Try again once it has stopped.",
+    "description": "An error: removing, hiding or deleting the project was refused, because a development server Combwork's Preview started in it (its folder, a slot or a review copy) couldn't be proved stopped. {project} is the project's name."
+  },
   "main.removal.refusedTree": {
     "defaultMessage": "{agent}'s worktree {path} ({why})",
     "description": "An agent's worktree Combwork won't remove or delete with its project. {agent} is the agent's name, {path} the worktree's folder, {why} why (main.removal.why.*)."

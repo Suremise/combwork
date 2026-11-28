@@ -94,7 +94,11 @@ export function copiesFor(ws: WorkspaceService, projectPath: string): Promise<Co
       reviewOn: () => advanced.get(COPIES_REVIEW) !== false && advanced.get<boolean>(WORKFLOW_ENFORCE) !== false,
       quietWaitMs: () => Math.max(1, Number(advanced.get(COPIES_QUIET_WAIT)) || 10) * 60_000,
       // HI-3614: a preview running in the copy under this lease stops with it (its review over).
-      returned: (l) => placeEnded({ kind: 'generation', id: l.id })
+      returned: async (l) => {
+        // One whose server isn't proved gone keeps the copy held for its job (round 2).
+        const held = await placeEnded({ kind: 'generation', id: l.id })
+        return held.length ? { holdJob: held[0] } : undefined
+      }
     })
     // The seals of jobs settled before this Combwork started (HI-1723; the folder slots' jobs share).
     sweepSealsOf(root, { once: true })
