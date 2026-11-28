@@ -86,9 +86,9 @@ export function PreviewSettings({ project }: { project: ProjectInfo }) {
         <input className={`input mono${pathOk ? '' : ' invalid'}`} data-field="path" value={path} spellCheck={false} maxLength={200} disabled={busy} aria-invalid={!pathOk} onChange={(e) => setPath(e.target.value)} />
       </label>
       {!pathOk && <div className="field-error">{tr(M.badPath)}</div>}
-      <div className="flex">
+      <div className="preview-row">
         <Switch checked={hmr} disabled={busy} label={tr(M.hmr)} onChange={setHmr} />
-        <span>{tr(M.hmr)}</span>
+        <span className="preview-hmr-label">{tr(M.hmr)}</span>
         <span className="faint small">{tr(M.hmrNote, { variable: PREVIEW_ENV.hmr })}</span>
       </div>
       {setup && (
@@ -96,7 +96,7 @@ export function PreviewSettings({ project }: { project: ProjectInfo }) {
           {tr(M.address, { first: String(setup.range[0]), last: String(setup.range[1]), variable: PREVIEW_ENV.port, url: `http://127.0.0.1:%PORT%${p}` })}
         </div>
       )}
-      <div className="flex">
+      <div className="preview-row">
         <button className="btn" data-action="save-preview" disabled={busy || !changed || !command.trim() || !pathOk} onClick={() => void save({ command: command.trim(), ...(p !== '/' ? { path: p } : {}), ...(hmr ? { hmrPort: true } : {}) })}>
           <Icon name="save" /> {tr(M.save)}
         </button>
