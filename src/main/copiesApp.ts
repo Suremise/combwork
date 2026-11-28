@@ -19,7 +19,7 @@ import { config } from './config'
 import { containsPlace } from './fsutil'
 import { agentMsg, say, sayWithId, type Said } from '../shared/agentText'
 import { createLogger, userText } from './logger'
-import { placeEnded } from './placeEnds'
+import { placeEnded, settleHeld } from './placeEnds'
 import { progress } from './progressService'
 import { sessions } from './sessions'
 import { appRunner, appSettle, boardConn, holder, journalsOf, retireSealOf, sweepSealsOf } from './slotsApp'
@@ -65,7 +65,8 @@ export function copiesFor(ws: WorkspaceService, projectPath: string): Promise<Co
       },
       runner: appRunner(ws, projectPath, root),
       settle: async (job) => {
-        const ok = await appSettle(root)(job)
+        // A preview's hold needs its page's guard proved gone too (HI-3615 round 2).
+        const ok = await settleHeld(job, appSettle(root))
         if (ok) {
           const closing: Promise<void>[] = []
           for (const [id, j] of jobs) {

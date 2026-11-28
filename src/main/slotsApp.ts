@@ -32,7 +32,7 @@ import { removeCopiesIn } from './skillCopies'
 import { settleSlotJob } from './slotJobs'
 import { builderCountOf, DETACH_FAILED, operationTold, SlotPool, slotLevelsOf, slotOptionsOf, SlotStore, type OpHolder, type Slot, type SlotConn, type SlotLease, type SlotRenamer, type SlotRunEnd, type SlotRunner, type SlotWriter } from './slots'
 import { onCombworkEvent } from './events'
-import { placeEnded } from './placeEnds'
+import { placeEnded, settleHeld } from './placeEnds'
 import { agentBusy } from './workflow/lineUpdates'
 import { agentRunsGoing } from './workflow/service'
 import { openWorkspaces, workspaceFor, WorkspaceService } from './workspace'
@@ -309,7 +309,8 @@ export function poolFor(ws: WorkspaceService, projectPath: string): Promise<Slot
       cap: () => agentMax(projectPath),
       runner: appRunner(ws, projectPath, root),
       settle: async (job) => {
-        const ok = await appSettle(root)(job)
+        // A preview's hold needs its page's guard proved gone too (HI-3615 round 2).
+        const ok = await settleHeld(job, appSettle(root))
         if (ok) retireSealOf(root, job)
         return ok
       },

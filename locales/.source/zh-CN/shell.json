@@ -100,6 +100,7 @@
   "shell.command.project.tab.next": "Next Project Tab",
   "shell.command.project.tab.overview": "Go to Overview",
   "shell.command.project.tab.performance": "Go to Performance",
+  "shell.command.project.tab.preview": "Go to Preview",
   "shell.command.project.tab.previous": "Previous Project Tab",
   "shell.command.project.tab.session": "Go to Session",
   "shell.command.project.tab.sessions": "Go to Sessions",

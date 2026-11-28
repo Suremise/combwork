@@ -403,6 +403,10 @@
     "defaultMessage": "Go to Performance",
     "description": "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Project category."
   },
+  "shell.command.project.tab.preview": {
+    "defaultMessage": "Go to Preview",
+    "description": "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Project category: shows the Preview tab (only while the Preview is turned on in Settings → Advanced)."
+  },
   "shell.command.project.tab.previous": {
     "defaultMessage": "Previous Project Tab",
     "description": "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Project category."

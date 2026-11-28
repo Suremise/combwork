@@ -1915,6 +1915,14 @@
     "defaultMessage": "Address a pull request’s comments",
     "description": "A tip's title (HI-3554): a pull request's comments show on its card, and chosen ones become a fix card."
   },
+  "tips.previewTab.text": {
+    "defaultMessage": "Turn on Settings → Advanced → Preview: run projects' dev servers, set the dev server's command in Project Settings → Preview, and the Preview tab runs it and shows its page in a guarded view that reaches only its own server and the internet.",
+    "description": "A tip (HI-3615). Names of Combwork's menus, views, settings and commands (Preview: run projects' dev servers is an advanced setting's title): keep them as Combwork shows them."
+  },
+  "tips.previewTab.title": {
+    "defaultMessage": "See a web project's page in Combwork",
+    "description": "A tip's title (HI-3615): the Preview tab shows a web project's dev server."
+  },
   "tips.progressCard.text": {
     "defaultMessage": "A run in the Progress panel shows the card and the revision it ran on under the agent, such as #1061 · a3f2c1d: click the card to open it, or the revision to copy it.",
     "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them. #1061 is a card's number and a3f2c1d a commit's short id: keep them as they are."

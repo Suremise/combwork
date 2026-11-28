@@ -57,6 +57,12 @@ export interface RunnerDeps {
   watch: (folder: string, changed: () => void) => () => void
   /** Where its server's log goes, or null. */
   logPath: (id: string, place: PreviewPlace) => string | null
+  /**
+   * HI-3615 round 1: the preview's own teardown beyond its server (its guarded page: its proxy, its page, its
+   * connections), awaited by every stop before its server is ended and its place and ports given back. False when its end
+   * can't be proved: the place stays held, as for a server's.
+   */
+  teardown?: (id: string) => Promise<boolean>
   /** How often a start looks at the TCP table (default 250 ms). */
   pollMs?: number
   now?: () => number
@@ -360,7 +366,10 @@ export class PreviewRunner {
         server = got && !('problem' in got) ? got : null
       }
       r.server = server
-      const proved = server ? await server.stop().catch(() => false) : true
+      // Its guarded page first (a page or proxy of this generation never outlives its stop), then its server. One that
+      // never had a server never had a page.
+      const pageGone = server && this.deps.teardown ? await this.deps.teardown(id).catch(() => false) : true
+      const proved = (server ? await server.stop().catch(() => false) : true) && pageGone
       if (proved) this.release(r)
       else this.hold(r)
     })()
@@ -376,10 +385,20 @@ export class PreviewRunner {
     this.changed(r)
   }
 
-  /** Tries again to end a held preview's server: true once proved (its place and ports then given back). */
+  /**
+   * A pool's question about a job it holds a place for (HI-3615 round 2): the held preview it names (its server's job, or
+   * its id) tried again, server and page; true once both are proved gone, or when no held preview has that job.
+   */
+  async retryHeldJob(job: string): Promise<boolean> {
+    const r = [...this.previews.values()].find((x) => x.unproved && (x.server?.job === job || x.view.id === job))
+    return r ? this.retryHeld(r) : true
+  }
+
+  /** Tries again to end a held preview's server and page: true once proved (its place and ports then given back). */
   private async retryHeld(r: Running): Promise<boolean> {
     if (!r.unproved) return true
-    const proved = r.server ? await r.server.stop().catch(() => false) : true
+    const pageGone = r.server && this.deps.teardown ? await this.deps.teardown(r.view.id).catch(() => false) : true
+    const proved = (r.server ? await r.server.stop().catch(() => false) : true) && pageGone
     if (!proved) return false
     r.unproved = false
     r.view.held = false

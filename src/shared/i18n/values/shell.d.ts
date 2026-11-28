@@ -102,6 +102,7 @@ interface CombworkMessageValues {
   'shell.command.project.tab.next': undefined
   'shell.command.project.tab.overview': undefined
   'shell.command.project.tab.performance': undefined
+  'shell.command.project.tab.preview': undefined
   'shell.command.project.tab.previous': undefined
   'shell.command.project.tab.session': undefined
   'shell.command.project.tab.sessions': undefined

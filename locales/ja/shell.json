@@ -100,6 +100,7 @@
   "shell.command.project.tab.next": "次のプロジェクトタブ",
   "shell.command.project.tab.overview": "概要タブに移動",
   "shell.command.project.tab.performance": "パフォーマンスタブに移動",
+  "shell.command.project.tab.preview": "プレビューへ移動",
   "shell.command.project.tab.previous": "前のプロジェクトタブ",
   "shell.command.project.tab.session": "セッションタブに移動",
   "shell.command.project.tab.sessions": "セッション履歴タブに移動",

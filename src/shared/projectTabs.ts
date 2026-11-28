@@ -26,6 +26,9 @@ export const PROJECT_TABS = [
   { id: 'skills', label: msg({ id: 'project.tab.skills', defaultMessage: 'Skills', description: "A project's tab: the skills its agents get." }), icon: 'sparkle', more: true },
   { id: 'templates', label: msg({ id: 'project.tab.templates', defaultMessage: 'Templates', description: "A project's tab: templates of agents and cards." }), icon: 'library', more: true },
   { id: 'mcp', label: msg({ id: 'project.tab.mcp', defaultMessage: 'MCP', description: "A project's tab: the MCP servers its agents get. Keep MCP." }), icon: 'plug', more: true },
+  // The Preview (HI-3615): only while Settings → Advanced's switch is on; in the strip, after its main tabs, once the
+  // project has a preview command (previewStrip), else here in More ▾ to set one up.
+  { id: 'preview', label: msg({ id: 'project.tab.preview', defaultMessage: 'Preview', description: "A project's tab: its dev server's page, shown in a guarded view." }), icon: 'globe', more: true },
   { id: 'settings', label: msg({ id: 'project.tab.settings', defaultMessage: 'Settings', description: "A project's tab: its own settings." }), icon: 'settings' }
 ] as const
 
@@ -57,6 +60,16 @@ const STARTER = agentMsg({ id: 'contract.instructions.starterFor', text: 'Instru
 const CONNECTION_STARTER = agentMsg({ id: 'contract.instructions.starterConnection', text: 'Instructions for {provider} agents on this connection, in every project.', note: "A connection's new instructions file's first line, under the connection's name (Memory creates it): its agents read it in every project. provider: the CLI's name (Claude Code)." })
 const USER_HEADING = agentMsg({ id: 'contract.instructions.userHeading', text: 'All projects', note: "The heading of the user's own new instructions file (~/.claude/CLAUDE.md and the like), which applies in every project (Memory creates it)." })
 const USER_STARTER = agentMsg({ id: 'contract.instructions.starterUser', text: 'Instructions for {provider} in every project.', note: "The user's own new instructions file's first line, under its heading (Memory creates it). provider: the CLI's name (Claude Code)." })
+
+/** HI-3615: where the Preview tab is: in the strip (a preview command set), in More ▾ (none yet), or hidden (the switch off). */
+export type PreviewTabPlace = 'strip' | 'more' | 'hidden'
+
+/** The strip's tabs and More ▾'s, with the Preview tab where it is now (the static lists have it in More ▾). */
+export function stripTabs(preview: PreviewTabPlace): { main: readonly (typeof STRIP_TABS)[number][]; more: readonly (typeof STRIP_TABS)[number][] } {
+  const tab = STRIP_TABS.find((t) => t.id === 'preview')!
+  const more = MORE_TABS.filter((t) => t.id !== 'preview' || preview === 'more')
+  return { main: preview === 'strip' ? [...MAIN_TABS, tab] : MAIN_TABS, more }
+}
 
 /** The command that shows a tab. */
 export const tabCommand = (id: ProjectTab): string => `project.tab.${id}`

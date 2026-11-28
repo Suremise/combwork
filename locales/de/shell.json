@@ -100,6 +100,7 @@
   "shell.command.project.tab.next": "Nächster Projekt-Tab",
   "shell.command.project.tab.overview": "Zu „Übersicht“ wechseln",
   "shell.command.project.tab.performance": "Zu „Leistung“ wechseln",
+  "shell.command.project.tab.preview": "Zu Vorschau wechseln",
   "shell.command.project.tab.previous": "Vorheriger Projekt-Tab",
   "shell.command.project.tab.session": "Zu „Sitzung“ wechseln",
   "shell.command.project.tab.sessions": "Zu „Sitzungen“ wechseln",

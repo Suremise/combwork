@@ -98,6 +98,8 @@ export default defineConfig({
           'log-writer': resolve(__dirname, 'src/main/logWriter.ts'),
           // The WAL checkpoints' worker thread (HI-1691).
           'wal-checkpoint-worker': resolve(__dirname, 'src/main/walCheckpointWorker.ts'),
+          // The Preview's filtering proxy, a utility process per preview generation (HI-3615).
+          'preview-proxy': resolve(__dirname, 'src/main/previewProxy.ts'),
           // The 1.0 data folders' move to .combwork: its card rewrite (HI-2462).
           'cw-move-worker': resolve(__dirname, 'src/main/combworkMoveWorker.ts')
         }

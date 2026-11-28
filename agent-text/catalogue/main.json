@@ -509,6 +509,11 @@
     "note": "An error: Project Settings → Preview's values weren't saved: the command is empty or too long, or the path doesn't start with a slash.",
     "audience": "both"
   },
+  "main.preview.guardFailed": {
+    "text": "The preview's network guard couldn't start, so its page isn't shown. Start it again; Combwork's log says why.",
+    "note": "An error: the Preview's network guard (the filtering proxy every request of the previewed page goes through) didn't start, so Combwork shows no page.",
+    "audience": "both"
+  },
   "main.preview.noConfig": {
     "text": "{project} has no preview command: set one in Project Settings → Preview.",
     "note": "An error: a preview was asked for in a project that has no preview command. {project} is the project's name. Project Settings → Preview is a section: use its names as translated there.",
@@ -522,6 +527,11 @@
   "main.preview.notLent": {
     "text": "{slot} isn't lent to a card or a review now, so a preview can't run in it.",
     "note": "An error: a preview was asked for in a slot or review copy no card or review holds now. {slot} is its name (slot-b, copy-1).",
+    "audience": "both"
+  },
+  "main.preview.notRunning": {
+    "text": "That preview isn't running now: start it again.",
+    "note": "An error: the Preview tab asked to show, reload or inspect a preview that has stopped meanwhile.",
     "audience": "both"
   },
   "main.preview.off": {

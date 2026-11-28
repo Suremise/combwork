@@ -509,6 +509,18 @@ export interface CombworkRequests {
   'preview:stop': (projectPath: string, folder?: string | null) => boolean
   'preview:suggest': (projectPath: string) => { suggestion: PreviewSuggestion | null; range: [number, number] }
   'preview:setConfig': (projectPath: string, config: PreviewConfig | null) => PreviewConfig | null
+  /**
+   * The Preview tab (HI-3615): a running preview's guarded page shown in the calling window at the tab's bounds (its guard
+   * made on first use), moved, taken out; reloaded (hard: past the cache); its DevTools (the user's button); a URL the
+   * page tried to leave for opened in the user's browser (only one it tried); test copies' look at its guard.
+   */
+  'preview:show': (projectPath: string, id: string, bounds: { x: number; y: number; width: number; height: number }) => PreviewView
+  'preview:place': (id: string, bounds: { x: number; y: number; width: number; height: number }) => void
+  'preview:hide': (id: string) => void
+  'preview:reload': (projectPath: string, id: string, hard: boolean) => void
+  'preview:devtools': (projectPath: string, id: string) => void
+  'preview:openTried': (id: string, url: string) => boolean
+  'preview:test': (op: { op: 'refusals' | 'killGuard' | 'shown' | 'tried' | 'capture'; id: string; file?: string }) => unknown
   /** A workspace's (null) or a project's GitHub host settings as they resolve (HI-2779), and a change to them. */
   'github:form': (projectPath: string | null) => GithubHostsForm
   'github:set': (projectPath: string | null, change: GithubHostChange) => GithubHostsForm

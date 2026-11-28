@@ -1,4 +1,56 @@
 {
+  "preview.end.exited": {
+    "defaultMessage": "{known, select, yes {The dev server exited (code {code}).} other {The dev server exited.}}",
+    "description": "The Preview tab's line: the dev server's process ended. known: yes when there is an exit code ({code}, a number): keep the select keys."
+  },
+  "preview.end.guardStopped": {
+    "defaultMessage": "Stopped: network guard stopped.",
+    "description": "The Preview tab's line: the Preview's network guard (the filtering proxy every request of the page goes through) stopped, so the page was closed."
+  },
+  "preview.end.noFreePort": {
+    "defaultMessage": "No free preview port in {first}–{last}.",
+    "description": "The Preview tab's line: every port of the Preview's range is in use. {first} and {last} are port numbers."
+  },
+  "preview.end.noStart": {
+    "defaultMessage": "The dev server couldn't start: {detail}",
+    "description": "The Preview tab's line. {detail} is why, in English as the log has it."
+  },
+  "preview.end.notListening": {
+    "defaultMessage": "Nothing listened on port {port} within {seconds} s.",
+    "description": "The Preview tab's line: the dev server didn't start listening in time. {port} is a port number, {seconds} a number of seconds."
+  },
+  "preview.end.otherPort": {
+    "defaultMessage": "The server listens on {ports}, not on {port}: pass the port it is given, such as --port %PORT%.",
+    "description": "The Preview tab's line: the dev server ignored the port it was given (in PORT). {ports} lists the ports it listens on, {port} is the one it was given; --port %PORT% is a command-line example: keep it."
+  },
+  "preview.end.placeEnded": {
+    "defaultMessage": "Stopped: its slot's lease or its review ended.",
+    "description": "The Preview tab's line: the place it ran in (a slot lent to a card, a review copy) was given back."
+  },
+  "preview.end.placeHeld": {
+    "defaultMessage": "An earlier dev server here couldn't be ended, so nothing starts here until it is.",
+    "description": "The Preview tab's line: a previous server in this place couldn't be proved stopped."
+  },
+  "preview.end.projectClosed": {
+    "defaultMessage": "Stopped: the project or its workspace closed.",
+    "description": "The Preview tab's line."
+  },
+  "preview.end.quitting": {
+    "defaultMessage": "Stopped as Combwork quit.",
+    "description": "The Preview tab's line."
+  },
+  "preview.end.stopped": {
+    "defaultMessage": "Stopped.",
+    "description": "The Preview tab's line: the dev server was stopped."
+  },
+  "preview.end.stranger": {
+    "defaultMessage": "Port {port} is held by another program (process {pid}), so its page isn't shown.",
+    "description": "The Preview tab's line: another program listens on the dev server's port. {port} and {pid} are numbers."
+  },
+  "preview.end.turnedOff": {
+    "defaultMessage": "Stopped: the Preview was turned off.",
+    "description": "The Preview tab's line."
+  },
   "preview.settings.address": {
     "defaultMessage": "Each start gets a free port from {first}–{last} in {variable}. The server must listen on it on localhost: the page is then at {url}.",
     "description": "A line in Project Settings → Preview: where the dev server must listen. {first} and {last} are port numbers (the range), {variable} is PORT (an environment variable), {url} an address such as http://127.0.0.1:%PORT%/: keep the last two as they are."
@@ -54,5 +106,85 @@
   "preview.settings.useIt": {
     "defaultMessage": "Use it",
     "description": "A button beside the suggested command (Project Settings → Preview): puts it in the Command box, unsaved until Save."
+  },
+  "preview.tab.about": {
+    "defaultMessage": "The page runs in a guarded view of its own: it reaches only its own dev server and the internet over https, never this computer's other services or your network, and asks for no permissions. The dev server's command is yours and runs with your rights. Turn the Preview off in Settings → Advanced (Preview: run projects' dev servers).",
+    "description": "The Preview tab's info tip: what the previewed page can and can't reach, and where to turn the Preview off. Settings → Advanced and the setting's title: use them as translated there."
+  },
+  "preview.tab.devTools": {
+    "defaultMessage": "Developer Tools",
+    "description": "A button's tooltip (the Preview tab): opens the browser's developer tools for the previewed page (yours only, never an agent's)."
+  },
+  "preview.tab.dismiss": {
+    "defaultMessage": "Dismiss",
+    "description": "A button's tooltip: closes the bar \"The page tried to open …\" (the Preview tab)."
+  },
+  "preview.tab.failed": {
+    "defaultMessage": "Couldn't do that in the Preview",
+    "description": "An error's title: a Preview tab action (start, stop, show, reload) failed."
+  },
+  "preview.tab.hardReload": {
+    "defaultMessage": "Reload, bypassing the cache",
+    "description": "A button's tooltip (the Preview tab): reloads the previewed page, fetching everything again."
+  },
+  "preview.tab.notStarted": {
+    "defaultMessage": "The dev server isn't running here. Start runs {command}.",
+    "description": "The Preview tab before a start. {command} is the project's preview command (a command line: keep it as it is)."
+  },
+  "preview.tab.openInBrowser": {
+    "defaultMessage": "Open in Browser",
+    "description": "A button on the bar \"The page tried to open …\" (the Preview tab): opens that address in the user's own web browser."
+  },
+  "preview.tab.openSettings": {
+    "defaultMessage": "Open Project Settings → Preview",
+    "description": "A button (the Preview tab, no command yet): opens that section. Project Settings → Preview: use its names as translated there."
+  },
+  "preview.tab.place": {
+    "defaultMessage": "Place",
+    "description": "The Preview tab's picker's label: where the previewed dev server runs (the project folder, a slot, a review copy)."
+  },
+  "preview.tab.projectFolder": {
+    "defaultMessage": "Project folder",
+    "description": "A place in the Preview tab's picker: the project's own folder (not a slot or a review copy)."
+  },
+  "preview.tab.reload": {
+    "defaultMessage": "Reload",
+    "description": "A button (the Preview tab): reloads the previewed page."
+  },
+  "preview.tab.restart": {
+    "defaultMessage": "Restart",
+    "description": "A button beside \"stale\" (the Preview tab): stops the dev server and starts it again from the place's files now."
+  },
+  "preview.tab.setUp": {
+    "defaultMessage": "Set the command that runs this project's dev server in Project Settings → Preview, and the Preview tab shows its page here.",
+    "description": "The Preview tab in a project with no preview command. Project Settings → Preview is a section: use its names as translated there."
+  },
+  "preview.tab.setUpTitle": {
+    "defaultMessage": "Set up a preview",
+    "description": "The Preview tab's heading in a project with no preview command yet."
+  },
+  "preview.tab.stale": {
+    "defaultMessage": "stale: its files changed after it started",
+    "description": "Beside the Preview tab's stamp: the place's files changed after the dev server started, so the page may not show them. Keep it short."
+  },
+  "preview.tab.start": {
+    "defaultMessage": "Start",
+    "description": "A button (the Preview tab): starts the project's dev server in the chosen place."
+  },
+  "preview.tab.starting": {
+    "defaultMessage": "Starting on port {port}…",
+    "description": "The Preview tab while the dev server starts. {port} is a port number."
+  },
+  "preview.tab.startingNoPort": {
+    "defaultMessage": "Starting…",
+    "description": "The Preview tab while the dev server starts, before it has a port."
+  },
+  "preview.tab.stop": {
+    "defaultMessage": "Stop",
+    "description": "A button (the Preview tab): stops the dev server."
+  },
+  "preview.tab.tried": {
+    "defaultMessage": "The page tried to open {url}",
+    "description": "A bar over the Preview tab's page: the page tried to leave its own address (a link, a script, a new window). Combwork didn't follow it. {url} is the address."
   }
 }

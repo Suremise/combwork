@@ -446,6 +446,8 @@
   "tips.planLimitsProviders.title": "Os limites de cada plano na barra de status",
   "tips.prComments.text": "O cartão de um pull request mostra seus comentários, revisões e conversas de revisão no GitHub, com quem escreveu cada um. Marque os que quer tratar e clique em Tratar feedback: um cartão de correção no branch do pull request fica com eles, citados como palavras de outra pessoa.",
   "tips.prComments.title": "Tratar os comentários de um pull request",
+  "tips.previewTab.text": "Ative Configurações → Avançado → Pré-visualização: rodar os servidores de desenvolvimento dos projetos, defina o comando do servidor de desenvolvimento em Configurações do projeto → Pré-visualização, e a aba Pré-visualização o roda e mostra a página dele em uma visualização protegida que só chega ao próprio servidor e à internet.",
+  "tips.previewTab.title": "Veja a página de um projeto web no Combwork",
   "tips.progressCard.text": "Uma execução no painel Progresso mostra, abaixo do agente, o cartão e a versão em que rodou, como #1061 · a3f2c1d: clique no cartão para abri-lo, ou na versão para copiá-la.",
   "tips.progressCard.title": "Para qual cartão foi essa execução?",
   "tips.progressCheck.text": "Uma execução para um cartão é registrada como verificação da versão do cartão. Os detalhes dela no painel Progresso dizem “Conta como verificação” ou por que não: não foi iniciada como essa verificação, a pasta tinha alterações não commitadas ou arquivos mudaram durante a execução.",

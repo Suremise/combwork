@@ -485,6 +485,9 @@
   "main.preview.badConfig": {
     "placeholders": {}
   },
+  "main.preview.guardFailed": {
+    "placeholders": {}
+  },
   "main.preview.noConfig": {
     "placeholders": {
       "project": "plain"
@@ -499,6 +502,9 @@
     "placeholders": {
       "slot": "plain"
     }
+  },
+  "main.preview.notRunning": {
+    "placeholders": {}
   },
   "main.preview.off": {
     "placeholders": {}

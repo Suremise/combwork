@@ -242,6 +242,9 @@ if (process.platform === 'win32') checkInstallDir()
 // One Combwork process, with a window per workspace (like VS Code): starting Combwork again brings it forward.
 // A quiet test copy's windows are off screen (testQuiet): Chromium mustn't take them for covered and stop drawing them.
 if (testQuiet()) app.commandLine.appendSwitch('disable-features', 'CalculateNativeWinOcclusion')
+// HI-3615: no QUIC (UDP) anywhere, so a Preview page's every connection goes through its filtering proxy (a fixed proxy
+// already rules QUIC out; this makes it so whatever Chromium decides). Combwork's own pages fall back to HTTP/2.
+app.commandLine.appendSwitch('disable-quic')
 
 // Chromium takes its language only at start (#767): --lang or CW_LANG, the setting, or Windows' languages.
 chooseStartLanguage(config.savedLanguage())
