@@ -883,20 +883,19 @@ function pollOther(key: string): void {
 /**
  * The board's revision (#1266): what has been committed to its cards and lanes, as a token that only moves on, never a
  * clock. This process's changes are counted as they commit (a board change that changed something, a save of the lanes:
- * noteLanesSaved); another process's move the writer's `data_version`; a database replaced or restored moves its
- * generation. The same revision twice: none of them changed between, so what was read between is still current. Lane
+ * noteLanesSaved); another process's move the writer's `data_version`. The same revision twice: none of them changed between, so what was read between is still current. Lane
  * notices check it under the board's lock (workflowNotices.ts). Writes nothing.
  */
 export function boardRevision(ws: WorkspaceService): string {
   const path = pathOf(ws)
   const b = boardOf(path)
-  return `${dbGenerationAt(b.place)}:${(b.version.get() as { data_version: number }).data_version}:${b.revision}`
+  return `${(b.version.get() as { data_version: number }).data_version}:${b.revision}`
 }
 
 /**
  * A token for what is committed to the board now (HI-1909), for a cache of what is read from it: it moves on with every
- * commit, a quiet one (no tasks-changed) too, another process's (the writer's `data_version`), and a database replaced
- * or opened again, moved as the commit ends, before anything told of it runs. Null inside a write, whose reads see its
+ * commit, a quiet one (no tasks-changed) too, another process's (the writer's `data_version`), and a database opened
+ * again, moved as the commit ends, before anything told of it runs. Null inside a write, whose reads see its
  * own changes, and inside a read's snapshot, which may be older: nothing read there may be cached or served from a
  * cache. The same token twice: nothing was committed between.
  */
@@ -906,16 +905,15 @@ export function boardReadToken(ws: WorkspaceService): string | null {
   const b = boardOf(path)
   // Inside a read's snapshot (readSnapshot), which may be older than what the token would name.
   if (b.db.reader.isTransaction) return null
-  return `${b.generation}:${dbGenerationAt(b.place)}:${(b.version.get() as { data_version: number }).data_version}:${b.commits}`
+  return `${b.generation}:${(b.version.get() as { data_version: number }).data_version}:${b.commits}`
 }
 
 /**
  * HI-3296: a token for what is committed of one project's queue now, for its queue listings: its queue revision
  * (schema/queueRevsStep.ts's `queue_revs`, raised by triggers for every connection's writes to the project's cards, less
- * the writes no listing reads, plus its cards' blockers changing), and the database's generation. With `also`, what else a
+ * the writes no listing reads, plus its cards' blockers changing), and the board's opening. With `also`, what else a
  * cache is made from, read on the same snapshot. Null as boardReadToken is (inside a write, or a read's snapshot that may
- * be older), and on a board without the revisions (one waiting for its upgrade): a cache keeps nothing then. Reading it
- * changes nothing. (HI-3306: HI-3291's project revision it was first made beside is gone, unread.)
+ * be older): a cache keeps nothing then. Reading it changes nothing. (HI-3306: HI-3291's project revision it was first made beside is gone, unread.)
  */
 export function queueRevision(ws: WorkspaceService, project: string, also?: (db: Db['reader']) => string): string | null {
   return revisionOf(ws, 'SELECT q AS r FROM queue_revs WHERE project = ?', project, also) // i18n-ignore: SQL
@@ -929,17 +927,16 @@ function revisionOf(ws: WorkspaceService, sql: string, project: string, also?: (
   try {
     return readSnapshot(ws, (_b, db) => {
       const r = (db.prepare(sql).get(project) as { r: number } | undefined)?.r ?? 0
-      return [b.generation, dbGenerationAt(b.place), r, also?.(db) ?? ''].join('\n') // i18n-ignore: a key, never shown
+      return [b.generation, r, also?.(db) ?? ''].join('\n') // i18n-ignore: a key, never shown
     })
   } catch {
     return null
   }
 }
 
-/** HI-3291: which opening of which database the board reads now: another (replaced, opened again) means rowids read before name nothing. */
+/** HI-3291: which opening of the database the board reads now: another (opened again) means rowids read before name nothing. */
 export function boardDatabase(ws: WorkspaceService): string {
-  const b = boardOf(pathOf(ws))
-  return `${b.generation}:${dbGenerationAt(b.place)}`
+  return String(boardOf(pathOf(ws)).generation)
 }
 
 /** HI-3291: the facts' epoch (schema/projectRevsStep.ts's `facts_epoch`) on a read's snapshot: raised whenever facts may have gone or changed hands. */
@@ -2066,32 +2063,6 @@ export function workspaceFrom09(workspacePath: string): boolean {
     join(workspacePath, CW_DIR, DB_FILE)
   ]
   return files.some((f) => isBoardFrom09(f))
-}
-
-/**
- * The workspace database's generation (#1207 round 2): a number that changes each time its file is replaced under the
- * services, whose caches were read from the file before. What a service read in an older generation is stale: it reads
- * again, and a save made from it is refused (`saveStore`'s guard). Nothing replaces the file since HI-3601 and HI-3602
- * (the 0.9 restore and the upgrade from 0.9 are gone), so it stays 0; the guards stay until a follow-up removes them.
- */
-/** By the workspace's place (#1395: a store loaded through another spelling of its folder is the same database's). */
-const generations = new Map<string, number>()
-/**
- * The generation of a workspace's database by a path entering now: its open board's place, as `replaced` counted it
- * (HI-1797: resolving the path on each call cost a realpath on main's thread, read on every lanes refresh), else the
- * place resolved here.
- */
-export const dbGeneration = (workspacePath: string): number => dbGenerationAt(boards.get(keyOf(workspacePath))?.place ?? placeKey(workspacePath))
-/** The generation of a workspace's database by the place a caller recorded as it entered. */
-export const dbGenerationAt = (place: string): number => generations.get(place) ?? 0
-const replacedListeners = new Set<(workspacePath: string, place: string) => void>()
-/**
- * Called, under the board's lock and with nothing awaited, once a workspace's database file was replaced: a service
- * drops (or reads again) what it keeps from it, matching by `place` (the replaced board's, as it opened) what it keeps
- * under any spelling. Its saves begun before are refused by their generation.
- */
-export function onDbReplaced(fn: (workspacePath: string, place: string) => void): void {
-  replacedListeners.add(fn)
 }
 
 /**

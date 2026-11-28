@@ -334,9 +334,6 @@
       "card": "plain"
     }
   },
-  "inbox.save.dbReplaced": {
-    "placeholders": {}
-  },
   "inbox.save.failed": {
     "placeholders": {
       "error": "plain"

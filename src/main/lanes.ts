@@ -17,7 +17,7 @@ import { onCombworkEvent } from './events'
 import { readFile } from 'original-fs/promises'
 import { placeKey, renameRetrying, withFileLock } from './fsutil'
 import { openTable, readTable, saveTable, saveTableInBoard } from './storeTables'
-import { beforeBoardCommit, boardOpen, boardRead, boardWrite, cardOwnersNow, cardPlacesNow, dbGeneration, onDbReplaced } from './boardStore'
+import { beforeBoardCommit, boardOpen, boardRead, boardWrite, cardOwnersNow, cardPlacesNow } from './boardStore'
 import { FactStore } from './workflow/factStore'
 import { pickTarget, projectTargets, targetExists, type ProjectTargets } from './workflow/targets'
 import { otherThanOwn, targetedOf, targetOfRulesetId } from '../shared/workflow/compile'
@@ -180,7 +180,6 @@ const readIds = new WeakMap<LaneRecord, string>()
  * (projectNow), and a lane saved before ids has its name only.
  */
 async function read(ws: WorkspaceService): Promise<LaneRecord[]> {
-  const gen = dbGeneration(ws.path!)
   const data = await savedLanes(ws)
   const raw = data && typeof data === 'object' && Array.isArray((data as { lanes?: unknown }).lanes) ? ((data as { lanes: unknown[] }).lanes as Record<string, unknown>[]) : []
   const seen = JSON.stringify(raw)
@@ -194,13 +193,9 @@ async function read(ws: WorkspaceService): Promise<LaneRecord[]> {
   }
   const lanes = readLanes(data)
   for (const l of lanes) if (idOf.has(l.id)) readIds.set(l, idOf.get(l.id)!)
-  readGens.set(lanes, gen)
   readAs.set(lanes, seen)
   return lanes
 }
-
-/** The workspace database's generation each list was read in (#1207 round 2): written back only into that one. */
-const readGens = new WeakMap<LaneRecord[], number>()
 
 /**
  * The lanes each list was read from, as saved (HR6's #1270 round 4): written back only while the tables still hold
@@ -214,11 +209,6 @@ const readAs = new WeakMap<LaneRecord[], string>()
  * workspace's place as it entered (#1456).
  */
 const opened = new Map<string, string>()
-// The database replaced (the upgrade to 1.0, a restore): lanes.json is looked for again (its move may have waited), under
-// every spelling of the workspace, by the place each recorded.
-onDbReplaced((workspacePath, place) => {
-  for (const [k, at] of [...opened]) if (k === workspacePath.toLowerCase() || at === place) opened.delete(k)
-})
 
 /**
  * lanes.json from before #1018, read to move it in (#1018 round 1): null only when there is none. One that can't be read
@@ -291,12 +281,9 @@ async function write(ws: WorkspaceService, lanes: LaneRecord[], check?: () => vo
     const { id, project: _shown, ...rest } = l
     return { id, project: saved, ...(projectId ? { projectId } : {}), ...rest }
   })
-  // Read from a database since replaced (the upgrade to 1.0, a restore): never written over the file as it is now.
-  const gen = readGens.get(lanes)
   const seen = readAs.get(lanes)
   const path = ws.path!
   const guard = (): void => {
-    if (gen !== undefined && gen !== dbGeneration(path)) throw new Error("the workspace's database was replaced since these lanes were read: nothing was saved") // i18n-ignore: a save refused as a mistake's error, for the log
     // Another writer (the runtime, #1270) changed the lanes since they were read: nothing is saved over it.
     if (seen !== undefined && boardOpen(path) && JSON.stringify(readTable(path, 'lanes').docs) !== seen) throw new StaleRead('the lanes changed since they were read') // i18n-ignore: internal, caught and retried (never shown)
     // Under the board's lock, with nothing awaited before the save: what a decision read of the cards still holds.

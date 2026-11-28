@@ -8812,9 +8812,9 @@ queued): what it reads for the window is read at once, not one after another (th
 agents), and its bundled skills and modes (§7.1) are brought up to date after the window has it, in the background; an
 agent's launch waits for them, and the .combwork folder is watched once they are (a watched folder can't be swapped on
 Windows). What the open starts in the background is timed, each part, in one "after opening" line of the log once all
-have ended. The workspace database's **generation** (`dbGeneration`, `onDbReplaced`), which moved on when the upgrade
-or the restore replaced the file under the services, now never moves (nothing replaces the file); its guards stay
-until a later card removes them.
+have ended. Nothing replaces a workspace's database file under the services (the upgrade and the restore that did are
+gone), so the services keep no guard against it (HI-3618: the database's generation, and what each service dropped or
+refused by it, are gone with them).
 - From 1.0 on, every Combwork writes a **workspace presence marker** (`.combwork/open/<profile>.json`, pid and a
   heartbeat), so the group's later steps and the queue's lock have a second signal beside SQLite's lock. [#1207]
   `<profile>` is the profile folder's name and a hash of its path; the heartbeat is renewed every 30 s while the board
