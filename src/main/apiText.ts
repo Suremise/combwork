@@ -215,6 +215,8 @@ export const API = {
     off: agentMsg({ id: 'api.preview.off', text: "The Preview is off: the user can turn it on in Settings → Advanced (Preview: run projects' dev servers)." }),
     notOwnPlace: agentMsg({ id: 'api.preview.notOwnPlace', text: 'cw_preview reaches only your own place (the slot you build in, or the review copy you review in): it takes no project, place, folder or agent.' }),
     notRunning: agentMsg({ id: 'api.preview.notRunning', text: "Your place's preview isn't running: start it first (action start)." }),
+    placeChanged: agentMsg({ id: 'api.preview.placeChanged', text: 'Your place changed meanwhile (its lease ended or passed on): nothing was done. Call again to reach your place as it is now.' }),
+    notOwned: agentMsg({ id: 'api.preview.notOwned', text: "Another program listens on its port now, so Combwork stopped the preview and loaded nothing: start it again (action start)." }),
     badPath: agentMsg({ id: 'api.preview.badPath', text: "path is a page of the preview's own server, starting with / (no //, no spaces or backslashes)." }),
     tooLarge: agentMsg({ id: 'api.preview.tooLarge', text: 'The screenshot is too large to save, even as a JPEG at half size: take the viewport (no full), or a smaller page. Nothing was saved.' }),
     timedOut: agentMsg({ id: 'api.preview.timedOut', text: "The capture took longer than Settings → Advanced → Preview: longest an agent's capture takes allows. Nothing was saved: try again." }),

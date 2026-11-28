@@ -1,43 +1,116 @@
 // HI-3616: an agent's preview captures, below Electron: the screenshot's encoding ladder within its limit, a place's shots
-// kept to 20, the accessibility tree as text, the console list and the log's tail (design HI-3597 s8, s16 §E test 6).
+// kept to 20, the accessibility tree as text, the console list and the log's tail (design HI-3597 s8, s16 §E test 6);
+// round 1: one deadline over a capture, its encoding and its save, and a preview's close cancelling and awaiting them.
 import { readdir } from 'fs/promises'
 import { join } from 'path'
-import { describe, expect, it } from 'vitest'
-import { axText, consoleList, encodeWithin, exists, logTail, removeShots, saveShot, setShotMaxForTests, shotMax, SHOT, type AxNode, type Encodable } from '../src/main/previewCapture'
+import { describe, expect, it, vi } from 'vitest'
+import { axText, checkOp, closeOps, consoleList, encodeLadder, exists, logTail, OpStopped, opsRunning, removeShots, runOp, saveShot, setShotMaxForTests, shotMax, SHOT, type AxNode, type Op, type Step } from '../src/main/previewCapture'
 import { tempDir } from './tempDir'
 
-/** An image whose encodings have the given sizes: png, jpeg by quality, and each scale's own. */
-function fake(sizes: Record<string, number>, scale = 1, made: string[] = []): Encodable {
-  const at = (k: string): Buffer => {
-    made.push(k)
-    return Buffer.alloc(sizes[k] ?? 0)
-  }
-  return { png: () => at(`png@${scale}`), jpeg: (q) => at(`jpeg${q}@${scale}`), scaled: (f) => fake(sizes, f, made) }
+/** A shoot whose steps' bytes have the given sizes (`png@1`, `jpeg80@1`, `jpeg60@0.5`…), each step recorded. */
+const sized = (sizes: Record<string, number>, made: string[] = []) => async (st: Step): Promise<Buffer> => {
+  const k = `${st.quality === null ? 'png' : `jpeg${st.quality}`}@${st.scale}`
+  made.push(k)
+  return Buffer.alloc(sizes[k] ?? 0)
 }
+const op = (id = 'pv-t'): Op => ({ id, cancelled: null })
+/** A promise and its resolver: a step held until the test lets it go. */
+function gate(): { wait: Promise<void>; open: () => void } {
+  let open = (): void => undefined
+  const wait = new Promise<void>((r) => (open = r))
+  return { wait, open }
+}
+let ids = 0
+const fresh = (): string => `pv-test-${++ids}`
 
-describe('encodeWithin: the ladder', () => {
-  it('keeps the PNG when it fits', () => {
-    const e = encodeWithin(fake({ 'png@1': 100 }), 200)
-    expect(e).toMatchObject({ ok: true, format: 'png', quality: null, scale: 1 })
+describe('encodeLadder: the ladder', () => {
+  it('keeps the PNG when it fits', async () => {
+    expect(await encodeLadder(sized({ 'png@1': 100 }), 200, op())).toMatchObject({ ok: true, format: 'png', quality: null, scale: 1 })
   })
-  it('steps PNG, JPEG 80, JPEG 60, 75%, 50%, checking the bytes each time', () => {
+  it('steps PNG, JPEG 80, JPEG 60, 75%, 50%, checking the bytes each time', async () => {
     const made: string[] = []
-    const e = encodeWithin(fake({ 'png@1': 900, 'jpeg80@1': 900, 'jpeg60@1': 900, 'jpeg60@0.75': 900, 'jpeg60@0.5': 150 }, 1, made), 200)
+    const e = await encodeLadder(sized({ 'png@1': 900, 'jpeg80@1': 900, 'jpeg60@1': 900, 'jpeg60@0.75': 900, 'jpeg60@0.5': 150 }, made), 200, op())
     expect(made).toEqual(['png@1', 'jpeg80@1', 'jpeg60@1', 'jpeg60@0.75', 'jpeg60@0.5'])
     expect(e).toMatchObject({ ok: true, format: 'jpeg', quality: 60, scale: 0.5 })
   })
-  it('a high-entropy page: its PNG over 2 MB, its JPEG within', () => {
-    const e = encodeWithin(fake({ 'png@1': 3 * 1024 * 1024, 'jpeg80@1': 1024 * 1024 }))
-    expect(e).toMatchObject({ ok: true, format: 'jpeg', quality: 80 })
+  it('a high-entropy page: its PNG over 2 MB, its JPEG within', async () => {
+    expect(await encodeLadder(sized({ 'png@1': 3 * 1024 * 1024, 'jpeg80@1': 1024 * 1024 }), SHOT.maxBytes, op())).toMatchObject({ ok: true, format: 'jpeg', quality: 80 })
   })
-  it('every step over: not ok, with the smallest it came to', () => {
-    const e = encodeWithin(fake({ 'png@1': 900, 'jpeg80@1': 800, 'jpeg60@1': 700, 'jpeg60@0.75': 600, 'jpeg60@0.5': 500 }), 200)
-    expect(e).toEqual({ ok: false, smallest: 500 })
+  it('every step over: not ok, with the smallest it came to', async () => {
+    expect(await encodeLadder(sized({ 'png@1': 900, 'jpeg80@1': 800, 'jpeg60@1': 700, 'jpeg60@0.75': 600, 'jpeg60@0.5': 500 }), 200, op())).toEqual({ ok: false, smallest: 500 })
+  })
+  it('a cancelled operation stops before its next step', async () => {
+    const o = op()
+    const made: string[] = []
+    const shoot = async (st: Step): Promise<Buffer> => {
+      const b = await sized({}, made)(st)
+      o.cancelled = 'timedOut'
+      return Buffer.alloc(900 + b.length)
+    }
+    await expect(encodeLadder(shoot, 200, o)).rejects.toBeInstanceOf(OpStopped)
+    expect(made).toEqual(['png@1'])
   })
   it("a test copy's limit, then SHOT.maxBytes again", () => {
     expect(setShotMaxForTests(100)).toBe(100)
     expect(shotMax()).toBe(100)
     expect(setShotMaxForTests(null)).toBe(SHOT.maxBytes)
+  })
+})
+
+describe('runOp: one deadline over the capture, its encoding and its save (HI-3616 round 1)', () => {
+  it('a slow encoder past the deadline: timed out, and no file even once it finishes', async () => {
+    const dir = join(tempDir('preview-shots'), 'place')
+    const slow = gate()
+    let finished = false
+    const id = fresh()
+    const run = runOp(id, 50, async (o) => {
+      try {
+        const e = await encodeLadder(async () => {
+          await slow.wait
+          return Buffer.alloc(10)
+        }, 200, o)
+        return await saveShot(dir, e, 1, SHOT.keep, o)
+      } finally {
+        finished = true
+      }
+    })
+    await expect(run).rejects.toMatchObject({ why: 'timedOut' })
+    slow.open()
+    await vi.waitFor(() => expect(finished).toBe(true))
+    expect(await exists(dir)).toBe(false)
+    expect(opsRunning(id)).toBe(0)
+  })
+  it("a preview's close cancels a capture held mid-way, waits for it, and refuses new ones; the next preview's run", async () => {
+    const dir = join(tempDir('preview-shots'), 'place')
+    const held = gate()
+    const id = fresh()
+    const run = runOp(id, 60_000, async (o) => {
+      await held.wait
+      checkOp(o)
+      return saveShot(dir, { ok: true, data: Buffer.from('x'), format: 'png', quality: null, scale: 1 }, 1, SHOT.keep, o)
+    })
+    run.catch(() => undefined)
+    expect(opsRunning(id)).toBe(1)
+    let closed = false
+    const closing = closeOps(id, 60_000).then(() => (closed = true))
+    await expect(run).rejects.toMatchObject({ why: 'closed' })
+    // The close waits for the work itself to end, not only its caller's answer.
+    expect(closed).toBe(false)
+    held.open()
+    await closing
+    expect(opsRunning(id)).toBe(0)
+    expect(await exists(dir)).toBe(false)
+    await expect(runOp(id, 60_000, async () => 'late')).rejects.toMatchObject({ why: 'closed' })
+    // A new generation's preview is a new id: its operations run.
+    expect(await runOp(fresh(), 60_000, async () => 'next')).toBe('next')
+  })
+  it('a save cancelled while it writes keeps nothing', async () => {
+    const dir = join(tempDir('preview-shots'), 'place')
+    const o = op()
+    const p = saveShot(dir, { ok: true, data: Buffer.alloc(64 * 1024), format: 'png', quality: null, scale: 1 }, 1, SHOT.keep, o)
+    o.cancelled = 'closed'
+    await expect(p).rejects.toBeInstanceOf(OpStopped)
+    expect((await readdir(dir).catch(() => [])).length).toBe(0)
   })
 })
 

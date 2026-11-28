@@ -1,10 +1,4 @@
 {
-  "preview.reply.changedAfterLoad": {
-    "placeholders": {
-      "at": "plain",
-      "loaded": "plain"
-    }
-  },
   "preview.reply.changedDuring": {
     "placeholders": {}
   },
@@ -69,6 +63,12 @@
       "url": "plain"
     }
   },
+  "preview.reply.sourceAfterLoad": {
+    "placeholders": {
+      "now": "plain",
+      "loaded": "plain"
+    }
+  },
   "preview.reply.sourceClean": {
     "placeholders": {
       "commit": "plain"
@@ -83,8 +83,19 @@
   "preview.reply.sourceNone": {
     "placeholders": {}
   },
+  "preview.reply.sourceNotStart": {
+    "placeholders": {
+      "now": "plain"
+    }
+  },
   "preview.reply.sourceUnknown": {
     "placeholders": {}
+  },
+  "preview.reply.sourceUnknownNow": {
+    "placeholders": {
+      "read": "select",
+      "now": "plain"
+    }
   },
   "preview.reply.stale": {
     "placeholders": {

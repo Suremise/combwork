@@ -24,7 +24,7 @@ import { combworkError } from './combworkError'
 import { emit, emitTo } from './events'
 import { PreviewGuard } from './previewGuard'
 import { PreviewShows } from './previewShown'
-import { removeShots, setShotMaxForTests } from './previewCapture'
+import { closeOps, removeShots, setShotMaxForTests } from './previewCapture'
 import { openableUrl } from '../shared/previewPolicy'
 import { createLogger, userText } from './logger'
 import { onPlaceEnded, setPreviewHoldCheck } from './placeEnds'
@@ -252,9 +252,11 @@ function admission(ws: WorkspaceService, projectPath: string, place: PreviewPlac
  * Starts the preview of a place (or gives the one running there): the tab's Start, the agent tool's start. It is
  * registered with its workspace at once (a closing finds it), and admitted again before its server starts.
  */
-export async function startPreview(ws: WorkspaceService, projectPath: string, folder?: string | null): Promise<PreviewView> {
+export async function startPreview(ws: WorkspaceService, projectPath: string, folder?: string | null, expect?: { generation: string }): Promise<PreviewView> {
   assertOn()
   const place = await placeOf(ws, projectPath, folder)
+  // An agent's start is for its own lease (HI-3616 round 1): the place under another generation now is another's.
+  if (expect && place.generation !== expect.generation) throw new PlaceMoved()
   // Screenshots an earlier preview of the place left (one that ended with Combwork, HI-3616), before a new one runs.
   if (runner?.at(place.folder)?.state !== 'running') await removeShots(shotsDirIn(place.folder))
   const cfg = await configOf(ws, projectPath)
@@ -385,6 +387,9 @@ function runningView(projectPath: string, id: string): PreviewView {
 
 /** A preview's guarded page closed (the runner's teardown, at its every end): true once its guard's end is proved. */
 async function closeShown(id: string): Promise<boolean> {
+  // Agents' captures first (HI-3616 round 1): none starts from now, those running are cancelled and awaited, so none
+  // writes after the place is given back.
+  await closeOps(id, CLOSE_OPS_MS)
   const proved = await shows.close(id)
   triedOf.delete(id)
   shownIn.delete(id)
@@ -400,6 +405,16 @@ async function closeShown(id: string): Promise<boolean> {
  * Code, unwatched, waits on that for good), and the place is its folder (a reviewer's copy, one it was given).
  */
 export const shotsDirIn = (folder: string): string => join(folder, CW_DIR, 'preview-shots')
+/** How long a preview's close waits for its agents' captures to stop (each stops at its next step). */
+const CLOSE_OPS_MS = 5000
+
+/** A start asked for under a place's generation that is no longer the place's (HI-3616 round 1: the caller's lease ended). */
+export class PlaceMoved extends Error {
+  constructor() {
+    // agent-protocol: an error's class name, never said (previewAgent.ts answers placeChanged in its words)
+    super('place moved') // i18n-ignore: as above
+  }
+}
 
 /** HI-3616: the runner and the guarded pages, for the agents' tool (previewAgent.ts), refused while the Preview is off. */
 export function previewForAgents(): { runner: PreviewRunner; guard: (id: string) => Promise<PreviewGuard> } {

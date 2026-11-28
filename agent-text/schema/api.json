@@ -1678,10 +1678,16 @@
   "api.preview.notOwnPlace": {
     "placeholders": {}
   },
+  "api.preview.notOwned": {
+    "placeholders": {}
+  },
   "api.preview.notRunning": {
     "placeholders": {}
   },
   "api.preview.off": {
+    "placeholders": {}
+  },
+  "api.preview.placeChanged": {
     "placeholders": {}
   },
   "api.preview.timedOut": {

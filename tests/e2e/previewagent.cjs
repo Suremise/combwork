@@ -14,6 +14,7 @@
 const lib = require('./lib.cjs')
 const { execFile } = require('child_process')
 const fs = require('fs')
+const net = require('net')
 const path = require('path')
 const q = require('./queueFixture.cjs')
 
@@ -70,6 +71,13 @@ async function api(token, body) {
   return { status: res.status, body: await res.json().catch(() => null) }
 }
 
+/** Whether a port can be bound on 127.0.0.1 now. */
+const portFree = (port) =>
+  new Promise((res) => {
+    const s = net.createServer()
+    s.once('error', () => res(false))
+    s.listen({ port, host: '127.0.0.1', exclusive: true }, () => s.close(() => res(true)))
+  })
 const shotsIn = (dir) => (fs.existsSync(dir) ? fs.readdirSync(dir).filter((n) => n.startsWith('shot-')) : [])
 /** A shot's path from its reply. */
 const shotPath = (text) => /Screenshot: (.+?) \(/.exec(text)?.[1] ?? null
@@ -231,6 +239,35 @@ const shotPath = (text) => /Screenshot: (.+?) \(/.exec(text)?.[1] ?? null
     check('…and its shots are gone', !!(await until(() => !fs.existsSync(dir) || shotsIn(dir).length === 0, HUNG_MS)))
     const after = await callTool(aServer, { action: 'screenshot' })
     check('a capture of a stopped preview is refused', after.isError && /isn't running/.test(after.text), after.text)
+
+    // --- A replaced listener (HR1's round 1): a server's child listener exits while its parent lives on, and another
+    // program takes its port. The agent's next capture checks the ports' owners first: refused, the preview stopped,
+    // nothing of the stranger's loaded. Its hot reload port too.
+    const pair = path.join(fx.tools, 'pair.js')
+    fs.writeFileSync(path.join(fx.tools, 'listen.js'), ["const [port, exitFile] = process.argv.slice(2)", "require('http').createServer((q, r) => r.end('child ' + port)).listen(Number(port), '127.0.0.1')", "setInterval(() => { if (require('fs').existsSync(exitFile)) process.exit(0) }, 100)", ''].join('\n'))
+    fs.writeFileSync(pair, ["const { spawn } = require('child_process')", "const path = require('path')", "const go = (port, name) => spawn(process.execPath, [path.join(__dirname, 'listen.js'), port, path.join(__dirname, 'exit-' + name)], { stdio: 'ignore' })", "go(process.env.PORT, 'main')", "if (process.env.CW_PREVIEW_HMR_PORT) go(process.env.CW_PREVIEW_HMR_PORT, 'hmr')", "console.log('pair up')", 'setInterval(() => {}, 1000)', ''].join('\n'))
+    await inv('preview:setConfig', fx.alpha, { command: `node "${pair}"`, hmrPort: true })
+    for (const which of ['hmr', 'main']) {
+      for (const f of ['exit-main', 'exit-hmr']) fs.rmSync(path.join(fx.tools, f), { force: true })
+      const up = await callTool(aServer, { action: 'start' })
+      const pv = (await inv('preview:list', fx.alpha)).find((v) => v.place.kind === 'project' && v.state === 'running')
+      check(`${which}: a server whose listeners are its children runs, with a hot reload port`, !up.isError && !!pv?.hmrPort, up.text)
+      const first = await callTool(aServer, { action: 'snapshot' })
+      check(`${which}: …and its page is read`, !first.isError && /child \d+/.test(first.text), first.text.slice(0, 200))
+      const port = which === 'hmr' ? pv.hmrPort : pv.port
+      fs.writeFileSync(path.join(fx.tools, `exit-${which}`), 'go')
+      const freed = await until(() => portFree(port), HUNG_MS)
+      const taken = freed ? await new Promise((res) => { const s = net.createServer((sock) => sock.end('stranger')); s.once('error', () => res(null)); s.listen(port, '127.0.0.1', () => res(s)) }) : null
+      check(`${which}: its child exits and another program takes its port`, !!taken)
+      const replaced = await callTool(aServer, { action: which === 'hmr' ? 'snapshot' : 'goto', path: '/' })
+      check(`${which}: the agent's next capture is refused: another program listens on its port`, replaced.isError && /Another program listens on its port/.test(replaced.text), replaced.text)
+      const ended = (await inv('preview:list', fx.alpha)).find((v) => v.id === pv?.id)
+      check(`${which}: …and the preview is stopped, naming the stranger`, ended?.state === 'stopped' && ended?.end?.kind === 'stranger' && ended.end.port === port, JSON.stringify(ended?.end))
+      if (taken) await new Promise((r) => taken.close(() => r()))
+      fs.writeFileSync(path.join(fx.tools, 'exit-main'), 'go')
+      fs.writeFileSync(path.join(fx.tools, 'exit-hmr'), 'go')
+    }
+    await inv('preview:setConfig', fx.alpha, { command: cmd })
 
     // --- Off again: refused, and a new launch has no tool.
     await inv('advanced:set', 'cw.preview.enabled', false)

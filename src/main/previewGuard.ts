@@ -14,6 +14,7 @@
 
 import { app, BrowserWindow, session, utilityProcess, WebContentsView, type Session, type UtilityProcess } from 'electron'
 import type { ConsoleEntry } from './previewCapture'
+import type { PreviewSource } from '../shared/preview'
 import { join } from 'path'
 import { createLogger } from './logger'
 import { checkUrl, openableUrl, sameOrigin } from '../shared/previewPolicy'
@@ -33,6 +34,8 @@ export interface AgentPage {
   /** Every error and warning since it was made (the list keeps the newest 50). */
   consoleTotal: number
   loadedAt: number | null
+  /** The source when its last load began (HI-3616 round 1), null when it couldn't be read: what a capture compares with. */
+  loadSource: PreviewSource | null
 }
 
 /** What refused something: a request's layer, or the partition's permission and download handlers. */
@@ -243,7 +246,7 @@ export class PreviewGuard {
     const wc = win.webContents
     this.harden(wc, () => undefined)
     wc.setFrameRate(10)
-    const page: AgentPage = { win, console: [], consoleTotal: 0, loadedAt: null }
+    const page: AgentPage = { win, console: [], consoleTotal: 0, loadedAt: null, loadSource: null }
     wc.on('console-message', (e) => {
       const level = e.level === 'error' ? 'error' : e.level === 'warning' ? 'warning' : null
       if (!level) return

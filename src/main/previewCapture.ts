@@ -26,38 +26,121 @@ export function setShotMaxForTests(bytes: number | null): number {
 /** The byte limit a screenshot is held to. */
 export const shotMax = (): number => testMax ?? SHOT.maxBytes
 
-/** An image as the encoding ladder uses it (Electron's NativeImage, or a test's). */
-export interface Encodable {
-  png: () => Buffer
-  jpeg: (quality: number) => Buffer
-  /** The image at `factor` of its size. */
-  scaled: (factor: number) => Encodable
+/** One step of the ladder: the image at `scale` of its size, as PNG (quality null) or JPEG at `quality`. */
+export interface Step {
+  scale: number
+  quality: number | null
 }
+
+/** The ladder (s21 §D′): PNG, JPEG at 80, JPEG at 60, 75% at 60, 50% at 60. */
+export const LADDER: readonly Step[] = [
+  { scale: 1, quality: null },
+  { scale: 1, quality: 80 },
+  { scale: 1, quality: 60 },
+  { scale: 0.75, quality: 60 },
+  { scale: 0.5, quality: 60 }
+]
 
 /** A screenshot encoded within its limit: its bytes, format and scale. */
 export type Encoded = { ok: true; data: Buffer; format: 'png' | 'jpeg'; quality: number | null; scale: number } | { ok: false; smallest: number }
 
 /**
- * The ladder (s21 §D′): PNG, JPEG at 80, JPEG at 60, 75% at 60, 50% at 60, the final bytes checked after each step and
- * nothing kept that is over `maxBytes`. Every step over: not ok (the smallest it came to, for the error).
+ * The ladder, each step's final bytes checked and nothing kept that is over `maxBytes`; every step over: not ok (the
+ * smallest it came to, for the error). `shoot` makes a step's bytes where the work can be bounded (the page's own process,
+ * never main's thread); the operation is checked before and after each step, so a cancelled one stops there.
  */
-export function encodeWithin(img: Encodable, maxBytes: number = SHOT.maxBytes): Encoded {
-  const steps: { scale: number; quality: number | null }[] = [
-    { scale: 1, quality: null },
-    { scale: 1, quality: 80 },
-    { scale: 1, quality: 60 },
-    { scale: 0.75, quality: 60 },
-    { scale: 0.5, quality: 60 }
-  ]
+export async function encodeLadder(shoot: (s: Step) => Promise<Buffer>, maxBytes: number, op: Op): Promise<Encoded> {
   let smallest = Infinity
-  for (const s of steps) {
-    const at = s.scale === 1 ? img : img.scaled(s.scale)
-    const data = s.quality === null ? at.png() : at.jpeg(s.quality)
+  for (const s of LADDER) {
+    checkOp(op)
+    const data = await shoot(s)
+    checkOp(op)
     smallest = Math.min(smallest, data.length)
     if (data.length <= maxBytes) return { ok: true, data, format: s.quality === null ? 'png' : 'jpeg', quality: s.quality, scale: s.scale }
   }
   return { ok: false, smallest }
 }
+
+/** One operation of an agent on a preview (a load or a capture): cancelled past its deadline or by its preview's close. */
+export interface Op {
+  readonly id: string
+  cancelled: 'timedOut' | 'closed' | null
+}
+
+/** Why an operation was refused or stopped: its deadline passed, or its preview was closing or closed. */
+export class OpStopped extends Error {
+  constructor(readonly why: 'timedOut' | 'closed') {
+    super(why)
+  }
+}
+
+/** Throws when the operation was cancelled: the step after a cancellation never runs. */
+export function checkOp(op: Op): void {
+  if (op.cancelled) throw new OpStopped(op.cancelled)
+}
+
+interface LiveOp {
+  op: Op
+  done: Promise<unknown>
+  stop: (why: 'timedOut' | 'closed') => void
+}
+const liveOps = new Map<string, Set<LiveOp>>()
+/** Previews whose close began: no new operation of theirs runs (kept for the newest CLOSED_KEPT). */
+const closedIds = new Set<string>()
+const CLOSED_KEPT = 1000
+
+/**
+ * Runs `work` as one operation of preview `id`, within `ms`: refused once the preview's close began; past `ms`, or at its
+ * close, cancelled and stopped at once (OpStopped), the work itself stopping at its next check (checkOp) and its close
+ * waiting for it (closeOps).
+ */
+export async function runOp<T>(id: string, ms: number, work: (op: Op) => Promise<T>): Promise<T> {
+  if (closedIds.has(id)) throw new OpStopped('closed')
+  const op: Op = { id, cancelled: null }
+  let stopNow: (why: 'timedOut' | 'closed') => void = () => undefined
+  const stopped = new Promise<never>((_, fail) => {
+    stopNow = (why) => {
+      if (!op.cancelled) op.cancelled = why
+      fail(new OpStopped(op.cancelled))
+    }
+  })
+  stopped.catch(() => undefined)
+  const w = work(op)
+  const entry: LiveOp = { op, done: w.catch(() => undefined), stop: stopNow }
+  const set = liveOps.get(id) ?? new Set<LiveOp>()
+  liveOps.set(id, set)
+  set.add(entry)
+  void entry.done.then(() => {
+    set.delete(entry)
+    if (!set.size && liveOps.get(id) === set) liveOps.delete(id)
+  })
+  const timer = setTimeout(() => stopNow('timedOut'), ms)
+  try {
+    const r = await Promise.race([w, stopped])
+    checkOp(op)
+    return r
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
+/**
+ * A preview's close (HI-3616 round 1): no new operation of it runs, those running are cancelled, and it waits for them
+ * to end (at most `waitMs`), so none writes after its place is given back: a cancelled save removes what it wrote.
+ */
+export async function closeOps(id: string, waitMs: number): Promise<void> {
+  closedIds.add(id)
+  if (closedIds.size > CLOSED_KEPT) closedIds.delete(closedIds.values().next().value as string)
+  const set = [...(liveOps.get(id) ?? [])]
+  for (const e of set) e.stop('closed')
+  if (!set.length) return
+  let timer: NodeJS.Timeout | undefined
+  await Promise.race([Promise.all(set.map((e) => e.done)), new Promise<void>((r) => (timer = setTimeout(r, waitMs)))])
+  clearTimeout(timer)
+}
+
+/** How many operations of a preview are running (tests). */
+export const opsRunning = (id: string): number => liveOps.get(id)?.size ?? 0
 
 /** A place's shots folder's files, oldest first (their names start with their time). */
 async function shotsIn(dir: string): Promise<string[]> {
@@ -67,13 +150,19 @@ async function shotsIn(dir: string): Promise<string[]> {
 
 /**
  * Writes an encoded shot into a place's folder and keeps at most `keep` (the oldest removed first): its path and bytes.
- * Nothing is written for one that isn't ok.
+ * Nothing is written for one that isn't ok, nor kept for a cancelled operation (`op`).
  */
-export async function saveShot(dir: string, e: Encoded, n: number, keep: number = SHOT.keep): Promise<{ path: string; bytes: number } | null> {
+export async function saveShot(dir: string, e: Encoded, n: number, keep: number = SHOT.keep, op?: Op): Promise<{ path: string; bytes: number } | null> {
   if (!e.ok) return null
+  if (op) checkOp(op)
   await mkdir(dir, { recursive: true })
   const file = join(dir, `shot-${String(Date.now()).padStart(14, '0')}-${String(n).padStart(4, '0')}.${e.format === 'png' ? 'png' : 'jpg'}`)
   await writeFile(file, e.data)
+  // Cancelled while it wrote (its deadline, its preview's close): nothing of it is kept.
+  if (op?.cancelled) {
+    await rm(file, { force: true }).catch(() => undefined)
+    checkOp(op)
+  }
   const all = await shotsIn(dir)
   for (const old of all.slice(0, Math.max(0, all.length - keep))) await rm(join(dir, old), { force: true }).catch(() => undefined)
   return { path: file, bytes: e.data.length }
@@ -84,7 +173,7 @@ export async function shotCount(dir: string): Promise<number> {
   return (await shotsIn(dir)).length
 }
 
-/** Removes a place's shots folder (its preview stopped), or every one (Combwork starting or quitting). */
+/** Removes a place's shots folder (its preview stopped, or a new one starting there). */
 export async function removeShots(dir: string): Promise<void> {
   await rm(dir, { recursive: true, force: true }).catch(() => undefined)
 }
