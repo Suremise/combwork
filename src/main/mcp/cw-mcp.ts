@@ -132,7 +132,7 @@ const T = {
   'lane.arg.reviewer': agentMsg({ id: 'tool.lane.arg.reviewer', text: 'Agent name or id.' }),
   'lane.arg.name': agentMsg({ id: 'tool.lane.arg.name', text: 'A short label for the lane.' }),
   'arg.target': agentMsg({ id: 'tool.arg.target', text: "Merges into: one of the project's Other branches work can merge into, or \"\" for its Work merges into." }),
-  'arg.source': agentMsg({ id: 'tool.arg.source', text: "The project's GitHub issue or pull request it is about: #12 or its address (null clears it). Only before it starts, in Todo or On Hold; read from GitHub, never written to.", note: 'HI-3584: the Assistant’s source on cw_create_task and cw_update_task: links the card, as the card dialog’s GitHub source does, so Close Shipped Issues… finds it.' }),
+  'arg.source': agentMsg({ id: 'tool.arg.source', text: "The project's GitHub issue or PR it's about: #12 or its URL (null clears). Only in Todo or On Hold; GitHub is only read.", note: 'HI-3584: the Assistant’s source on cw_create_task and cw_update_task: links the card, as the card dialog’s GitHub source does, so Close Shipped Issues… finds it. HI-3624: shortened to a parameter’s 120 characters (toolLimits.cjs).' }),
   'lane.arg.brief': agentMsg({ id: 'tool.lane.arg.brief', text: "start: the builder's brief (at most 4000 characters)." }),
   'lane.arg.applyNow': agentMsg({ id: 'tool.lane.arg.applyNow', text: 'start: a changed list applies now, not after the card in flight.' }),
   'lane.arg.lane': agentMsg({ id: 'tool.lane.arg.lane', text: 'end: the lane id.' }),
