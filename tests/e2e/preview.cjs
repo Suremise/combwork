@@ -13,6 +13,7 @@
 // 4. Turned off again: the running preview is stopped (its server gone, its port free), and the section goes.
 // Dev build, throwaway profile and workspace (no agent is started). Ports: the dev build's range, a stranger's at random
 // in it as the test finds them free; the all-taken case moves the range to 52000–52999 for its step.
+// Dev build only (#1578): its slot is lent and released through slots:test, which a packaged build refuses.
 const lib = require('./lib.cjs')
 const fs = require('fs')
 const http = require('http')

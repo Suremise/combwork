@@ -48,7 +48,7 @@ export async function previewSource(folder: string, scratch: string): Promise<Pr
     if (!OBJECT_ID.test(id)) return { kind: 'unknown', commit, why: why('write-tree', tree) }
     if (!commit) return { kind: 'dirty', commit: null, content: id }
     const headTree = await git(folder, ['rev-parse', `${commit}^{tree}`], 1024, undefined, opts)
-    if (!headTree.ok || !OBJECT_ID.test(headTree.out.trim())) return { kind: 'unknown', commit, why: why("the commit's tree", headTree) }
+    if (!headTree.ok || !OBJECT_ID.test(headTree.out.trim())) return { kind: 'unknown', commit, why: why("the commit's tree", headTree) } // i18n-ignore: a step's name in the log and the stamp's reason, beside git's own words
     return headTree.out.trim() === id ? { kind: 'clean', commit } : { kind: 'dirty', commit, content: id }
   } finally {
     await rm(temp, { force: true }).catch(() => undefined)
