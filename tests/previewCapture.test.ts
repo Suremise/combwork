@@ -104,6 +104,31 @@ describe('runOp: one deadline over the capture, its encoding and its save (HI-36
     // A new generation's preview is a new id: its operations run.
     expect(await runOp(fresh(), 60_000, async () => 'next')).toBe('next')
   })
+  it("a close past its bound with work still running isn't proof: false, until the work has ended (round 2)", async () => {
+    const held = gate()
+    const id = fresh()
+    const run = runOp(id, 60_000, async (o) => {
+      await held.wait
+      checkOp(o)
+    })
+    run.catch(() => undefined)
+    // The bound passes with the work still held: not proved, the work still counted.
+    expect(await closeOps(id, 20)).toBe(false)
+    expect(opsRunning(id)).toBe(1)
+    held.open()
+    await vi.waitFor(() => expect(opsRunning(id)).toBe(0))
+    // Asked again (the runner's retry): proved now.
+    expect(await closeOps(id, 20)).toBe(true)
+  })
+  it('a close during the mkdir: the write never starts', async () => {
+    const dir = join(tempDir('preview-shots'), 'place')
+    const o = op()
+    const p = saveShot(dir, { ok: true, data: Buffer.alloc(16), format: 'png', quality: null, scale: 1 }, 1, SHOT.keep, o)
+    // saveShot is awaiting its mkdir now: the cancellation lands between the two.
+    o.cancelled = 'closed'
+    await expect(p).rejects.toBeInstanceOf(OpStopped)
+    expect(await readdir(dir).catch(() => [])).toEqual([])
+  })
   it('a save cancelled while it writes keeps nothing', async () => {
     const dir = join(tempDir('preview-shots'), 'place')
     const o = op()

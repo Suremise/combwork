@@ -125,18 +125,21 @@ export async function runOp<T>(id: string, ms: number, work: (op: Op) => Promise
 }
 
 /**
- * A preview's close (HI-3616 round 1): no new operation of it runs, those running are cancelled, and it waits for them
- * to end (at most `waitMs`), so none writes after its place is given back: a cancelled save removes what it wrote.
+ * A preview's close (HI-3616 rounds 1 and 2): no new operation of it runs, those running are cancelled, and it waits for
+ * them to end, at most `waitMs`. Its answer is the proof: true only once none is running. False (one still running past
+ * the bound) is the runner's "not proved": the place stays held, and the close is asked again (retryHeldJob) until
+ * true, so nothing of its operations can touch the place once it is given back. Asked again, it waits for those left.
  */
-export async function closeOps(id: string, waitMs: number): Promise<void> {
+export async function closeOps(id: string, waitMs: number): Promise<boolean> {
   closedIds.add(id)
   if (closedIds.size > CLOSED_KEPT) closedIds.delete(closedIds.values().next().value as string)
   const set = [...(liveOps.get(id) ?? [])]
   for (const e of set) e.stop('closed')
-  if (!set.length) return
+  if (!set.length) return true
   let timer: NodeJS.Timeout | undefined
   await Promise.race([Promise.all(set.map((e) => e.done)), new Promise<void>((r) => (timer = setTimeout(r, waitMs)))])
   clearTimeout(timer)
+  return opsRunning(id) === 0
 }
 
 /** How many operations of a preview are running (tests). */
@@ -156,6 +159,8 @@ export async function saveShot(dir: string, e: Encoded, n: number, keep: number 
   if (!e.ok) return null
   if (op) checkOp(op)
   await mkdir(dir, { recursive: true })
+  // Checked again between the awaits: a close during the mkdir never starts the write.
+  if (op) checkOp(op)
   const file = join(dir, `shot-${String(Date.now()).padStart(14, '0')}-${String(n).padStart(4, '0')}.${e.format === 'png' ? 'png' : 'jpg'}`)
   await writeFile(file, e.data)
   // Cancelled while it wrote (its deadline, its preview's close): nothing of it is kept.

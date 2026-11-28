@@ -387,16 +387,17 @@ function runningView(projectPath: string, id: string): PreviewView {
 
 /** A preview's guarded page closed (the runner's teardown, at its every end): true once its guard's end is proved. */
 async function closeShown(id: string): Promise<boolean> {
-  // Agents' captures first (HI-3616 round 1): none starts from now, those running are cancelled and awaited, so none
-  // writes after the place is given back.
-  await closeOps(id, CLOSE_OPS_MS)
+  // Agents' captures first (HI-3616 rounds 1 and 2): none starts from now, those running are cancelled and awaited. One
+  // still running past the bound is not proved ended: the teardown answers false, so the runner keeps the place held
+  // (as for an unproved server or guard: one hold for all of a place's work) and asks again until it is.
+  const drained = await closeOps(id, CLOSE_OPS_MS)
   const proved = await shows.close(id)
   triedOf.delete(id)
   shownIn.delete(id)
-  // Its agents' screenshots go with it (HI-3616).
+  // Its agents' screenshots go with it (HI-3616), once nothing of theirs can still write there.
   const v = runner?.views().find((x) => x.id === id)
-  if (v) await removeShots(shotsDirIn(v.place.folder))
-  return proved
+  if (v && drained) await removeShots(shotsDirIn(v.place.folder))
+  return proved && drained
 }
 
 /**
