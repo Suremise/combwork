@@ -291,6 +291,13 @@ interface CombworkMessageValues {
   'main.plan.resetsOn': { when: string | number }
   'main.plan.used': { share: number; provider: string | number; window: string; hours: number; label: string | number }
   'main.plan.usedOn': { share: number; window: string; hours: number; label: string | number; connection: string | number }
+  'main.preview.badConfig': undefined
+  'main.preview.guardFailed': undefined
+  'main.preview.noConfig': { project: string | number }
+  'main.preview.notAPlace': { project: string | number }
+  'main.preview.notLent': { slot: string | number }
+  'main.preview.notRunning': undefined
+  'main.preview.off': undefined
   'main.profileMove.refused': { from: string | number; to: string | number; reason: string | number }
   'main.profileMove.refusedTitle': undefined
   'main.profileMove.signInBody': { names: string | number; n: number }
@@ -322,6 +329,7 @@ interface CombworkMessageValues {
   'main.removal.notHidden': { project: string | number }
   'main.removal.notProject': { path: string | number }
   'main.removal.notTrashed': { path: string | number; why: string | number }
+  'main.removal.previewHeld': { project: string | number }
   'main.removal.refusedTree': { agent: string | number; path: string | number; why: string | number }
   'main.removal.stillThere': { project: string | number }
   'main.removal.stopFailed': { project: string | number }

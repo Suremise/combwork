@@ -250,6 +250,12 @@ interface CombworkMessageValues {
   'tips.editTemplates.title': undefined
   'tips.externalTerminal.text': undefined
   'tips.externalTerminal.title': undefined
+  'tips.fileBlame.text': undefined
+  'tips.fileBlame.title': undefined
+  'tips.fileCompare.text': undefined
+  'tips.fileCompare.title': undefined
+  'tips.fileHistory.text': undefined
+  'tips.fileHistory.title': undefined
   'tips.fileLinks.text': undefined
   'tips.fileLinks.title': undefined
   'tips.fileRestore.text': undefined
@@ -474,6 +480,10 @@ interface CombworkMessageValues {
   'tips.planLimitsProviders.title': undefined
   'tips.prComments.text': undefined
   'tips.prComments.title': undefined
+  'tips.previewAgents.text': undefined
+  'tips.previewAgents.title': undefined
+  'tips.previewTab.text': undefined
+  'tips.previewTab.title': undefined
   'tips.progressCard.text': undefined
   'tips.progressCard.title': undefined
   'tips.progressCheck.text': undefined

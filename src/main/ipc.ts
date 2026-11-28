@@ -139,6 +139,7 @@ import { presetNotNow } from './workflow/presetStep'
 import { checkLevelChange, levelForm, setLevelOptions } from './workflow/levels'
 import { rulesNow } from './workflow/rulesets'
 import { poolFor, removeGoneSlot, slotTest, slotViews } from './slotsApp'
+import { hidePreview, openTried, placePreview, previewDevTools, previewSuggestion, previewTest, previewViews, reloadPreview, setPreviewConfig, showPreview, startPreview, stopPreview } from './previewApp'
 import { projectSlotCopy, setSlotDefault, setSlotSetting, slotLevelForm } from './slotSettings'
 import { githubHostsForm, setGithubHosts } from './githubHosts'
 import { githubLinkOf, githubRepoFor, openPrsOf, setGithubRemote } from './githubLink'
@@ -236,6 +237,23 @@ const advancedState = (): AdvancedState => advanced.state(workspace.path ? (work
 
 /** The window an IPC call came from, for calls that keep something per window (the developer console's subscription). */
 const senderStore = new AsyncLocalStorage<WebContents>()
+
+/** HI-3476: the windows whose blames are stopped when they go (registered once each). */
+const blameWindows = new WeakSet<WebContents>()
+/**
+ * HI-3476: whose blame request ids an IPC call's are: its window's (its webContents' id), so two windows' ids never
+ * meet; `onGone` stops that window's blames when it is destroyed (registered once a window).
+ */
+function blameOwner(onGone?: (owner: string) => void): string {
+  const wc = senderStore.getStore()
+  if (!wc) return 'none'
+  const owner = `wc:${wc.id}`
+  if (onGone && !blameWindows.has(wc)) {
+    blameWindows.add(wc)
+    wc.once('destroyed', () => onGone(owner))
+  }
+  return owner
+}
 
 /** HI-3372: who may cancel a run started now: this window, this open of its workspace, the project (gitCancel.ts). */
 const cancelOwner = (projectPath: string): CancelOwner => cancelOwnerOf(senderStore.getStore(), currentWorkspace(), projectPath)
@@ -1039,6 +1057,8 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
       if (patch.workflow !== undefined) throw new CombworkError({ lines: ["A project's workflow options change through workflow:setOptions"] }, { kind: 'invalid' }) // i18n-ignore: a mistake in Combwork's code, never shown
       // Its version control switches only with its checks and its options kept per platform (#1419): workflow:setPlatform.
       if (patch.platform !== undefined) throw new CombworkError({ lines: ["A project's version control changes through workflow:setPlatform"] }, { kind: 'invalid' }) // i18n-ignore: a mistake in Combwork's code, never shown
+      // HI-3614: its preview is checked whole, and only while the Preview is on: preview:setConfig.
+      if (patch.preview !== undefined) throw new CombworkError({ lines: ["A project's preview changes through preview:setConfig"] }, { kind: 'invalid' }) // i18n-ignore: a mistake in Combwork's code, never shown
       const projectPath = workspace.assertProject(p)
       // A project has no provider pages or default provider since HI-2106/HI-2107: its agents' connections hold what they
       // set (HI-2122: nothing is made from them), and project.json keeps none.
@@ -1072,6 +1092,18 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
     'slots:move': (p, preview) => slotMoveApply(currentWorkspace(), workspace.assertProject(p), slotMoveArg(preview)),
     'slots:setSetting': (p, key, value) => setSlotSetting(workspace, workspace.assertProject(p), key, value),
     'slots:copyOf': (p) => projectSlotCopy(workspace, workspace.assertProject(p)),
+    'preview:list': (p) => previewViews(workspace.assertProject(p)),
+    'preview:start': (p, folder) => startPreview(workspace, workspace.assertProject(p), typeof folder === 'string' ? folder : null),
+    'preview:stop': (p, folder) => stopPreview(workspace, workspace.assertProject(p), typeof folder === 'string' ? folder : null),
+    'preview:suggest': (p) => previewSuggestion(workspace.assertProject(p)),
+    'preview:setConfig': (p, cfg) => setPreviewConfig(workspace, workspace.assertProject(p), cfg),
+    'preview:show': (p, id, bounds) => showPreview(win(), workspace.assertProject(p), String(id), bounds),
+    'preview:place': (id, bounds) => placePreview(win(), String(id), bounds),
+    'preview:hide': (id) => hidePreview(win(), String(id)),
+    'preview:reload': (p, id, hard) => reloadPreview(workspace.assertProject(p), String(id), hard === true),
+    'preview:devtools': (p, id) => previewDevTools(workspace.assertProject(p), String(id)),
+    'preview:openTried': (id, url) => openTried(String(id), url),
+    'preview:test': (op) => previewTest(op),
     'slots:gitFiles': async (p) => (await slotWorkspaces().files?.status(workspace.assertProject(p))) ?? null,
     // A workspace's (null) or project's GitHub hosts (HI-2779): parsed again in setGithubHosts, whoever asks.
     'github:form': (p) => githubHostsForm(workspace, p ? workspace.assertProject(p) : null, process.env),
@@ -1873,6 +1905,20 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
       }) }
     },
     'git:branchDrops': (p, name) => lineRepoReads().lineDrops(p, String(name ?? '')),
+    // HI-3475: the Files tab's History, in the folder it shows (the project folder, a slot, a worktree): reads only.
+    'files:history': async (root, rel, isDir, pinned, page) => (await import('./fileHistoryPanel')).fileHistoryAt(workspace, root, rel, isDir, pinned, page, lineRepoReads()),
+    'files:historyDiff': async (root, left, right) => (await import('./fileHistoryPanel')).fileHistoryDiffAt(workspace, root, left, right, lineRepoReads()),
+    'files:historyIntro': async (root, head, commit) => (await import('./fileHistoryPanel')).fileHistoryIntroAt(workspace, root, head, commit, lineRepoReads()),
+    // HI-3476: blame by card, in the same folders as History; a later request with the same id, or blameCancel, stops it.
+    'files:blame': async (root, rel, text, large, id) => {
+      const blame = await import('./fileBlamePanel')
+      return blame.fileBlameAt(workspace, root, rel, text, large, id, lineRepoReads(), blameOwner(blame.fileBlameOwnerGone))
+    },
+    'files:blameCancel': async (id) => (await import('./fileBlamePanel')).fileBlameCancel(blameOwner(), id),
+    // HI-3478: Compare with…, in the same folders as History.
+    'files:compareChoices': async (root) => (await import('./fileComparePanel')).compareChoicesAt(workspace, root, lineRepoReads()),
+    'files:compareWith': async (root, rel, ref, path) => (await import('./fileComparePanel')).compareWithAt(workspace, root, rel, ref, path, lineRepoReads()),
+    'files:compareProject': async (root, rel) => (await import('./fileComparePanel')).compareProjectAt(workspace, root, rel),
     'git:history': async (p, ref, page) => {
       p = workspace.assertProject(p)
       const reads = lineRepoReads()

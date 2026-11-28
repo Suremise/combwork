@@ -234,6 +234,61 @@
     "note": "An error untracking the project's .combwork folder from git: the git command (git rm --cached: keep it) failed; {why} is git's own first line, or why git can't run.",
     "audience": "both"
   },
+  "service.fileBlame.invalid": {
+    "text": "That was asked for wrongly: nothing was read.",
+    "note": "HI-3476: an error from the Files tab's Blame: the request was malformed (not reached from the window).",
+    "audience": "both"
+  },
+  "service.fileBlame.unsupported": {
+    "text": "This folder's version control can't say who changed each line.",
+    "note": "HI-3476: an error from the Files tab's Blame: the folder's version control has no blame.",
+    "audience": "both"
+  },
+  "service.fileCompare.invalid": {
+    "text": "That was asked for wrongly: nothing was read.",
+    "note": "HI-3478: an error from the Files tab's Compare with…: the request was malformed (not reached from the window), or the name typed can't be a branch, tag or commit (it starts with a dash, or holds spaces or range characters).",
+    "audience": "both"
+  },
+  "service.fileCompare.noRef": {
+    "text": "{ref} isn't a branch, tag or commit here.",
+    "note": "HI-3478: an error from the Files tab's Compare with…: what the user typed or chose ({ref}) doesn't name a commit in the repository.",
+    "audience": "both"
+  },
+  "service.fileCompare.unsupported": {
+    "text": "This folder's version control can't compare a file with another version.",
+    "note": "HI-3478: an error from the Files tab's Compare with…: the folder's version control has no such read.",
+    "audience": "both"
+  },
+  "service.fileHistory.cancelled": {
+    "text": "Stopped: the file or its text changed meanwhile.",
+    "note": "HI-3476: why a blame of a file in the Files tab stopped: the file shown, or its text in the editor, changed, so its answer was no longer wanted (the window drops it; rarely seen).",
+    "audience": "both"
+  },
+  "service.fileHistory.failed": {
+    "text": "Git couldn't read the history: {why}",
+    "note": "HI-3475: an error in the Files tab's History panel: git's own command failed; {why} is git's error line, in English.",
+    "audience": "both"
+  },
+  "service.fileHistory.invalid": {
+    "text": "That was asked for wrongly: nothing was read.",
+    "note": "HI-3475: an error from the Files tab's History panel: the request was malformed (not reached from the window).",
+    "audience": "both"
+  },
+  "service.fileHistory.noCommit": {
+    "text": "Git has no commit {commit}: it may be gone. Refresh the history.",
+    "note": "HI-3475: an error in the Files tab's History panel: a commit the panel showed ({commit}, a short id) isn't in the repository any more.",
+    "audience": "both"
+  },
+  "service.fileHistory.timedOut": {
+    "text": "Git was still reading the history after {seconds, number} seconds, so Combwork stopped it. Try again, or raise Settings → Advanced → Git: longest a history read takes.",
+    "note": "HI-3475: an error in the Files tab's History panel: reading a page of history, a commit's diff or its merge ran past the advanced setting's time ({seconds}) and git was ended. Keep the setting's name as Settings → Advanced shows it.",
+    "audience": "both"
+  },
+  "service.fileHistory.unsupported": {
+    "text": "This folder's version control has no history to show.",
+    "note": "HI-3475: an error from the Files tab's History panel: the folder's version control can't read a file's history.",
+    "audience": "both"
+  },
   "service.files.badName": {
     "text": "\"{name}\" is not a valid name",
     "note": "An error making or renaming a file or folder: {name} is empty, . or .., or has a character Windows can't have in a name.",

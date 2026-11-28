@@ -482,6 +482,33 @@
       "connection": "plain"
     }
   },
+  "main.preview.badConfig": {
+    "placeholders": {}
+  },
+  "main.preview.guardFailed": {
+    "placeholders": {}
+  },
+  "main.preview.noConfig": {
+    "placeholders": {
+      "project": "plain"
+    }
+  },
+  "main.preview.notAPlace": {
+    "placeholders": {
+      "project": "plain"
+    }
+  },
+  "main.preview.notLent": {
+    "placeholders": {
+      "slot": "plain"
+    }
+  },
+  "main.preview.notRunning": {
+    "placeholders": {}
+  },
+  "main.preview.off": {
+    "placeholders": {}
+  },
   "main.quit.closed": {
     "placeholders": {}
   },

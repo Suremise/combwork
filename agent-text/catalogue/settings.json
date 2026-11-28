@@ -1939,6 +1939,16 @@
     "note": "An advanced setting's title (Settings → Advanced), listed under Combwork, followed by its value in seconds: how long the project's command that chooses a card's focused tests may run, when the card is submitted and at its merge.",
     "audience": "both"
   },
+  "settings.advanced.cw.git.blameAskLines.desc": {
+    "text": "Blame in the Files tab reads which commit last changed each line, which takes git longer the longer the file and its history. For a file with more lines than this it asks first. Each read still stops at Git: longest a history read takes.",
+    "note": "What the advanced setting \"Git: ask before blaming a file longer than\" does (Settings → Advanced, HI-3476). Git: longest a history read takes is another setting’s name: keep it as Settings → Advanced shows it.",
+    "audience": "both"
+  },
+  "settings.advanced.cw.git.blameAskLines.title": {
+    "text": "Git: ask before blaming a file longer than",
+    "note": "An advanced setting's title (Settings → Advanced), listed under Combwork, followed by its value in lines: the Files tab's Blame (HI-3476).",
+    "audience": "both"
+  },
   "settings.advanced.cw.git.commitMinutes.desc": {
     "text": "How long Commit and Set aside of a folder's changes may run, the repository's pre-commit hook, filters and signer included, before Combwork ends git as stuck. You can cancel one from the window at any time: this is a last resort for one nobody is watching. Raise it if a hook really runs longer.",
     "note": "What the advanced setting \"Git: longest a commit or set aside takes\" does, and when to change it (Settings → Advanced, HI-3372).",
@@ -1947,6 +1957,16 @@
   "settings.advanced.cw.git.commitMinutes.title": {
     "text": "Git: longest a commit or set aside takes",
     "note": "An advanced setting's title (Settings → Advanced), listed under Combwork, followed by its value in minutes. Commit and Set aside are the buttons that commit or stash a folder's uncommitted changes (HI-3372).",
+    "audience": "both"
+  },
+  "settings.advanced.cw.git.historySeconds.desc": {
+    "text": "How long the Files tab's History may spend reading one page of a file's commits (with their cards), one commit's changes, or the merge that brought a commit in, before Combwork stops git and says so. A page usually takes well under a second; raise this for a very large repository whose history git reads slowly.",
+    "note": "What the advanced setting \"Git: longest a history read takes\" does (Settings → Advanced, HI-3475).",
+    "audience": "both"
+  },
+  "settings.advanced.cw.git.historySeconds.title": {
+    "text": "Git: longest a history read takes",
+    "note": "An advanced setting's title (Settings → Advanced), listed under Combwork, followed by its value in seconds: the Files tab's History panel (HI-3475).",
     "audience": "both"
   },
   "settings.advanced.cw.git.networkMinutes.desc": {
@@ -2347,6 +2367,46 @@
   "settings.advanced.cw.outage.waitMinutes.title": {
     "text": "Resuming after a connection drops: wait at most",
     "note": "An advanced setting's title (Settings → Advanced), followed by its value in minutes (\"120 min\").",
+    "audience": "both"
+  },
+  "settings.advanced.cw.preview.captureSeconds.desc": {
+    "text": "How long an agent's look at its preview may take: loading the page, a screenshot and its encoding, or reading the page's text. Past it the agent is told the capture timed out, and nothing is saved.",
+    "note": "What the advanced setting \"Preview: longest an agent's capture takes\" does (Settings → Advanced, under Combwork).",
+    "audience": "both"
+  },
+  "settings.advanced.cw.preview.captureSeconds.title": {
+    "text": "Preview: longest an agent's capture takes",
+    "note": "An advanced setting's title (Settings → Advanced), listed under Combwork, followed by its value in seconds (\"10 s\"). The Preview runs web projects' development servers; agents can take screenshots and read their pages.",
+    "audience": "both"
+  },
+  "settings.advanced.cw.preview.enabled.desc": {
+    "text": "Lets Combwork run a web project's development server, the command set in Project Settings → Preview, in the project folder, a slot or a review copy, each on a free port of its own, started only when asked and stopped with its slot's or review's end. Turned off, Project Settings has no Preview section, no preview starts, and the ones running are stopped.",
+    "note": "What the advanced setting \"Preview: run projects' dev servers\" does (Settings → Advanced, under Combwork). A slot is a worktree Combwork lends to a card or a lane; a review copy is a copy of a project at the revision a reviewer reviews. Project Settings → Preview is a section: use its names as translated there.",
+    "audience": "both"
+  },
+  "settings.advanced.cw.preview.enabled.title": {
+    "text": "Preview: run projects' dev servers",
+    "note": "An advanced setting's title (Settings → Advanced), listed under Combwork. The Preview runs a web project's development server (the command in Project Settings → Preview) so it can be looked at.",
+    "audience": "both"
+  },
+  "settings.advanced.cw.preview.portRange.desc": {
+    "text": "Preview servers get their ports from the 1,000 ports from this one, across every project and window of Combwork. A development build of Combwork uses the 1,000 after them while this is left at its default, so the two never share. A port another program listens on is skipped, and so are Combwork's own.",
+    "note": "What the advanced setting \"Preview: first port\" does (Settings → Advanced, under Combwork). A preview server is a web project's development server Combwork runs.",
+    "audience": "both"
+  },
+  "settings.advanced.cw.preview.portRange.title": {
+    "text": "Preview: first port",
+    "note": "An advanced setting's title (Settings → Advanced), listed under Combwork, followed by a port number. The Preview runs web projects' development servers, each on a port of its own.",
+    "audience": "both"
+  },
+  "settings.advanced.cw.preview.startSeconds.desc": {
+    "text": "How long a preview server gets to listen on the port Combwork gave it. Not listening by then, or listening on another port, it is stopped and the preview says why.",
+    "note": "What the advanced setting \"Preview: longest a server takes to start\" does (Settings → Advanced, under Combwork). A preview server is a web project's development server Combwork runs.",
+    "audience": "both"
+  },
+  "settings.advanced.cw.preview.startSeconds.title": {
+    "text": "Preview: longest a server takes to start",
+    "note": "An advanced setting's title (Settings → Advanced), listed under Combwork, followed by its value in seconds (\"60 s\"). The Preview runs web projects' development servers.",
     "audience": "both"
   },
   "settings.advanced.cw.processes.knownHosts.desc": {
@@ -5267,6 +5327,16 @@
     "note": "A setting's title (Project Settings → Advanced).",
     "audience": "both"
   },
+  "settings.project.preview.desc": {
+    "text": "Combwork runs this command in the place being previewed, with a free port in PORT (and CW_PREVIEW_PORT). The server must listen on that port on localhost: one that picks its own needs it passed, such as --port %PORT%.",
+    "note": "What the setting \"Dev server\" does, under its title (Project Settings → Preview). PORT, CW_PREVIEW_PORT and --port %PORT% are names and a command line: keep them as they are.",
+    "audience": "both"
+  },
+  "settings.project.preview.title": {
+    "text": "Dev server",
+    "note": "A setting's title (Project Settings → Preview): the command that starts the project's development server, its page and its ports.",
+    "audience": "both"
+  },
   "settings.project.reset.desc": {
     "text": "Everything on this page goes back to Inherit. Agents, and skill and MCP opt-outs, are kept.",
     "note": "What the setting \"Reset project settings\" does, under its title (Project Settings → Advanced).",
@@ -5395,6 +5465,16 @@
   "settings.projectSection.keys.label": {
     "text": "Keyboard Shortcuts",
     "note": "A section of Project Settings, in its list on the left.",
+    "audience": "both"
+  },
+  "settings.projectSection.preview.desc": {
+    "text": "The command that runs this project’s development server, which the Preview starts when asked, in the project folder, a slot or a review copy, each on a port of its own.",
+    "note": "Under the heading of the section \"Preview\" of Project Settings: what it holds. A slot is a worktree Combwork lends to a card or a lane; a review copy is a copy at the revision a reviewer reviews.",
+    "audience": "both"
+  },
+  "settings.projectSection.preview.label": {
+    "text": "Preview",
+    "note": "A section of Project Settings, in its list on the left: the command that runs the project’s development server for the Preview.",
     "audience": "both"
   },
   "settings.projectSection.sessions.desc": {

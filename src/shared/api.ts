@@ -1,4 +1,5 @@
 import type { PrView } from './githubSource'
+import type { PreviewConfig, PreviewSuggestion, PreviewView } from './preview'
 import type { FeedbackTarget, PrFeedbackRead } from './prFeedback'
 import type { FeedbackExpect, LineCommentView } from './workflow/lineComments'
 import type { CardAttachment, CardAttachmentGroup, CardDrafts } from './cardAttachments'
@@ -198,6 +199,9 @@ import type { StashApplied, StashFile, StashList, StashRef, StashRequest } from 
 import type { BranchMoves, RestorePlan, RestoreRequest } from './gitMoves'
 import type { FileCommits, FileRestored, FileRestorePlan, FileRestoreRequest, RestoreSource } from './gitFileRestore'
 import type { CommitActionDone, CommitActionRequest, CommitDetail } from './gitCommitView'
+import type { CommitIntro, FileHistoryPage, FileSide, FileVersions } from './fileHistory'
+import type { BlameResult } from './fileBlame'
+import type { CompareChoices, CompareVersion, ProjectCopy } from './fileCompare'
 import type { BoardFoldChange } from './tasks'
 import type { CardCost, CardRoundCosts, LaneCost } from './cardCosts'
 import type { ConsoleEvent, ConsoleRecordingInfo, ConsoleSource } from './devConsole'
@@ -491,6 +495,28 @@ export interface CombworkRequests {
   'slots:gitFiles': (projectPath: string) => GitFilesStatus | null
   /** A project's copied files as they inherit (HI-1765: its own, its workspace's, Combwork's, the default), and where they come from. */
   'slots:copyOf': (projectPath: string) => { value: string; origin: SlotOptionOrigin }
+  /**
+   * The Preview (HI-3614, SPEC §16.21), each refused while Settings → Advanced's switch is off: a project's previews (running,
+   * and the last stopped one of each place), a place's start (`folder`: the project folder, a lent slot or a review copy;
+   * left out: the project folder) and stop, Project Settings → Preview's suggestion, and its setting (null: none).
+   */
+  'preview:list': (projectPath: string) => PreviewView[]
+  'preview:start': (projectPath: string, folder?: string | null) => PreviewView
+  'preview:stop': (projectPath: string, folder?: string | null) => boolean
+  'preview:suggest': (projectPath: string) => { suggestion: PreviewSuggestion | null; range: [number, number] }
+  'preview:setConfig': (projectPath: string, config: PreviewConfig | null) => PreviewConfig | null
+  /**
+   * The Preview tab (HI-3615): a running preview's guarded page shown in the calling window at the tab's bounds (its guard
+   * made on first use), moved, taken out; reloaded (hard: past the cache); its DevTools (the user's button); a URL the
+   * page tried to leave for opened in the user's browser (only one it tried); test copies' look at its guard.
+   */
+  'preview:show': (projectPath: string, id: string, bounds: { x: number; y: number; width: number; height: number }) => PreviewView
+  'preview:place': (id: string, bounds: { x: number; y: number; width: number; height: number }) => void
+  'preview:hide': (id: string) => void
+  'preview:reload': (projectPath: string, id: string, hard: boolean) => void
+  'preview:devtools': (projectPath: string, id: string) => void
+  'preview:openTried': (id: string, url: string) => boolean
+  'preview:test': (op: { op: 'refusals' | 'killGuard' | 'shown' | 'tried' | 'capture' | 'shotMax'; id: string; file?: string; bytes?: number | null }) => unknown
   /** A workspace's (null) or a project's GitHub host settings as they resolve (HI-2779), and a change to them. */
   'github:form': (projectPath: string | null) => GithubHostsForm
   'github:set': (projectPath: string | null, change: GithubHostChange) => GithubHostsForm
@@ -1239,6 +1265,21 @@ export interface CombworkRequests {
   'git:deleteRemoteBranches': (projectPath: string, remote: string, branches: BranchAt[], op?: string) => string
   'git:branchDrops': (projectPath: string, branch: string) => BranchDrops
   'git:history': (projectPath: string, ref?: string | null, page?: number) => GitHistory
+  /** HI-3475: the Files tab's History of a file (following renames) or folder in the folder shown, a page at a time from `pinned` (page 1's head). */
+  'files:history': (root: string, rel: string, isDir: boolean, pinned: string | null, page: number) => FileHistoryPage
+  /** HI-3475: a file at two commits, each side at its own path from the repository's top (null: no side). */
+  'files:historyDiff': (root: string, left: FileSide | null, right: FileSide | null) => FileVersions
+  /** HI-3475: the merge that brought `commit` into `head`'s line, and its card ("came in with"); null when none can be said. */
+  'files:historyIntro': (root: string, head: string, commit: string) => CommitIntro | null
+  /** HI-3476: who last changed each line of `rel` with `text` (the editor's) as its content, with their cards; `large` blames a file over the advanced limit. `id`: the window's, so a later request or `files:blameCancel` stops it. */
+  'files:blame': (root: string, rel: string, text: string, large: boolean, id: string) => BlameResult
+  'files:blameCancel': (id: string) => void
+  /** HI-3478: what Compare with… offers in the folder shown: the target, branches and tags, and a slot's project folder. */
+  'files:compareChoices': (root: string) => CompareChoices
+  /** HI-3478: `rel` at a branch, tag or commit (`path`: its path there when known, as History's row), its path found across renames. */
+  'files:compareWith': (root: string, rel: string, ref: string, path: string | null) => CompareVersion
+  /** HI-3478: a slot's or worktree's file, the project folder's copy: text, missing (only when absent), a folder, or not text. */
+  'files:compareProject': (root: string, rel: string) => ProjectCopy
   /** Each action replies with what it did, in a sentence. Switching (and creating a branch to switch to) or pulling is refused while an agent works in the folder or its merge slot is held (`folderBusy`). */
   'git:switch': (projectPath: string, branch: string) => string
   /** Update from <target> (HI-1180): what it would do to a branch (its dialog), and the update, merge or rebase, saying what it did. */

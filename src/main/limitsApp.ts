@@ -1,5 +1,5 @@
 import { advanced } from './advanced'
-import { GIT_COMMIT_MINUTES, GIT_NETWORK_MINUTES, GIT_PROCESS_NAMES, GIT_STALE_LOCK_SECONDS, QUEUE_CHECK_MINUTES, QUEUE_NETWORK_MINUTES } from '../shared/advanced'
+import { GIT_BLAME_ASK_LINES, GIT_COMMIT_MINUTES, GIT_HISTORY_SECONDS, GIT_NETWORK_MINUTES, GIT_PROCESS_NAMES, GIT_STALE_LOCK_SECONDS, QUEUE_CHECK_MINUTES, QUEUE_NETWORK_MINUTES } from '../shared/advanced'
 import { platformLimits } from './platform/limits'
 
 /** A setting's value as a whole number of ms (its unit `perMs`), at least 1: its own default where it can't be read. */
@@ -18,5 +18,7 @@ export function applyAdvancedLimits(): void {
   platformLimits.queueNetworkMs = ms(QUEUE_NETWORK_MINUTES, 60_000, 30)
   platformLimits.queueCheckMs = ms(QUEUE_CHECK_MINUTES, 60_000, 90)
   platformLimits.staleLockMs = ms(GIT_STALE_LOCK_SECONDS, 1000, 60)
+  platformLimits.gitHistoryMs = ms(GIT_HISTORY_SECONDS, 1000, 60)
+  platformLimits.blameAskLines = ms(GIT_BLAME_ASK_LINES, 1, 20_000)
   platformLimits.gitProcessNames = () => advanced.pattern(GIT_PROCESS_NAMES)
 }

@@ -539,6 +539,18 @@
   "tool.notify.description": {
     "placeholders": {}
   },
+  "tool.preview.arg.fresh": {
+    "placeholders": {}
+  },
+  "tool.preview.arg.full": {
+    "placeholders": {}
+  },
+  "tool.preview.arg.path": {
+    "placeholders": {}
+  },
+  "tool.preview.description": {
+    "placeholders": {}
+  },
   "tool.projectStatus.description": {
     "placeholders": {}
   },

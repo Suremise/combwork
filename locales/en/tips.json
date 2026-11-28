@@ -995,6 +995,30 @@
     "defaultMessage": "Choose your external terminal",
     "description": "A tip's title (HI-3582)."
   },
+  "tips.fileBlame.text": {
+    "defaultMessage": "Blame by card, above a file in the Files tab, shows beside each run of lines the card whose commit last changed it and the agent that submitted it. Click the card to open it, or the rest to see what that commit changed.",
+    "description": "A tip (HI-3476). Names of Combwork's buttons and views: keep them as Combwork shows them."
+  },
+  "tips.fileBlame.title": {
+    "defaultMessage": "Which card changed this line?",
+    "description": "A tip's title (HI-3476)."
+  },
+  "tips.fileCompare.text": {
+    "defaultMessage": "Compare with…, above a file in the Files tab, shows it beside its version on the target branch, another branch, tag or commit, or (in an agent's slot) the project folder's copy, following renames. Your unsaved edits are compared too.",
+    "description": "A tip (HI-3478). Names of Combwork's buttons and views: keep them as Combwork shows them."
+  },
+  "tips.fileCompare.title": {
+    "defaultMessage": "Compare a file with any branch",
+    "description": "A tip's title (HI-3478)."
+  },
+  "tips.fileHistory.text": {
+    "defaultMessage": "History, above a file in the Files tab, lists the commits that changed it, following its renames: each with the card its commit names and the agent that submitted it. Click one to see what it changed; Back to file keeps your edits.",
+    "description": "A tip (HI-3475). Names of Combwork's buttons and views: keep them as Combwork shows them."
+  },
+  "tips.fileHistory.title": {
+    "defaultMessage": "Which card changed this file?",
+    "description": "A tip's title (HI-3475)."
+  },
   "tips.fileLinks.text": {
     "defaultMessage": "File paths an agent prints, like src/app.ts:42, are links: Ctrl+click one to open the file in the Files tab at that line.",
     "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
@@ -1890,6 +1914,22 @@
   "tips.prComments.title": {
     "defaultMessage": "Address a pull request’s comments",
     "description": "A tip's title (HI-3554): a pull request's comments show on its card, and chosen ones become a fix card."
+  },
+  "tips.previewAgents.text": {
+    "defaultMessage": "With the Preview on and a project's dev server command set, its agents can start the preview of the slot or review copy they work in, read its page, take screenshots and read its console's errors, on a page of their own that never moves yours.",
+    "description": "A tip (HI-3616). The Preview runs web projects' dev servers; a slot is an agent's own working folder for a card, a review copy a reviewer's."
+  },
+  "tips.previewAgents.title": {
+    "defaultMessage": "Agents look at their own preview",
+    "description": "A tip's title (HI-3616): agents can run and look at the web preview of the place they work in."
+  },
+  "tips.previewTab.text": {
+    "defaultMessage": "Turn on Settings → Advanced → Preview: run projects' dev servers, set the dev server's command in Project Settings → Preview, and the Preview tab runs it and shows its page in a guarded view that reaches only its own server and the internet.",
+    "description": "A tip (HI-3615). Names of Combwork's menus, views, settings and commands (Preview: run projects' dev servers is an advanced setting's title): keep them as Combwork shows them."
+  },
+  "tips.previewTab.title": {
+    "defaultMessage": "See a web project's page in Combwork",
+    "description": "A tip's title (HI-3615): the Preview tab shows a web project's dev server."
   },
   "tips.progressCard.text": {
     "defaultMessage": "A run in the Progress panel shows the card and the revision it ran on under the agent, such as #1061 · a3f2c1d: click the card to open it, or the revision to copy it.",

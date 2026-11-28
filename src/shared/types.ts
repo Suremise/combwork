@@ -10,6 +10,7 @@ import type { ActivityKind, ActivityTarget, UndoFinalWhy } from './assistantActi
 import type { AttachmentKind } from './attachments'
 import type { IgnoreRule, IgnoreTarget } from './gitIgnoreRules'
 import type { GitlinkChange } from './gitlink'
+import type { PreviewConfig } from './preview'
 import type { AgentProcess } from './agentProcesses'
 import type { StartFailure } from './startFailure'
 import type { IdleResume } from './sessionFresh'
@@ -1989,6 +1990,8 @@ export interface ProjectConfig {
   githubRemote?: string
   /** The project's review and check copies (#1435): how many it keeps (left out: the larger of 2 and its reviewers plus one). */
   copies?: { size?: number }
+  /** The project's preview (HI-3614, SPEC §16.21): its dev server's command, page path and hot reload port, set in Project Settings → Preview. */
+  preview?: PreviewConfig
   /** From before HI-1766 (Project Settings → Card loops): see `fileLocks`. */
   loopWakes?: boolean
   loopRounds?: number | null
@@ -4438,6 +4441,10 @@ export type CombworkEvent =
   | { type: 'language-changed'; language: LanguageInfo }
   /** A workspace's progress runs changed (all of them, newest first): for in-process listeners (the Agent API's stream, the developer console). */
   | { type: 'progress-changed'; workspacePath: string; runs: ProgressRun[] }
+  /** A preview changed (HI-3614/HI-3615): started, running, stopped, its files changed. */
+  | { type: 'preview-changed'; preview: import('./preview').PreviewView }
+  /** A preview's page tried to leave its origin (HI-3615): Combwork's own bar offers the URL, opened only by the user's click. */
+  | { type: 'preview-tried'; projectPath: string; id: string; url: string }
   /** The window's telling of the same (#1108): ProgressTelling. */
   | ProgressTelling
   /** A workspace's merge slots changed (those held or waited for). */

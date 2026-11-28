@@ -195,9 +195,141 @@
     "defaultMessage": "View",
     "description": "An attachment's right-click menu: opens it in the viewer."
   },
+  "files.blame.blameAnyway": {
+    "defaultMessage": "Blame it",
+    "description": "HI-3476: the button on the long file's bar: reads the blame anyway."
+  },
+  "files.blame.commitTip": {
+    "defaultMessage": "{subject}\n{author} · {when} · {commit}\nClick to see what this commit changed in the file.",
+    "description": "HI-3476: the tooltip of an annotation in the blame column (keep the line breaks): the commit's message's first line, its author, when (a date and time) and short id."
+  },
+  "files.blame.failed": {
+    "defaultMessage": "Couldn't read who changed each line: {error}",
+    "description": "HI-3476: a bar over the editor when reading the blame failed. {error} is why."
+  },
+  "files.blame.large": {
+    "defaultMessage": "This file has {lines, number} lines: reading who changed each one may take a while.",
+    "description": "HI-3476: a bar over the editor before blaming a file longer than Settings → Advanced's limit."
+  },
+  "files.blame.loading": {
+    "defaultMessage": "Reading who changed each line…",
+    "description": "HI-3476: atop the blame column while git reads it."
+  },
+  "files.blame.openCard": {
+    "defaultMessage": "Open {card}: {title}",
+    "description": "HI-3476: the tooltip of a card in the blame column. {card} is its key (HI-12), {title} its title."
+  },
+  "files.blame.retry": {
+    "defaultMessage": "Try again",
+    "description": "HI-3476: the blame bar's button after reading it failed."
+  },
+  "files.blame.submittedByTip": {
+    "defaultMessage": "{agent} submitted this commit for review in one of {card}'s submissions. It doesn't say who wrote it: git records one author for everyone here.",
+    "description": "HI-3476: the tooltip of the agent in the blame column. {agent} is the agent's name, {card} the card's key."
+  },
+  "files.blame.toggle": {
+    "defaultMessage": "Blame by card",
+    "description": "HI-3476: the Files tab's toolbar button (and right-click menu item) that shows or hides, beside the editor, which card and agent last changed each line."
+  },
+  "files.blame.toggleTip": {
+    "defaultMessage": "Which card and agent last changed each line",
+    "description": "HI-3476: the tooltip of the Files tab's Blame by card button."
+  },
+  "files.blame.uncommitted": {
+    "defaultMessage": "Not committed yet",
+    "description": "HI-3476: the blame column beside lines no commit has: the editor's unsaved edits, or changes not committed."
+  },
+  "files.blame.untracked": {
+    "defaultMessage": "Git has no committed version of this file yet: there's nothing to blame.",
+    "description": "HI-3476: a bar over the editor when Blame by card is on for a file git doesn't track, or that isn't in the last commit (new, renamed and not committed)."
+  },
   "files.collapseAll": {
     "defaultMessage": "Collapse All",
     "description": "Files tab's toolbar: closes every open folder."
+  },
+  "files.compare.back": {
+    "defaultMessage": "Back to file",
+    "description": "HI-3478: the button atop a comparison: shows the file's editor again, as it was left (unsaved edits kept)."
+  },
+  "files.compare.badRef": {
+    "defaultMessage": "Type a branch, tag or commit hash: not an option or a range.",
+    "description": "HI-3478: in Compare with…'s picker, what was typed can't be one (it starts with a dash, or holds spaces, .. or ~)."
+  },
+  "files.compare.binary": {
+    "defaultMessage": "Binary or too large to compare as text.",
+    "description": "HI-3478: in place of a comparison when the other version is binary or too large."
+  },
+  "files.compare.branches": {
+    "defaultMessage": "Branches",
+    "description": "HI-3478: a heading in Compare with…'s picker."
+  },
+  "files.compare.failed": {
+    "defaultMessage": "Couldn't compare: {error}",
+    "description": "HI-3478: in place of the comparison when reading the other version failed. {error} is why."
+  },
+  "files.compare.heading": {
+    "defaultMessage": "{side} ← → this file",
+    "description": "HI-3478: the heading of a comparison: the other version on the left ({side}, e.g. 'main · 1a2b3c4' or 'the project folder's copy'), the file as the editor has it on the right."
+  },
+  "files.compare.loading": {
+    "defaultMessage": "Reading…",
+    "description": "HI-3478: Compare with…'s picker, or its diff, while it reads."
+  },
+  "files.compare.notFile": {
+    "defaultMessage": "In {side} this path is a folder or submodule, not a file.",
+    "description": "HI-3478: under a comparison's heading: at the other version ({side}) the file's path is a folder or a submodule."
+  },
+  "files.compare.notThere": {
+    "defaultMessage": "This file isn't in {side} under its name or a rename git found: the left side is empty.",
+    "description": "HI-3478: under a comparison's heading: the other version ({side}) has no such file (deleted there, never there, or renamed in a way git didn't follow)."
+  },
+  "files.compare.open": {
+    "defaultMessage": "Compare with…",
+    "description": "HI-3478: the Files tab's toolbar button (and right-click menu item) that compares the file with its version on another branch, tag or commit, or the project folder's copy."
+  },
+  "files.compare.projectCopy": {
+    "defaultMessage": "The project folder's copy",
+    "description": "HI-3478: Compare with…'s choice in an agent's slot or worktree: the same file in the project folder, as it is on disk there."
+  },
+  "files.compare.projectNotText": {
+    "defaultMessage": "The project folder's copy isn't text Combwork can compare: {kind, select, binary {it's binary} tooLarge {it's too large to open} other {it isn't UTF-8}}.",
+    "description": "HI-3478: in place of a comparison with the project folder's copy when that copy is there but isn't text (binary, too large, or in another encoding). Keep the select keys."
+  },
+  "files.compare.projectSide": {
+    "defaultMessage": "the project folder's copy",
+    "description": "HI-3478: the left side's name in a comparison with the project folder's copy (used inside files.compare.heading)."
+  },
+  "files.compare.refSide": {
+    "defaultMessage": "{ref} · {commit}",
+    "description": "HI-3478: the left side's name in a comparison: what was chosen ({ref}: a branch, tag or the commit's short id) and its commit's short id."
+  },
+  "files.compare.renamed": {
+    "defaultMessage": "There it was {path}.",
+    "description": "HI-3478: under a comparison's heading: at the other version the file had another path ({path}), followed across a rename."
+  },
+  "files.compare.search": {
+    "defaultMessage": "Branch, tag or commit",
+    "description": "HI-3478: the placeholder of Compare with…'s search box: filters the list, and a name or commit hash typed and Enter compares with it."
+  },
+  "files.compare.tags": {
+    "defaultMessage": "Tags",
+    "description": "HI-3478: a heading in Compare with…'s picker."
+  },
+  "files.compare.target": {
+    "defaultMessage": "Target branch ({branch})",
+    "description": "HI-3478: Compare with…'s first choice: the branch this folder's work merges into ({branch}, its name)."
+  },
+  "files.compare.title": {
+    "defaultMessage": "Compare {name} with…",
+    "description": "HI-3478: the title of Compare with…'s picker. {name} is the file's name."
+  },
+  "files.compare.typedRef": {
+    "defaultMessage": "Compare with “{ref}”",
+    "description": "HI-3478: in Compare with…'s picker, the choice that compares with exactly what was typed ({ref}: a branch, tag or commit hash)."
+  },
+  "files.compare.unsaved": {
+    "defaultMessage": "Right: your edits (not saved)",
+    "description": "HI-3478: under a comparison's heading when the editor has unsaved edits: the right side is the editor's text, not the file on disk."
   },
   "files.csv.firstRows": {
     "defaultMessage": "Showing the first {count, plural, one {# row} other {# rows}}. Switch to Edit to see everything.",
@@ -498,6 +630,142 @@
   "files.header.info": {
     "defaultMessage": "Everything in the project folder. Drag files in from Explorer to copy them here, or drag files onto the Session tab to paste their paths into the session. Deleted files go to the Recycle Bin.",
     "description": "The (i) beside the Files tab's heading."
+  },
+  "files.history.back": {
+    "defaultMessage": "Back to file",
+    "description": "HI-3475: the button atop a commit's diff opened from History: shows the file's editor again, as it was left (unsaved edits kept)."
+  },
+  "files.history.binary": {
+    "defaultMessage": "Binary file",
+    "description": "HI-3475: in place of a commit's diff from History when the file is binary."
+  },
+  "files.history.cameIn": {
+    "defaultMessage": "Came in with {card}'s merge",
+    "description": "HI-3475: a History row, after Find its merge: the merge that brought the commit into the branch names the card {card} (its key). The card merged it, it didn't necessarily make it."
+  },
+  "files.history.cameInPlain": {
+    "defaultMessage": "Came in with merge {commit}, which names no card",
+    "description": "HI-3475: a History row, after Find its merge: the merge that brought the commit in ({commit}, a short id) names no card."
+  },
+  "files.history.cardHow": {
+    "defaultMessage": "{how, select, trailer {Named by the commit’s Combwork-Card trailer.} attributed {Combwork recorded this commit as the card’s when it was made.} other {Named at the start of the commit’s message.}}",
+    "description": "HI-3475: under the card's tooltip in the History panel: how the commit was linked to the card. Combwork-Card is a commit trailer's name: keep it. Keep the select keys."
+  },
+  "files.history.close": {
+    "defaultMessage": "Close History",
+    "description": "HI-3475: the tooltip of the History panel's close button."
+  },
+  "files.history.compareThis": {
+    "defaultMessage": "Compare with this version",
+    "description": "HI-3478: a History row's button (a file's history): compares the file as the editor has it with its version at this commit."
+  },
+  "files.history.copyHash": {
+    "defaultMessage": "Copy hash {commit}",
+    "description": "HI-3475: the tooltip of a History row's short commit id: copies the full hash. {commit} is the full hash."
+  },
+  "files.history.diffFailed": {
+    "defaultMessage": "Couldn't show the commit's changes: {error}",
+    "description": "HI-3475: in place of a commit's diff from History when reading it failed. {error} is why."
+  },
+  "files.history.diffPaths": {
+    "defaultMessage": "{from} → {to}",
+    "description": "HI-3475: under a commit's diff from History, when the commit renamed the file: its path before and after."
+  },
+  "files.history.diffTitle": {
+    "defaultMessage": "{commit} · {subject}",
+    "description": "HI-3475: the heading of a commit's diff of a file opened from History: its short id and its message's first line."
+  },
+  "files.history.failed": {
+    "defaultMessage": "Couldn't read the history: {error}",
+    "description": "HI-3475: the History panel when reading it failed. {error} is why."
+  },
+  "files.history.files": {
+    "defaultMessage": "{n, plural, one {# file} other {# files}}",
+    "description": "HI-3475: in a folder's History row: how many files under the folder the commit changed (click to list them)."
+  },
+  "files.history.findMerge": {
+    "defaultMessage": "Find its merge",
+    "description": "HI-3475: a History row's button for a commit naming no card: looks for the merge that brought it into the branch, and that merge's card."
+  },
+  "files.history.findMergeTip": {
+    "defaultMessage": "This commit names no card. Looks for the merge that brought it into the branch, and the card that merge names. It doesn't say the card made this commit.",
+    "description": "HI-3475: the tooltip of a History row's Find its merge button."
+  },
+  "files.history.loading": {
+    "defaultMessage": "Reading the history…",
+    "description": "HI-3475: the History panel while it reads the commits."
+  },
+  "files.history.meta": {
+    "defaultMessage": "{author} · {when}",
+    "description": "HI-3475: in a History row: the commit's author and how long ago it was made (\"3 days ago\")."
+  },
+  "files.history.more": {
+    "defaultMessage": "Show more",
+    "description": "HI-3475: the button at the end of the History panel's list: reads the next page of older commits."
+  },
+  "files.history.moved": {
+    "defaultMessage": "The branch has moved since this list was read.",
+    "description": "HI-3475: a bar atop the History panel: the folder's checked-out commit changed (a commit, a switch) since the list was read; Refresh reads it again."
+  },
+  "files.history.noMerge": {
+    "defaultMessage": "No merge brought it in that Combwork can name",
+    "description": "HI-3475: a History row, after Find its merge: the commit was made on the branch itself, or how it came in isn't clear (several branches merged at once), so nothing is said."
+  },
+  "files.history.none": {
+    "defaultMessage": "No commit has changed this yet.",
+    "description": "HI-3475: the History panel for a file or folder no commit has changed (new, or not tracked by git)."
+  },
+  "files.history.notFile": {
+    "defaultMessage": "{side, select, left {Before this commit: a folder or submodule, not a file} other {After this commit: a folder or submodule, not a file}}",
+    "description": "HI-3475: above a commit's diff from History when one side is a folder or a submodule at that path. Keep the select keys."
+  },
+  "files.history.notThere": {
+    "defaultMessage": "{side, select, left {Before this commit: not in that version} other {After this commit: not in that version}}",
+    "description": "HI-3475: above a commit's diff from History when one side has no file: the commit added the file (left) or deleted it (right). Keep the select keys."
+  },
+  "files.history.openCard": {
+    "defaultMessage": "Open {card}: {title}",
+    "description": "HI-3475: the tooltip of a commit's card in the History panel. {card} is its key (HI-12), {title} its title."
+  },
+  "files.history.openCommit": {
+    "defaultMessage": "Open commit",
+    "description": "HI-3475: a History row's button: opens the Commit dialog (the commit's message, files and actions)."
+  },
+  "files.history.pick": {
+    "defaultMessage": "Select one file or folder to see its history.",
+    "description": "HI-3475: the History panel when nothing, or several items, are selected in the Files tab."
+  },
+  "files.history.refresh": {
+    "defaultMessage": "Refresh",
+    "description": "HI-3475: the History panel's button: reads the history again from the folder's current commit."
+  },
+  "files.history.renamed": {
+    "defaultMessage": "Renamed from {path}",
+    "description": "HI-3475: in a History row: this commit renamed the file; {path} is the path it had before."
+  },
+  "files.history.retry": {
+    "defaultMessage": "Try again",
+    "description": "HI-3475: the History panel's button after reading failed."
+  },
+  "files.history.submittedBy": {
+    "defaultMessage": "submitted by {agent}",
+    "description": "HI-3475: in a History row, after the card: the agent ({agent}, its name) that submitted this commit for review in one of the card's submissions. Not who wrote it."
+  },
+  "files.history.submittedByTip": {
+    "defaultMessage": "{agent} submitted this commit for review in one of {card}'s submissions. It doesn't say who wrote it: git records one author for everyone here.",
+    "description": "HI-3475: the tooltip of 'submitted by' in a History row. {agent} is the agent's name, {card} the card's key."
+  },
+  "files.history.title": {
+    "defaultMessage": "History",
+    "description": "HI-3475: the heading of the Files tab's History panel: the commits that changed the file or folder selected."
+  },
+  "files.history.toggle": {
+    "defaultMessage": "History",
+    "description": "HI-3475: the Files tab's toolbar button (and right-click menu item) that shows or hides the History panel: the commits that changed the file or folder."
+  },
+  "files.history.toggleTip": {
+    "defaultMessage": "The commits that changed this, with their cards",
+    "description": "HI-3475: the tooltip of the Files tab's History button."
   },
   "files.image.actualSize": {
     "defaultMessage": "Click for actual size",

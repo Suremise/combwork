@@ -149,6 +149,10 @@ export const GITHUB_GH_MINUTES = 'cw.github.ghMinutes'
 export const GITHUB_PR_FOLLOW_MINUTES = 'cw.github.prFollowMinutes'
 /** HI-3473: how old a lock file of git's must be before Repository health calls it stale. */
 export const GIT_STALE_LOCK_SECONDS = 'cw.git.staleLockSeconds'
+/** HI-3475: the longest one read of the Files tab's History takes before Combwork ends git. */
+export const GIT_HISTORY_SECONDS = 'cw.git.historySeconds'
+/** HI-3476: blame by card asks before blaming a file longer than this many lines. */
+export const GIT_BLAME_ASK_LINES = 'cw.git.blameAskLines'
 /** HI-3473: the programs that count as a git that may hold a lock (Windows' process names). */
 export const GIT_PROCESS_NAMES = 'cw.git.processNames'
 /** HI-3372: the merge queue's own fetches and pushes. */
@@ -181,6 +185,15 @@ export const USAGE_TIMELINE_DETAIL_DAYS = 'cw.usage.timelineDetailDays'
 
 /** The longest a slot's setup, install or archive command runs, in minutes (#1429): read by main's slotsApp. */
 export const SLOTS_SETUP_MINUTES = 'cw.slots.setupMinutes'
+
+/** Whether the Preview is on (HI-3614, SPEC §16.21): off, no preview runs and nothing of it is offered. Read by main's previewApp. */
+export const PREVIEW_ENABLED = 'cw.preview.enabled'
+/** The first of the profile's preview ports (HI-3614): a development build's default range is the next 1000 (previewApp). */
+export const PREVIEW_PORT_RANGE = 'cw.preview.portRange'
+/** How long a preview's server gets to listen on its port, in seconds (HI-3614): read by main's previewApp. */
+export const PREVIEW_START_SECONDS = 'cw.preview.startSeconds'
+/** How long an agent's capture of a preview (a screenshot, a snapshot, a page load) may take, in seconds (HI-3616). */
+export const PREVIEW_CAPTURE_SECONDS = 'cw.preview.captureSeconds'
 
 /**
  * Whether a lane's end lets its builder finish its turn, tells it, and ends its CLI with the CLI's own exit (HI-1706):
@@ -1078,6 +1091,33 @@ const SOURCES: readonly AdvancedSource[] = [
     unit: 's',
     applies: 'now'
   },
+  // HI-3475: the Files tab's History: one page (its commits, their cards and who submitted them), a commit's diff of a
+  // file or the merge that brought one in, each read under this bound, git ended at it.
+  {
+    id: GIT_HISTORY_SECONDS,
+    group: 'cw',
+    title: msg({ id: 'settings.advanced.cw.git.historySeconds.title', defaultMessage: 'Git: longest a history read takes', description: "An advanced setting's title (Settings → Advanced), listed under Combwork, followed by its value in seconds: the Files tab's History panel (HI-3475)." }),
+    desc: msg({ id: 'settings.advanced.cw.git.historySeconds.desc', defaultMessage: "How long the Files tab's History may spend reading one page of a file's commits (with their cards), one commit's changes, or the merge that brought a commit in, before Combwork stops git and says so. A page usually takes well under a second; raise this for a very large repository whose history git reads slowly.", description: 'What the advanced setting "Git: longest a history read takes" does (Settings → Advanced, HI-3475).' }),
+    kind: 'number',
+    default: 60,
+    min: 5,
+    max: 3600,
+    unit: 's',
+    applies: 'now'
+  },
+  // HI-3476: blame by card in the Files tab: a file longer than this is blamed only once the user says so.
+  {
+    id: GIT_BLAME_ASK_LINES,
+    group: 'cw',
+    title: msg({ id: 'settings.advanced.cw.git.blameAskLines.title', defaultMessage: 'Git: ask before blaming a file longer than', description: "An advanced setting's title (Settings → Advanced), listed under Combwork, followed by its value in lines: the Files tab's Blame (HI-3476)." }),
+    desc: msg({ id: 'settings.advanced.cw.git.blameAskLines.desc', defaultMessage: "Blame in the Files tab reads which commit last changed each line, which takes git longer the longer the file and its history. For a file with more lines than this it asks first. Each read still stops at Git: longest a history read takes.", description: 'What the advanced setting "Git: ask before blaming a file longer than" does (Settings → Advanced, HI-3476). Git: longest a history read takes is another setting’s name: keep it as Settings → Advanced shows it.' }),
+    kind: 'number',
+    default: 20000,
+    min: 1000,
+    max: 1000000,
+    unit: 'lines',
+    applies: 'now'
+  },
   {
     id: GIT_PROCESS_NAMES,
     group: 'cw',
@@ -1222,6 +1262,67 @@ const SOURCES: readonly AdvancedSource[] = [
     min: 1,
     max: 1440,
     unit: 'min',
+    applies: 'now'
+  },
+  // The Preview (HI-3614, SPEC §16.21): a project's dev server per place, on a port of its own; off by default.
+  {
+    id: PREVIEW_ENABLED,
+    group: 'cw',
+    title: msg({ id: 'settings.advanced.cw.preview.enabled.title', defaultMessage: "Preview: run projects' dev servers", description: "An advanced setting's title (Settings → Advanced), listed under Combwork. The Preview runs a web project's development server (the command in Project Settings → Preview) so it can be looked at." }),
+    desc: msg({
+      id: 'settings.advanced.cw.preview.enabled.desc',
+      defaultMessage: "Lets Combwork run a web project's development server, the command set in Project Settings → Preview, in the project folder, a slot or a review copy, each on a free port of its own, started only when asked and stopped with its slot's or review's end. Turned off, Project Settings has no Preview section, no preview starts, and the ones running are stopped.",
+      description: "What the advanced setting \"Preview: run projects' dev servers\" does (Settings → Advanced, under Combwork). A slot is a worktree Combwork lends to a card or a lane; a review copy is a copy of a project at the revision a reviewer reviews. Project Settings → Preview is a section: use its names as translated there."
+    }),
+    kind: 'boolean',
+    default: false,
+    applies: 'now'
+  },
+  {
+    id: PREVIEW_PORT_RANGE,
+    group: 'cw',
+    title: msg({ id: 'settings.advanced.cw.preview.portRange.title', defaultMessage: 'Preview: first port', description: "An advanced setting's title (Settings → Advanced), listed under Combwork, followed by a port number. The Preview runs web projects' development servers, each on a port of its own." }),
+    desc: msg({
+      id: 'settings.advanced.cw.preview.portRange.desc',
+      defaultMessage: "Preview servers get their ports from the 1,000 ports from this one, across every project and window of Combwork. A development build of Combwork uses the 1,000 after them while this is left at its default, so the two never share. A port another program listens on is skipped, and so are Combwork's own.",
+      description: "What the advanced setting \"Preview: first port\" does (Settings → Advanced, under Combwork). A preview server is a web project's development server Combwork runs."
+    }),
+    kind: 'number',
+    default: 45000,
+    min: 1024,
+    max: 64536,
+    applies: 'now'
+  },
+  {
+    id: PREVIEW_START_SECONDS,
+    group: 'cw',
+    title: msg({ id: 'settings.advanced.cw.preview.startSeconds.title', defaultMessage: 'Preview: longest a server takes to start', description: "An advanced setting's title (Settings → Advanced), listed under Combwork, followed by its value in seconds (\"60 s\"). The Preview runs web projects' development servers." }),
+    desc: msg({
+      id: 'settings.advanced.cw.preview.startSeconds.desc',
+      defaultMessage: 'How long a preview server gets to listen on the port Combwork gave it. Not listening by then, or listening on another port, it is stopped and the preview says why.',
+      description: "What the advanced setting \"Preview: longest a server takes to start\" does (Settings → Advanced, under Combwork). A preview server is a web project's development server Combwork runs."
+    }),
+    kind: 'number',
+    default: 60,
+    min: 5,
+    max: 600,
+    unit: 's',
+    applies: 'now'
+  },
+  {
+    id: PREVIEW_CAPTURE_SECONDS,
+    group: 'cw',
+    title: msg({ id: 'settings.advanced.cw.preview.captureSeconds.title', defaultMessage: "Preview: longest an agent's capture takes", description: "An advanced setting's title (Settings → Advanced), listed under Combwork, followed by its value in seconds (\"10 s\"). The Preview runs web projects' development servers; agents can take screenshots and read their pages." }),
+    desc: msg({
+      id: 'settings.advanced.cw.preview.captureSeconds.desc',
+      defaultMessage: "How long an agent's look at its preview may take: loading the page, a screenshot and its encoding, or reading the page's text. Past it the agent is told the capture timed out, and nothing is saved.",
+      description: "What the advanced setting \"Preview: longest an agent's capture takes\" does (Settings → Advanced, under Combwork)."
+    }),
+    kind: 'number',
+    default: 10,
+    min: 2,
+    max: 120,
+    unit: 's',
     applies: 'now'
   },
   // Lanes nothing will wake the Assistant about (HI-2069): told so as its turn ends.

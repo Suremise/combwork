@@ -13,6 +13,9 @@
 
 import type { BranchDrops, BranchUpdatePlan, CompareLines, GitComparison, GitHistory, GitRemote, GitRepoInfo, GitRepoSummary, LeftoverInfo } from '../../shared/gitRepo'
 import type { SigningInfo } from '../../shared/gitSigning'
+import type { FileLog, FileSide, FileVersions, MergeIntro } from '../../shared/fileHistory'
+import type { BlameRead } from '../../shared/fileBlame'
+import type { CompareVersion } from '../../shared/fileCompare'
 import type { GitOperationState } from '../../shared/gitOperations'
 import type { StashConflict } from '../../shared/gitStashes'
 import type { ResolvedStart, StartPoints } from '../../shared/nextVersion'
@@ -64,6 +67,28 @@ export interface RepoReads {
    * at most once a minute unless `force`). Optional: a platform without signing has none, and nothing is shown.
    */
   signing?(root: string, force?: boolean): Promise<SigningInfo>
+  /**
+   * HI-3475: the Files tab's History of a file (following its renames) or a folder in a working folder, a page at a
+   * time from the commit pinned on page 1 (`pinned`; null reads the folder's head and pins it; a pin no longer there is
+   * refused). Optional, as the members below: a platform without them offers no History. Each is bounded by `at` (ms
+   * since the epoch; default now plus `cw.git.historySeconds`), refused once it has run out, the tool ended.
+   */
+  fileLog?(root: string, rel: string, isDir: boolean, pinned: string | null, page: number, at?: number): Promise<FileLog>
+  /** HI-3475: a file at two commits, each side at its own path (null: no side); a side confirmed absent is `missing`. */
+  fileVersions?(root: string, left: FileSide | null, right: FileSide | null, at?: number): Promise<FileVersions>
+  /** HI-3475: the merge that introduced `commit` on `head`'s first-parent line, or null when none can be said. */
+  introducedBy?(root: string, head: string, commit: string, at?: number): Promise<MergeIntro | null>
+  /** HI-3475: the commits in `revision` and not in `base` (a submission's own); null when they can't be read here. */
+  rangeCommits?(root: string, base: string, revision: string, at?: number, signal?: AbortSignal): Promise<Set<string> | null>
+  /**
+   * HI-3476: which commit last changed each line of `rel` with `text` as its content (the editor's), and each commit's
+   * card trailer; `untracked` when HEAD has no such file. Bounded by `at` as History's reads, ended by `signal`.
+   */
+  fileBlame?(root: string, rel: string, text: string, at: number, signal?: AbortSignal): Promise<BlameRead>
+  /** HI-3478: Compare with…'s branches and tags, the most recently changed first. Bounded by `at` as History's reads. */
+  compareRefs?(root: string, at: number): Promise<{ branches: { name: string; commit: string }[]; tags: { name: string; commit: string }[] }>
+  /** HI-3478: `rel` at a branch, tag or commit, its path there found across renames (`given`: a path already known). */
+  fileAtRef?(root: string, rel: string, ref: string, given: string | null, at: number): Promise<CompareVersion>
   /** A line's history, a page at a time, and the tags. */
   history(root: string, o: { ref?: string | null; page?: number; workTarget?: string | null }): Promise<GitHistory>
   /** What can be compared: the lines, main, the integration line and the slots with a line. */

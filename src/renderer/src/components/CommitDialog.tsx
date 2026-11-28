@@ -48,8 +48,12 @@ export const COMMIT_TEXT = {
 }
 const T = COMMIT_TEXT
 
-/** HI-3471: the Commit dialog for `commit` (in full), in `project`; `onClose` when it closes. */
-export function CommitDialog({ project, commit, onClose }: { project: ProjectInfo; commit: string; onClose: () => void }) {
+/**
+ * HI-3471: the Commit dialog for `commit` (in full), in `project`; `onClose` when it closes. HI-3475: `focus`, the file
+ * History opened it on (its path from the repository's top), shown first; where the commit renamed it (`oldPath`), its
+ * diff reads each side at its own path, so a rename shows as one change rather than a deletion and an addition.
+ */
+export function CommitDialog({ project, commit, focus, onClose }: { project: ProjectInfo; commit: string; focus?: { path: string; oldPath: string | null } | null; onClose: () => void }) {
   const [detail, setDetail] = useState<{ data: CommitDetail | null; error?: string } | null>(null)
   const [reads, setReads] = useState(0)
   const [file, setFile] = useState<string | null>(null)
@@ -58,33 +62,40 @@ export function CommitDialog({ project, commit, onClose }: { project: ProjectInf
   const [form, setForm] = useState<OpenForm | null>(null)
   const folderBusy = useFolderBusy(project)
 
+  // The file History opened the dialog on, as it was when it opened.
+  const focusPath = focus?.path ?? null
   useEffect(() => {
     let live = true
     void repoOp('git:commitDetail', project.path, commit).then(
       (data) => {
         if (!live) return
         setDetail({ data })
-        setFile((f) => (f && data.files.some((x) => x.path === f) ? f : (data.files[0]?.path ?? null)))
+        setFile((f) => (f && data.files.some((x) => x.path === f) ? f : focusPath && data.files.some((x) => x.path === focusPath) ? focusPath : (data.files[0]?.path ?? null)))
       },
       (e) => live && setDetail({ data: null, error: errorMessage(e) })
     )
     return () => {
       live = false
     }
-  }, [project.path, commit, reads])
+  }, [project.path, commit, reads, focusPath])
 
   useEffect(() => {
     if (!file) return
     let live = true
     const key = `${commit}\0${file}`
-    void repoOp('git:commitFileDiff', project.path, commit, file).then(
+    const parent = detail?.data?.parents[0]
+    const renamed = focus?.oldPath && focus.path === file && parent ? { parent, from: focus.oldPath, to: focus.path } : null
+    const read = renamed ? call('files:historyDiff', project.path, { commit: renamed.parent, path: renamed.from }, { commit, path: renamed.to }) : repoOp('git:commitFileDiff', project.path, commit, file)
+    void read.then(
       (d) => live && setDiff({ for: key, diff: d }),
       (e) => live && setDiff({ for: key, diff: null, error: errorMessage(e) })
     )
     return () => {
       live = false
     }
-  }, [project.path, commit, file])
+    // A renamed file's diff needs the commit's parent: read again once the commit's details have it.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [project.path, commit, file, focus?.path, detail?.data?.parents[0]])
 
   if (form) return <GitForm make={form.make} onClose={onClose} />
   const d = detail?.data ?? null

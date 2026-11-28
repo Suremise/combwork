@@ -1,0 +1,340 @@
+// The Files tab's History (HI-3475), driven in the window: a project whose doc.txt was made as old.txt, renamed and
+// edited in a commit naming a card, and edited on a side branch by a commit naming none, merged by a commit naming the
+// card. History, from the file's toolbar, lists the file's commits across the rename, the card's key on its commit
+// (opening the card), "Renamed from"; a click shows the commit's diff in place of the editor, the rename's from its old
+// path, and Back to file returns to the editor with its unsaved edit and its undo kept; Find its merge on the side commit
+// says it came in with the card's merge; a folder's History lists its commits; switching file shows that file's history.
+// HI-3476's Blame by card: the column names the card on its commit's lines, the unsaved and newly typed lines as not
+// committed, the side commit by its hash; an entry opens its commit's diff (Back keeps the edit), the card opens it.
+// HI-3478's Compare with…: a branch from before the rename compares at the old path, beside the editor's unsaved text;
+// an option-like name is refused, a hash typed compares with that commit, History's row with its commit; a file not
+// in the version says so. Screenshots of the panel, a diff, the blame column and a comparison in both themes. Git's
+// global config the suite's own. Dev build, throwaway profile and workspace.
+const lib = require('./lib.cjs')
+const { execFileSync } = require('child_process')
+const fs = require('fs')
+const path = require('path')
+// The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
+const HUNG_MS = lib.timing('hang.ui')
+
+const userData = path.join(lib.WORK, 'filehistory-profile')
+const ws = path.join(lib.WORK, 'filehistory-ws')
+const claudeHome = path.join(lib.WORK, 'filehistory-claude-home')
+const globalConfig = path.join(lib.WORK, 'filehistory-gitconfig')
+const alpha = path.join(ws, 'alpha')
+let failed = 0
+const check = (name, ok, extra = '') => {
+  if (!ok) failed++
+  console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${ok || !extra ? '' : ` (${extra})`}`)
+}
+
+;(async () => {
+  for (const d of [userData, ws, claudeHome]) fs.rmSync(d, { recursive: true, force: true })
+  fs.writeFileSync(globalConfig, '[user]\n\tname = Test User\n\temail = 1+test@users.noreply.github.com\n[init]\n\tdefaultBranch = main\n[core]\n\tautocrlf = false\n')
+  const gitEnv = lib.gitEnv({ GIT_CONFIG_GLOBAL: globalConfig })
+  const g = (...a) => execFileSync('git', a, { cwd: alpha, env: gitEnv, encoding: 'utf8' }).trim()
+  const write = (f, t) => {
+    fs.mkdirSync(path.dirname(path.join(alpha, f)), { recursive: true })
+    fs.writeFileSync(path.join(alpha, f), t)
+  }
+  fs.mkdirSync(alpha, { recursive: true })
+  execFileSync('git', ['init', '-q', '-b', 'main', alpha], { env: gitEnv })
+  write('old.txt', 'one\ntwo\nthree\nfour\nfive\nsix\n')
+  write('notes/a.md', '# A\n')
+  g('add', '-A')
+  g('commit', '-qm', 'start')
+  // HI-3478: a branch from before the rename, to compare with.
+  g('branch', 'before')
+  const claude = lib.fakeClaude(userData, claudeHome, [alpha])
+  const env = { ...claude, CW_API_PORT: lib.port(47608), GIT_CONFIG_GLOBAL: globalConfig }
+
+  const { app, page, inv } = await lib.launch({ userData, env, viewport: { width: 1500, height: 950 } })
+  page.on('pageerror', (e) => check('no page errors', false, e.message))
+  try {
+    await lib.openWorkspace(inv, page, ws)
+    const card = await inv('tasks:create', { title: 'Rename the doc', project: 'alpha' })
+    const key = card.key
+    check('a card to name in commits', typeof key === 'string' && /-\d+$/.test(key), JSON.stringify(card))
+    // The card's commit renames and edits the file; a side branch's commit (no key) edits it, merged under the card.
+    g('mv', 'old.txt', 'doc.txt')
+    write('doc.txt', 'ONE\ntwo\nthree\nfour\nfive\nsix\n')
+    g('commit', '-qam', `${key}: rename the doc`)
+    const renamed = g('rev-parse', 'HEAD')
+    g('switch', '-q', '-c', 'side')
+    write('doc.txt', 'ONE\ntwo\nthree\nfour\nfive\nSIX\n')
+    g('commit', '-qam', 'tidy the end')
+    const sideCommit = g('rev-parse', 'HEAD')
+    g('switch', '-q', 'main')
+    write('notes/b.md', '# B\n')
+    g('add', '-A')
+    g('commit', '-qm', 'add notes b')
+    g('merge', '-q', '--no-ff', '-m', `${key}: merge side`, 'side')
+
+    const text = (loc) => loc.innerText().catch(() => '')
+    const shown = (loc) => lib.until(async () => (await loc.count()) > 0 && (await loc.first().isVisible()), HUNG_MS)
+    const theme = async (t) => {
+      await inv('settings:update', { appearance: { theme: t } })
+      await lib.until(() => page.evaluate((x) => document.documentElement.dataset.theme === x, t), HUNG_MS)
+    }
+    const shoot = async (loc, name) => {
+      for (const t of ['dark', 'light']) {
+        await theme(t)
+        await page.mouse.move(5, 5)
+        await loc.screenshot({ path: path.join(lib.WORK, `filehistory-${name}-${t}.png`) })
+      }
+      await theme('dark')
+    }
+    await page.getByText('alpha', { exact: true }).first().click()
+    await page.locator('.tab', { hasText: 'Files' }).click()
+    await lib.until(async () => (await page.locator('.file-row').count()) > 0, HUNG_MS)
+    const row = (rel) => page.locator(`.file-row[data-rel="${rel}"]`)
+    await row('doc.txt').click()
+    await shown(page.locator('.split-main .monaco .view-lines'))
+
+    // An unsaved edit, before History is opened: it must outlive a diff and Back to file.
+    await page.locator('.split-main .monaco').first().click({ position: { x: 90, y: 10 } })
+    await page.keyboard.press('Control+End')
+    await page.keyboard.type('unsaved line')
+    check('the edit marks the file unsaved', !!(await lib.until(async () => (await page.locator('.editor-toolbar .dirty-dot').count()) === 1, HUNG_MS)))
+
+    await page.locator('[data-action="file-history"]').click()
+    const panel = page.locator('[data-file-history="doc.txt"]')
+    const rows = panel.locator('[data-history-row]')
+    check("History lists the file's commits across its rename", !!(await lib.until(async () => (await rows.count()) === 3, HUNG_MS)), String(await rows.count()))
+    const subjects = await panel.locator('.history-subject').allInnerTexts()
+    check('…newest first', JSON.stringify(subjects) === JSON.stringify(['tidy the end', `${key}: rename the doc`, 'start']), JSON.stringify(subjects))
+    const renameRow = panel.locator(`[data-history-row="${renamed}"]`)
+    check("the rename's commit names its card", (await renameRow.locator(`[data-history-card="${key}"]`).count()) === 1)
+    check('…and says what the file was called', /Renamed from old\.txt/.test(await text(renameRow)))
+    const sideRow = panel.locator(`[data-history-row="${sideCommit}"]`)
+    check('the side commit names no card', (await sideRow.locator('[data-history-card]').count()) === 0)
+    await shoot(panel, 'panel')
+
+    // A commit's diff, over the editor; the rename's from its old path.
+    await renameRow.locator('.history-main').click()
+    const diff = page.locator(`[data-history-diff="${renamed}:doc.txt"]`)
+    check("a click shows the commit's diff of the file", await shown(diff.locator('.monaco')))
+    check("…the rename's, from the old path", /old\.txt → doc\.txt/.test(await text(diff)))
+    check('…in place of the editor', (await page.locator('.split-main .editor-host[hidden]').count()) === 1)
+    await shoot(page.locator('.split-main'), 'diff')
+    await diff.locator('[data-action="history-back"]').click()
+    check('Back to file shows the editor', !!(await lib.until(async () => (await diff.count()) === 0 && (await page.locator('.split-main .editor-host[hidden]').count()) === 0, HUNG_MS)))
+    // Monaco draws a space as a no-break space.
+    const editorText = () => page.evaluate(() => (document.querySelector('.split-main .monaco .view-lines')?.textContent ?? '').replace(/\u00a0/g, ' '))
+    check('…with the unsaved edit kept', (await editorText()).includes('unsaved line') && (await page.locator('.editor-toolbar .dirty-dot').count()) === 1)
+    await page.locator('.split-main .monaco').first().click({ position: { x: 90, y: 10 } })
+    await page.keyboard.press('Control+Z')
+    check('…and its undo too', !!(await lib.until(async () => !(await editorText()).includes('unsaved line'), HUNG_MS)))
+    await page.keyboard.press('Control+Y')
+    await lib.until(async () => (await editorText()).includes('unsaved line'), HUNG_MS)
+
+    // A commit naming no card: the merge that brought it in names the card.
+    await sideRow.locator('[data-action="history-find-merge"]').click()
+    check("Find its merge says the card's merge brought it in", !!(await lib.until(async () => (await sideRow.locator(`[data-history-came-in="${key}"]`).count()) === 1, HUNG_MS)), await text(sideRow))
+    await sideRow.locator(`[data-history-came-in="${key}"]`).click()
+    const cardDialog = page.locator('.dialog[role="dialog"]').filter({ has: page.locator('.task-title-input') })
+    check('…and opens that card', !!(await lib.until(async () => (await cardDialog.locator('.task-title-input').inputValue().catch(() => '')) === 'Rename the doc', HUNG_MS)))
+    await cardDialog.locator('.dialog-header button[aria-label^="Close"]').click()
+    await lib.until(async () => (await cardDialog.count()) === 0, HUNG_MS)
+
+    // HI-3476: Blame by card beside the editor, of the text as the editor has it.
+    await page.locator('[data-action="file-blame"]').click()
+    const column = page.locator('.blame-column')
+    check('blame shows a column of the lines\' commits', !!(await lib.until(async () => Number((await column.getAttribute('data-blame-column').catch(() => '')) || 0) > 0, HUNG_MS)))
+    check("…the card's key on the line its commit changed", (await column.locator(`.blame-block[data-blame-line="1"] [data-blame-card="${key}"]`).count()) === 1, await text(column))
+    check('…the unsaved line as not committed yet', (await column.locator('.blame-block.uncommitted').count()) >= 1)
+    check('…the side commit by its hash, naming no card', (await column.locator(`.blame-block[data-blame-commit="${sideCommit}"] [data-blame-card]`).count()) === 0 && (await column.locator(`.blame-block[data-blame-commit="${sideCommit}"]`).count()) === 1)
+    await shoot(page.locator('.split-main'), 'blame')
+    await column.locator(`.blame-block[data-blame-commit="${sideCommit}"] [data-action="blame-commit"]`).click()
+    const sideDiff = page.locator(`[data-history-diff="${sideCommit}:doc.txt"]`)
+    check("a commit's entry opens its diff of the file", await shown(sideDiff.locator('.monaco')))
+    await sideDiff.locator('[data-action="history-back"]').click()
+    check('…and Back to file keeps the edit', !!(await lib.until(async () => (await sideDiff.count()) === 0 && (await editorText()).includes('unsaved line'), HUNG_MS)))
+    await column.locator(`[data-blame-card="${key}"]`).first().click()
+    check('the card in the column opens it', !!(await lib.until(async () => (await cardDialog.locator('.task-title-input').inputValue().catch(() => '')) === 'Rename the doc', HUNG_MS)))
+    await cardDialog.locator('.dialog-header button[aria-label^="Close"]').click()
+    await lib.until(async () => (await cardDialog.count()) === 0, HUNG_MS)
+    // Typing is blamed a moment later: a new line is not committed yet.
+    // The new text's blame is held in main until released, so the stale interval is seen whatever the timing: until it
+    // comes, the old annotations aren't drawn beside the lines that moved.
+    await app.evaluate(({ ipcMain }) => {
+      const handlers = ipcMain._invokeHandlers
+      const h = handlers.get('files:blame')
+      globalThis.__blameHold = { on: true, held: [], h }
+      handlers.set('files:blame', (...x) => (globalThis.__blameHold.on ? new Promise((r) => globalThis.__blameHold.held.push(() => r(h(...x)))) : h(...x)))
+    })
+    const releaseBlame = () =>
+      app.evaluate(({ ipcMain }) => {
+        const hold = globalThis.__blameHold
+        if (!hold) return
+        hold.on = false
+        for (const r of hold.held.splice(0)) r()
+        ipcMain._invokeHandlers.set('files:blame', hold.h)
+        globalThis.__blameHold = null
+      })
+    try {
+      await page.locator('.split-main .monaco').first().click({ position: { x: 90, y: 10 } })
+      await page.keyboard.press('Control+Home')
+      await page.keyboard.type('top line\n')
+      check("the new text's blame is asked for (and held)", !!(await lib.until(async () => (await app.evaluate(() => globalThis.__blameHold.held.length)) >= 1 && (await editorText()).includes('top line'), HUNG_MS)))
+      check('while it is held, none of the old annotations is drawn', (await column.locator('.blame-block').count()) === 0 && (await column.getAttribute('aria-busy')) === 'true')
+    } finally {
+      await releaseBlame()
+    }
+    check('a line typed is blamed as not committed', !!(await lib.until(async () => (await column.locator('.blame-block.uncommitted[data-blame-line="1"]').count()) === 1, HUNG_MS)))
+    await page.keyboard.press('Control+Home')
+    await page.keyboard.press('Shift+ArrowDown')
+    await page.keyboard.press('Delete')
+    check('…and deleted again, its card again', !!(await lib.until(async () => (await column.locator(`.blame-block[data-blame-line="1"] [data-blame-card="${key}"]`).count()) === 1, HUNG_MS)))
+    await page.locator('[data-action="file-blame"]').click()
+    check('Blame by card turns off', !!(await lib.until(async () => (await column.count()) === 0, HUNG_MS)))
+
+    // HI-3478: Compare with… a branch from before the rename: the file at its old path there, beside the editor's text.
+    await page.locator('[data-action="file-compare"]').click()
+    const picker = page.locator('[data-compare-picker]')
+    check('Compare with… lists the branches', await shown(picker.locator('[data-compare-choice="branch:before"]')))
+    await picker.locator('[data-compare-choice="branch:before"]').click()
+    const compared = page.locator('[data-compare-diff]')
+    check('…and compares with the one chosen', await shown(compared.locator('.monaco')))
+    check('…found at its old path there', /There it was old\.txt/.test(await text(compared)), await text(compared))
+    check('…the right side the unsaved edits, said so', (await compared.locator('[data-compare-unsaved]').count()) === 1)
+    await shoot(page.locator('.split-main'), 'compare')
+    await compared.locator('[data-action="compare-back"]').click()
+    check('Back to file keeps the edit', !!(await lib.until(async () => (await compared.count()) === 0 && (await editorText()).includes('unsaved line'), HUNG_MS)))
+    // A name typed: only a branch, tag or hash; a hash compares with that commit.
+    await page.locator('[data-action="file-compare"]').click()
+    await picker.locator('input').fill('--output=x')
+    check('an option-like name is refused in the picker', /not an option or a range/.test(await text(picker)) && (await picker.locator('[data-compare-choice^="typed:"]').count()) === 0)
+    await picker.locator('input').fill(renamed)
+    await picker.locator('input').press('Enter')
+    check('a commit hash typed compares with it', !!(await lib.until(async () => (await page.locator(`[data-compare-diff="${renamed}"] .monaco`).count()) === 1, HUNG_MS)))
+    await page.locator('[data-action="compare-back"]').click()
+    // From History: the row's commit at the path it had there.
+    await panel.locator(`[data-history-row="${renamed}"] [data-action="history-compare"]`).click()
+    check("History's Compare with this version compares with that commit", !!(await lib.until(async () => (await page.locator(`[data-compare-diff="${renamed}"] .monaco`).count()) === 1, HUNG_MS)))
+    await page.locator('[data-action="compare-back"]').click()
+    await lib.until(async () => (await page.locator('[data-compare-diff]').count()) === 0, HUNG_MS)
+
+    // The project folder's copy, as a slot's file sees it (HR1's round 1 finding): main's answers are set here, one state
+    // at a time (this suite's folder is the project folder, which offers no copy of its own), each shown as it is.
+    await app.evaluate(({ ipcMain }) => {
+      const handlers = ipcMain._invokeHandlers
+      const choices = handlers.get('files:compareChoices')
+      const project = handlers.get('files:compareProject')
+      globalThis.__copy = { state: 'text', choices, project }
+      handlers.set('files:compareChoices', async (...x) => ({ ...(await choices(...x)), projectFolder: 'the project folder' }))
+      handlers.set('files:compareProject', async () => {
+        const s = globalThis.__copy.state
+        if (s === 'error') throw new Error("EACCES: permission denied, open 'doc.txt'")
+        return s === 'text' ? { state: 'text', text: 'ONE\ntwo\nfrom the project\n' } : s === 'notText' ? { state: 'notText', kind: 'binary' } : { state: s }
+      })
+    })
+    // app.evaluate's first argument is Electron's module, the value passed comes second.
+    const copyAs = (state) =>
+      app.evaluate((_electron, s) => {
+        globalThis.__copy.state = s
+      }, state)
+    const compareCopy = async () => {
+      await page.locator('[data-action="file-compare"]').click()
+      await page.locator('[data-compare-picker] [data-compare-choice="project"]').click()
+    }
+    try {
+      await compareCopy()
+      check("the project folder's copy compares as text", !!(await lib.until(async () => (await page.locator('[data-compare-diff="project"] .monaco').count()) === 1, HUNG_MS)))
+      await page.locator('[data-action="compare-back"]').click()
+      await copyAs('missing')
+      await compareCopy()
+      check('…one confirmed absent says it isn\'t there', !!(await lib.until(async () => (await page.locator('[data-compare-diff="project"] [data-compare-missing]').count()) === 1, HUNG_MS)))
+      await page.locator('[data-action="compare-back"]').click()
+      await copyAs('error')
+      await compareCopy()
+      const failedCopy = page.locator('[data-compare-diff]')
+      check('…a read that fails says so, never an empty file', !!(await lib.until(async () => /Couldn't compare: EACCES/.test(await text(failedCopy)), HUNG_MS)) && (await failedCopy.locator('[data-compare-missing]').count()) === 0, await text(failedCopy))
+      await page.locator('[data-action="compare-back"]').click()
+      await copyAs('notText')
+      await compareCopy()
+      check('…one that is binary says so, with no text diff', !!(await lib.until(async () => (await page.locator('[data-compare-not-text="binary"]').count()) === 1, HUNG_MS)) && (await page.locator('[data-compare-diff] .monaco').count()) === 0)
+      await page.locator('[data-action="compare-back"]').click()
+    } finally {
+      await app.evaluate(({ ipcMain }) => {
+        const c = globalThis.__copy
+        if (!c) return
+        ipcMain._invokeHandlers.set('files:compareChoices', c.choices)
+        ipcMain._invokeHandlers.set('files:compareProject', c.project)
+        globalThis.__copy = null
+      })
+    }
+
+    // Another item selected: its history, never the last one's.
+    await row('notes').click()
+    const folder = page.locator('[data-file-history="notes"]')
+    check("a folder's History lists its commits", !!(await lib.until(async () => (await folder.locator('[data-history-row]').count()) === 2, HUNG_MS)), await text(folder))
+    await folder.locator('[data-history-row]').first().locator('.history-main').click()
+    check("…a commit's files under it", await shown(folder.locator('[data-history-file="notes/b.md"]')))
+    await folder.locator('[data-history-file="notes/b.md"]').click()
+    check("…and one file's diff in place of the folder's details", await shown(page.locator('[data-history-diff$=":notes/b.md"] .monaco')))
+    await row('doc.txt').click()
+    check('back on the file, its history again and its editor (the diff left with the folder)', !!(await lib.until(async () => (await panel.locator('[data-history-row]').count()) === 3 && (await page.locator('[data-history-diff]').count()) === 0, HUNG_MS)))
+    check('…its edit still unsaved', (await editorText()).includes('unsaved line'))
+    // A file the version doesn't have: said, the left side empty.
+    await row('notes/b.md').click()
+    // A Markdown file opens in its preview: its toolbar's Compare with… is there all the same.
+    await shown(page.locator('.editor-toolbar .path', { hasText: 'b.md' }))
+    await page.locator('[data-action="file-compare"]').click()
+    await page.locator('[data-compare-picker] [data-compare-choice="branch:before"]').click()
+    check("a file not in the version says it isn't there", !!(await lib.until(async () => (await page.locator('[data-compare-missing]').count()) === 1, HUNG_MS)))
+    await page.locator('[data-action="compare-back"]').click()
+    await row('doc.txt').click()
+    await lib.until(async () => (await editorText()).includes('unsaved line'), HUNG_MS)
+
+    // A later page whose pinned commit is gone (amended, then pruned): refused, the list kept as it was until Refresh.
+    for (let i = 0; i <= 50; i++) {
+      write('many.txt', `${i}\n`)
+      g('add', 'many.txt')
+      g('commit', '-qm', `many ${i}`)
+    }
+    await lib.until(async () => (await row('many.txt').count()) === 1, HUNG_MS)
+    await row('many.txt').click()
+    const many = page.locator('[data-file-history="many.txt"]')
+    check('a long history shows its first page, with Show more', !!(await lib.until(async () => (await many.locator('[data-history-row]').count()) === 50 && (await many.locator('[data-action="history-more"]').count()) === 1, HUNG_MS)))
+    // The commit the list was pinned to, replaced and then gone: its loose object removed (no gc, which the app would
+    // meet mid-run).
+    const pinned = g('rev-parse', 'HEAD')
+    g('commit', '--amend', '-qm', 'many 50, amended')
+    fs.rmSync(path.join(alpha, '.git', 'objects', pinned.slice(0, 2), pinned.slice(2)))
+    check('the pinned commit is gone from the repository', (() => {
+      try {
+        g('cat-file', '-e', `${pinned}^{commit}`)
+        return false
+      } catch {
+        return true
+      }
+    })())
+    await many.locator('[data-action="history-more"]').click()
+    check('Show more from a pruned commit says it is gone', !!(await lib.until(async () => /no commit .* Refresh the history/.test(await text(many)), HUNG_MS)), await text(many.locator('.banner')))
+    check('…and keeps the page shown', (await many.locator('[data-history-row]').count()) === 50)
+    await many.locator('.file-history-head [aria-label="Refresh"], .file-history-head .icon-btn').first().click()
+    check('Refresh reads it again from the branch now', !!(await lib.until(async () => (await many.locator('.history-subject').first().innerText().catch(() => '')) === 'many 50, amended', HUNG_MS)))
+
+    await page.locator('[data-file-history] .file-history-head .icon-btn').last().click()
+    check('closing hides the panel', !!(await lib.until(async () => (await page.locator('[data-file-history]').count()) === 0, HUNG_MS)))
+    // Saved, so quitting has no unsaved file to ask about.
+    await row('doc.txt').click()
+    await lib.until(async () => (await page.locator('.editor-toolbar .dirty-dot').count()) === 1, HUNG_MS)
+    await page.locator('.split-main .monaco').first().click({ position: { x: 90, y: 10 } })
+    await page.keyboard.press('Control+S')
+    check('the edit saves to the file', !!(await lib.until(async () => fs.readFileSync(path.join(alpha, 'doc.txt'), 'utf8').includes('unsaved line'), HUNG_MS)))
+  } finally {
+    // Bounded, and a check: a close that hangs fails here, saying what was open, rather than holding the run.
+    const open = await page.locator('.dialog, .modal').allInnerTexts().catch(() => [])
+    let timer
+    const closed = await Promise.race([app.close().then(() => true), new Promise((r) => (timer = setTimeout(() => r(false), lib.timing('app.closeMs'))))])
+    clearTimeout(timer)
+    check('the app closes', closed, `open as it closed: ${JSON.stringify(open)}`)
+  }
+  console.log(failed ? `${failed} check(s) failed` : 'all checks passed')
+  process.exit(failed ? 1 : 0)
+})().catch((e) => {
+  console.error(e)
+  process.exit(1)
+})

@@ -1938,6 +1938,8 @@ Each workspace has a **Assistant**, its overseer, in a panel on the right. Show 
 
 Ask it anything about the workspace: what the agents are doing, what a project is, what changed, what things cost, or for a plan or a review. It reads any project's files and uses Combwork's own tools to see projects, agents, usage, shared notes and handovers. It doesn't edit project files itself: the agents do the work. What else it may do, from only advising to running agents and creating projects, is up to you (see **What the Assistant may do** below).
 
+**The window's way first.** When something you ask for can be done in Combwork's window (cleaning up merged branches, moving a slot, closing an issue), the Assistant names that way first, such as Version Control → Branches & remotes → Clean Up Merged Branches…: it goes through Combwork's own checks, queue, undo and history, which a git command skips. Ask for the command and it gives it; it also says when the window has no way to do it.
+
 **The panel.** Its header works like an agent pane's: the Assistant's state mark (a ring when it's idle or not running, a pulsing dot while it works, a diamond when it waits for you, a square when it's stuck), **Assistant** (hover it for its coding agent), its mode as a small pill (click it to switch), then **Stop** while it runs; when it doesn't, **Resume** (|▷) to go back to its last conversation, or **Start** if there is nothing to resume, then **⋯** and the fold button (the chevron, as on the Progress panel: it folds the panel to its strip, Ctrl+Alt+I, and the Assistant keeps running). Everything else is in **⋯**: **Compact…** while it runs (recommended there once its context passes **Highlight Compact over**), **New Conversation**, **Resume** and **Resume a Conversation…**, **All Conversations…**, **Assistant Settings…**, **Manage Modes…**, **Move Panel to the Left** and **Fold the Assistant panel**. Under it, one line says what the Assistant is doing: **Status: Working**, **Idle**, **Waiting for you** (in the attention colour, when it asks you something), **Waiting for your approval** (when one of its actions needs your answer on a card under the line, such as stopping a busy agent; one that is only watching cards it stops without asking, and a question you don't answer within about 4½ minutes is withdrawn, the agent left running), **Not running**, or the cards it is watching and until when ("Waiting for #12 #13 → Review (watch until 22:22)"), each card the same chip as elsewhere in Combwork, in its column's colour: click one to open the card; or the agents it is watching ("Waiting for B6 to finish (watch until 22:22)"). Hover the line when a narrow panel cuts it short. Once the Assistant has changed something, the line ends in **Done by the Assistant (n)**: click it to open the list under the line. It lists its changes by your message they were for (**Your message at 08:14: 61 changes**), newest first: the newest message is open, the others folded (click one to open it). A message shows its last 3 changes, newest first, each with **Undo** (hover one for when it was and, if it wasn't done, why); see **Undo** below. **Show all** lists every one in the same space, scrolling, so the terminal keeps its size; click **Done by the Assistant** again to close it (each workspace remembers which). Then the workspace at a glance: agents waiting for you (or in trouble) first (click one to go to it; going to an agent that has finished also removes its row, and its **×**, shown as you point at the row or Tab to it, removes the row without going there, until that agent finishes again), then one line per active project: its name (click it to open the project), a state mark for each of its agents that is running (or not running but stuck on the board: a card of its in Active, or one blocked on you) and how many run. Hover a mark, or Tab to it, for the agent, its state in words, what it's doing (how far its tests or build have got, "e2e: 12 suites 4/12"), its cards, its progress and its worktree's branch; click it to go to that agent, switching project if needed. The tag button beside the counts shows each agent's name beside its mark (each workspace remembers it). Inactive projects fold into one row at the end; click it to show them. Drag the line under the workspace to give it more or less room. Then the Assistant's terminal, and a footer with its model and effort, permission mode, context and cost, as agents have. While it isn't running, the panel offers **Start Assistant**, **Resume** and its past conversations. While the panel is hidden, the strip shows the Assistant's icon and status dot. The same icon (a honeycomb cell with a crown, the queen's) marks the Assistant wherever it's listed: the activity bar, **Done by the Assistant**, its runs in the Progress panel, the inbox and the Workspace Overview.
 
 **Waiting on agents.** Ask the Assistant to tell you when an agent is done (a build, a test run, a release step, a push and its CI) and it doesn't keep checking on it: it starts an **agent watch** and stops, and Combwork wakes it with one line when the agent finishes, needs you, or stops (*"[CW] B6 (demo) finished: "The installer is built…""*), and it tells you. Meanwhile its status line says **Waiting for B6 to finish**. An agent just given a task counts as busy until its CLI takes it, so a watch started straight after doesn't answer at once that it is idle before the work has begun: a task typed into it, or one it was started with (a card's **Start**, a new agent's prompt, a task in a new conversation), which its CLI takes only once it is ready. Combwork waits for that at most 30 seconds (after typing it, or after the agent became ready). A question or sign-in its CLI shows as it starts still ends the wait, as needing you. As with a card watch, Combwork doesn't wake it while you're typing to it, and after two hours with nothing done it is woken to say so (it checks on the agent, and tells you if it seems stuck). Agents can watch another agent the same way.
@@ -2281,6 +2283,49 @@ Two more entries of the Git section put one file back to another version. Each a
 
 They act on one file at a time, and refuse while an agent or its session is working in the project folder, a run is going there, git is in the middle of a merge or rebase, or the file is in conflict.
 
+### A file's history <a id="file-history"></a>
+
+**History** (the clock button above a file, **History** in a file's or folder's right-click menu, or **Toggle File History** in the command palette) opens a panel on the right listing the commits that changed the file or folder selected, newest first. With nothing selected, it's the history of the whole folder shown. It works in the project folder and in an agent's slot or worktree, each on the branch it has checked out. A file's history follows its renames: a commit that renamed it says **Renamed from** its old path. A folder's history lists every commit that changed a file under it. Click a folder's commit to see those files.
+
+Each commit shows its message, its author and how long ago it was made (hover for the exact time), and its short hash (click to copy the full one).
+
+- **Its card** shows as the card's key. Click it to open the card. Combwork takes the card only from the commit itself: its `Combwork-Card` trailer, else Combwork's own record of whose commit it was when it was made in the project folder, else a key at the start of its message (`HI-12: …`). A key elsewhere in the message, such as "fixes HI-12's bug", isn't a link, and neither is another project's card.
+- **submitted by** names the agent that submitted the commit for review, in one of its card's submissions. It doesn't say who wrote it. Git records one author for everyone in a Combwork project, so a commit of yours that an agent submitted says the same.
+- **Find its merge**, on a commit naming no card, looks for the merge that brought it into the branch, and shows **Came in with HI-12's merge** when that merge names a card. That card merged the commit; it didn't necessarily make it. When it isn't clear (the commit was made on the branch itself, or several branches were merged at once), nothing is said.
+
+Click a file's commit to see what it changed in the file, in place of the editor. A renamed file's diff compares the file at its old path with the new one. **Back to file** shows the editor again, as you left it: unsaved edits and undo are kept. **Open commit** shows the commit's whole message, its other files and its actions (project folder only; see [A commit's details](#a-commits-details)).
+
+The list is read in pages of 50 (**Show more**) from the commit checked out when it was first read. If the branch moves meanwhile (a commit, a switch), a bar says so, and **Refresh** reads it again. If that commit is gone altogether (after a reset, say), **Show more** says so and keeps the list as it is until you **Refresh**. Each read stops after a minute (**Settings → Advanced → Git: longest a history read takes**), saying so, with **Try again**. It takes well under a second even in a large repository.
+
+### Blame by card <a id="blame-by-card"></a>
+
+**Blame by card** (the button above a file's editor, beside History, the file's right-click menu, or **Toggle Blame by Card** in the command palette) adds a column beside the editor. For each run of lines, it shows which commit last changed them, in Combwork's terms:
+
+- **The card** that commit names, by the same rules as History: its `Combwork-Card` trailer, Combwork's record of the commit, or a key at the start of its message. Click the card to open it.
+- **The agent** that submitted the commit for review in one of that card's submissions. As in History, this isn't necessarily who wrote it.
+- Without a card, the commit's short hash and author.
+- How long ago it was made. Older commits are fainter.
+
+Hover an entry for the commit's message, author, date and hash. Click it (anywhere but the card) to see what that commit changed in the file, in place of the editor. **Back to file** returns with your edits kept.
+
+It blames the file as it is in the editor: lines you've typed or changed and not committed say **Not committed yet**. It reads again a moment after you stop typing. Lines are followed across the file's renames and moves within it. A line copied in from another file is put down to the commit that brought it here.
+
+It works in the project folder and in an agent's slot or worktree. A file git has no committed version of has nothing to blame. For a file longer than 20,000 lines it asks first (**Settings → Advanced → Git: ask before blaming a file longer than**). Each read stops after a minute, like History's (**Git: longest a history read takes**).
+
+### Comparing a file <a id="compare-a-file"></a>
+
+**Compare with…** (the button above a file's editor, the file's right-click menu, or **Compare File With…** in the command palette) shows the file beside another version of it, in place of the editor. Choose:
+
+- **Target branch**: the branch this folder's work merges into. In an agent's slot, that's its card's target.
+- **The project folder's copy**, in an agent's slot or worktree: the same file in the project folder, as it is on disk there.
+- **A branch or tag** from the list, newest first. Or type a name, or a commit's hash, and press **Enter**.
+
+From **History**, a commit's **Compare with this version** compares the file with it at that commit.
+
+The other version is on the left. On the right is the file as it is in the editor, so your unsaved edits are compared too, and a note says so. If the file was renamed since the two versions parted, on either side, it's found at its old name, and the note says what it was called there. A file that isn't in that version, under its name or a rename git found, shows an empty left side and says so. **Back to file** returns to the editor as you left it.
+
+It works in the project folder and in an agent's slot or worktree. Each read stops after a minute (**Settings → Advanced → Git: longest a history read takes**).
+
 ### Viewing and editing files <a id="viewing-and-editing-files"></a>
 
 Select a file and it opens on the right, ready to edit, with syntax highlighting for code, SQL, XML, JSON, YAML and many more. **Ctrl+S** (or **Save**) saves it. Some file types also get a nicer view, and the buttons above the file switch between them:
@@ -2512,10 +2557,58 @@ How its agents launch isn't here: each agent chooses a connection (see [Accounts
 | | Completion chime | On, off or inherit |
 | Agents | Agents | See [Several agents in one project](#several-agents-in-one-project). The setup script and copied files are in the project's Version Control tab, under **Slots and copies**; file locks and card loops are workflow options there (see [Workflow options](#workflow-options)) |
 | Keyboard Shortcuts | | Shortcuts for project and session commands in this project (see [Keyboard shortcuts](#keyboard-shortcuts)) |
+| Preview | Dev server | The command that runs the project's development server for the Preview, shown only while the Preview is turned on (see [Preview](#preview-dev-servers)) |
 
 **Number settings**, here and in Settings, save when you press Enter or click away. An empty box inherits the global value here; in Settings it just puts the saved value back. A number out of range, or text that isn't a number, isn't saved: the range shows under the box. Settings that can be turned off have a **Never** (or **No pause**) checkbox beside the number; untick it to get your last number back.
 
 Changes apply to new sessions.
+
+### Preview: a project's dev server <a id="preview-dev-servers"></a>
+
+Combwork can run a web project's development server for you, so you and its agents can look at the change being made. It's off by default: turn on **Settings → Advanced → Preview: run projects' dev servers**. While it's off, Project Settings has no Preview section and nothing of it runs.
+
+**Setting it up.** In **Project Settings → Preview**, type the command that starts the server. If the project's `package.json` has a `dev`, `start` or `preview` script, the first of them is suggested (run with the package manager its lockfile names, npm otherwise): **Use it** puts it in the box, and nothing is saved until you click **Save**. **Page** is the path of the page to open (`/` by default). Turn on **A second port for hot reload** for a server whose hot reload socket listens on a port of its own.
+
+**Its port.** Each time a preview starts, Combwork gives the server a free port in `PORT` (and `CW_PREVIEW_PORT`; the hot reload port in `CW_PREVIEW_HMR_PORT`), from a range of its own: 45000–45999 (a development build of Combwork uses 46000–46999). The section shows the range and the address. The server must listen on that port on localhost. The command runs in cmd, so a server that picks its own port needs it passed, such as `npm run dev -- --port %PORT%`. Ports another program listens on are skipped, and so are Combwork's own. **Settings → Advanced → Preview: first port** moves the range.
+
+**Where it runs.** A preview runs in one place: the project folder, a slot lent to a card, or a review copy during its review. Each place has at most one, each on its own port, so a builder's slot, a reviewer's copy and your project folder never clash, across all your projects and windows. A preview starts only when asked, never when Combwork starts, and stops when you stop it, when its slot's lease or its review ends, when the project is removed or its workspace closed, when the Preview is turned off, and when Combwork quits. The server's output is kept in Combwork's own logs folder (`logs\preview`).
+
+**Checked, never assumed.** Combwork waits up to a minute (**Settings → Advanced → Preview: longest a server takes to start**) for the server to listen, then checks that what listens on the port is the server it started. If another program holds the port, or the server listens on another port (it ignored `PORT`), the preview fails and says which. Once the server exits, the preview stays stopped: Combwork never shows whatever program takes the port afterwards.
+
+**Which source it is.** A preview records the commit its place was at when it started, and, when there were uncommitted changes, an id of the files themselves: the same files always give the same id. It also notes when the files change afterwards. That tells you which source the server was started from. It can't promise the page shows it: hot reload can lag or fail, and the server's own data is its own.
+
+### The Preview tab <a id="preview-tab"></a>
+
+With the Preview on (above), a project with a preview command has a **Preview** tab in its tab strip; without one, Preview is under More ▾ and says **Set up a preview**, with a button to Project Settings → Preview.
+
+- **Place** picks where the page comes from: the project folder, or a slot or review copy whose preview runs (agents start those).
+- **Start** runs the dev server and shows its page; **Stop** stops it; **Reload** and **Reload, bypassing the cache** load it again; **Developer Tools** opens the browser's tools for the page (yours only: no agent can open them).
+- The header's **stamp** says which source the server was started from: the place, a slot's card, and the commit (`a1b2c3d`), with `+ tree …` when there were uncommitted changes. Once the files change, it says **stale**, and **Restart** starts the server again from them. The stamp names the source, not the page: hot reload can lag or fail, and a server can keep old output.
+- A page that tries to leave its own address (a link to another site, a script, `window.open`, a refresh) stays where it is, and a bar says **The page tried to open …**. Only **Open in Browser** on that bar opens it, in your own browser.
+
+**What the page can reach.** The page is treated as untrusted: it is your project's code, its dependencies and whatever they load from the internet. It runs in a view of its own, with its own storage that's thrown away when the preview stops, and every request it makes goes through Combwork's network guard:
+
+- its own dev server's ports (and the hot reload port), and the internet over **https** and **wss**: allowed;
+- any other port on this computer (Combwork's own Agent API, other previews, other programs), names that point at this computer (`localhost`, `foo.localhost`, a name that resolves to `127.0.0.1`), your local network and other private addresses: **refused**, however the address is written or wherever a redirect leads;
+- `file:`, Combwork's own addresses, and other schemes: refused;
+- camera, microphone, location, notifications and clipboard reading: refused; downloads are cancelled; WebRTC can't open connections of its own.
+
+If the guard stops, the page is closed and the preview says **Stopped: network guard stopped**; nothing more loads until you start it again.
+
+**What it doesn't cover.** The **dev server's command** is yours, like a command you run in a terminal: it runs with your rights and can reach anything. Only the page in the Preview tab is guarded.
+
+To turn the Preview off, switch off **Settings → Advanced → Preview: run projects' dev servers**: the tab goes, and running previews stop.
+
+### Agents and the preview <a id="preview-agents"></a>
+
+With the Preview on and a project's command set, the project's agents can use the preview of the place they work in: a builder its slot's, a reviewer its review copy's, an agent in the project folder the project's. They can't reach another place's or another project's. Agents started before you turned the Preview on, or before you set the command, get it once they restart.
+
+- An agent can **start**, **check** and **stop** its place's dev server, as the Preview tab's buttons do. The tab's **Place** picker shows the previews agents started.
+- It reads the page as **text** (its title, headings, buttons, fields and text), takes **screenshots** and reads the page's console **errors and warnings**. Its page is its own, behind the same network guard as yours: it never moves the page your Preview tab shows.
+- Screenshots are small files in the place's own `.combwork\preview-shots` folder, which git leaves out: over 2 MB as a PNG, a JPEG is saved, then a smaller one; a page taller than 6,000 pixels is cut. A place keeps its last 20, and they're removed when its preview stops.
+- Each answer says which source the server was started from and whether the files changed after the page loaded, so an agent knows when it's looking at an older page.
+
+**Settings → Advanced → Preview: longest an agent's capture takes** (10 seconds by default) bounds each look: past it, the agent is told the capture timed out, and nothing is saved.
 
 ### Permission modes <a id="permission-modes"></a>
 

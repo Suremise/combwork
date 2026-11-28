@@ -81,6 +81,7 @@ import { endAllOwnedWork, endOwnedWork, endOwnedWorkNow } from './platform/owned
 import { queueLive, startQueueHosts, stopQueueHosts } from './workflow/queueHost'
 import { startPrHosts, stopPrHosts } from './workflow/prHosts'
 import { poolFor, startSlots, stopSlots } from './slotsApp'
+import { startPreviews, stopPreviews } from './previewApp'
 import { setQueueNeed, setSlotPools } from './unusedWorktrees'
 import { quitSlotCards, startSlotCards, stopSlotCards } from './slotCards'
 import { startFinishPath } from './finishPath'
@@ -240,6 +241,9 @@ if (process.platform === 'win32') checkInstallDir()
 // One Combwork process, with a window per workspace (like VS Code): starting Combwork again brings it forward.
 // A quiet test copy's windows are off screen (testQuiet): Chromium mustn't take them for covered and stop drawing them.
 if (testQuiet()) app.commandLine.appendSwitch('disable-features', 'CalculateNativeWinOcclusion')
+// HI-3615: no QUIC (UDP) anywhere, so a Preview page's every connection goes through its filtering proxy (a fixed proxy
+// already rules QUIC out; this makes it so whatever Chromium decides). Combwork's own pages fall back to HTTP/2.
+app.commandLine.appendSwitch('disable-quic')
 
 // Chromium takes its language only at start (#767): --lang or CW_LANG, the setting, or Windows' languages.
 chooseStartLanguage(config.savedLanguage())
@@ -853,6 +857,8 @@ async function quitNow(tellUser: boolean): Promise<void> {
   await agentsClosed('quitting', undefined, ['writers'], CLOSE_WRITERS_MS, allWindows)
   // The merge queues' runners: their processes ended and their leases given up, so another Combwork can run them at once.
   await releaseQueueRunners()
+  // HI-3614: the previews' servers ended (their jobs settled), never left running past Combwork.
+  await stopPreviews().catch((e) => log.warn('ending the previews as Combwork closes', e))
   // HI-1185: platforms' owned work (the Git view's signing checks): no new one admitted from here, and those running
   // ended and waited for, their signers and temp folders gone, before the app exits (HR1's round 2).
   await endAllOwnedWork().catch((e) => log.warn("ending the platforms' owned work as Combwork closes", e))
@@ -1375,6 +1381,8 @@ app.whenReady().then(async () => {
   startPrHosts()
   // The slot pools (#1429): their idle slots tidied every hour.
   startSlots()
+  // The Preview (HI-3614): its servers stop with their places, projects and workspaces, and when it is turned off.
+  startPreviews()
   // Unused Worktrees reads the slots through those pools (#1450, #1519).
   setSlotPools(poolFor)
   // …and asks whether a merge queue still needs a folder it kept (#1644): no workflow known, it does.

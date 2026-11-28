@@ -1159,6 +1159,34 @@
     "defaultMessage": "{share, number, ::percent} of the {window, select, hours {{hours, plural, one {#-hour limit} other {#-hour limit}}} weekly {weekly limit} other {{label} limit}} used on {connection}",
     "description": "A notice (HI-1756): how much of a plan's usage limit is used ({share}: \"85%\") on one connection, a sign-in the user named ({connection}: \"Max 1\"). The limit is a rolling window of {hours} hours (the 5-hour one), the weekly one, or another the provider names itself ({label}, in English as the provider says it)."
   },
+  "main.preview.badConfig": {
+    "defaultMessage": "A preview needs a command (one line, at most 1,000 characters) and a page path starting with /.",
+    "description": "An error: Project Settings → Preview's values weren't saved: the command is empty or too long, or the path doesn't start with a slash."
+  },
+  "main.preview.guardFailed": {
+    "defaultMessage": "The preview's network guard couldn't start, so its page isn't shown. Start it again; Combwork's log says why.",
+    "description": "An error: the Preview's network guard (the filtering proxy every request of the previewed page goes through) didn't start, so Combwork shows no page."
+  },
+  "main.preview.noConfig": {
+    "defaultMessage": "{project} has no preview command: set one in Project Settings → Preview.",
+    "description": "An error: a preview was asked for in a project that has no preview command. {project} is the project's name. Project Settings → Preview is a section: use its names as translated there."
+  },
+  "main.preview.notAPlace": {
+    "defaultMessage": "That folder isn't {project}'s folder, one of its slots or one of its review copies.",
+    "description": "An error: a preview was asked for in a folder that isn't one a preview runs in. {project} is the project's name. A slot is a worktree Combwork lends to a card or a lane; a review copy is a copy at the revision a reviewer reviews."
+  },
+  "main.preview.notLent": {
+    "defaultMessage": "{slot} isn't lent to a card or a review now, so a preview can't run in it.",
+    "description": "An error: a preview was asked for in a slot or review copy no card or review holds now. {slot} is its name (slot-b, copy-1)."
+  },
+  "main.preview.notRunning": {
+    "defaultMessage": "That preview isn't running now: start it again.",
+    "description": "An error: the Preview tab asked to show, reload or inspect a preview that has stopped meanwhile."
+  },
+  "main.preview.off": {
+    "defaultMessage": "The Preview is turned off (Settings → Advanced, Preview: run projects’ dev servers).",
+    "description": "An error: something asked for the Preview while its advanced setting is off. Settings → Advanced and the setting's title are names: use them as translated there."
+  },
   "main.profileMove.refused": {
     "defaultMessage": "Combwork's data from before it was renamed is in {from}, and Combwork couldn't rename that folder to {to}: {reason}. Nothing was changed or lost. Close any copy of Combwork, or of its 1.0 version, that is still running, then start Combwork again.",
     "description": "The text of an error box at start (HI-2594): Combwork's data folder from version 1.0 (from before the app was renamed) couldn't be renamed to Combwork's. {from} and {to} are folder paths; {reason} says why, in English (e.g. \"it couldn't be renamed (EBUSY)\")."
@@ -1282,6 +1310,10 @@
   "main.removal.notTrashed": {
     "defaultMessage": "{path} couldn't be moved to the Recycle Bin: {why}",
     "description": "A warning after Delete: a worktree or handover note of the project couldn't go to the Recycle Bin. {path} is it, {why} the system's message."
+  },
+  "main.removal.previewHeld": {
+    "defaultMessage": "A Preview dev server in {project} couldn't be ended, so the project was left as it is. Try again once it has stopped.",
+    "description": "An error: removing, hiding or deleting the project was refused, because a development server Combwork's Preview started in it (its folder, a slot or a review copy) couldn't be proved stopped. {project} is the project's name."
   },
   "main.removal.refusedTree": {
     "defaultMessage": "{agent}'s worktree {path} ({why})",

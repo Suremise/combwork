@@ -34,6 +34,8 @@ const FAKE_CLAUDE_ONLY = [
   'card-loop-outside-job',
   // HI-2944: a start's warning of the target folder's changes; the repository and the start's reply after the server.
   'start-target-changes',
+  // HI-3616: cw_preview's replies and the MCP log after the server; reading a screenshot is the model trials'.
+  'preview-snapshot', 'preview-screenshot',
   // Overrides, intents, old moves, presets.
   'assistant-override-reason', 'assistant-override-none', 'assistant-override-unneeded', 'intent-put-back', 'intent-submit-commit', 'intent-review-request', 'pool-reviewer-wake', 'old-move-submit', 'old-move-review', 'preset-solo-card', 'solo-ab-card', 'preset-pair-lane',
   // The Assistant's board work.
@@ -52,7 +54,9 @@ const MODEL_TRIALS_ONLY = [
   'pick-up-named', 'hold-skipped', 'assistant-plan', 'assistant-look', 'coordinator-relayed-ok', 'fresh-start-solo-done', 'fresh-start-lanes-ended', 'review-screenshot-report', 'prioritise',
   'follow-up-title', 'assistant-follow-up-title', 'progress-background', 'mode-coordinator-coordinates', 'mode-planner-coordinates', 'mode-qa-triager-coordinates', 'mode-release-manager-coordinates',
   // HI-2854's A: its one check (the parser's tests) holds by construction on a fake, whose script writes them.
-  'solo-ab-plain'
+  'solo-ab-plain',
+  // HI-3595: its checks read only the Assistant's reply and the branches, which a fake's script states.
+  'assistant-window-route'
 ]
 
 const NOT_A_TRIAL = ['tool-sweep']
