@@ -11,7 +11,7 @@ import { LANE_MAX_ROUNDS, LOOP_STEP_WAIT_MAX_MINUTES, LOOP_WAIT_MAX_HOURS } from
 import { CHURN_MAX } from '@shared/loopLimits'
 import { compile, mustCompile } from '@shared/workflow/compile'
 import { STAGE_TEXT, stageNameProblems, stageNameProblemText, type StageNames } from '@shared/workflow/stages'
-import { guardProblems, guardProblemText, type MergeGuard } from '@shared/workflow/mergeGuards'
+import { guardProblems, guardProblemText } from '@shared/workflow/mergeGuards'
 import { MergeGuardsEditor } from './MergeGuardsEditor'
 import type { StageId } from '@shared/workflow/facts'
 import { shownText } from '@shared/advanced'
@@ -21,6 +21,7 @@ import { agentProviderOf, cardLabelOf, chooseTab, confirm, focusWorkflowOption, 
 import { loadReleaseOffers, ReleaseOfferRow, useReleaseOffers } from '../releaseOffers'
 import { cx } from '../util'
 import { RT, retargetSkippedText } from '../retargetText'
+import { optionValueText, VT } from '../workflowValueText'
 import { SlotCopyLevel, SlotsAndCopies } from './SlotsAndCopies'
 import { GithubHosts } from './GithubHosts'
 import { GithubLink } from './GithubLink'
@@ -70,11 +71,8 @@ const T = {
   from: ORIGIN_TEXT,
   inherit: msg({ id: 'workflow.form.inherit', defaultMessage: 'Inherit', description: 'A button beside a workflow option set for this project: stop setting it here, and use the workspace’s or Combwork’s value.' }),
   inheritTip: msg({ id: 'workflow.form.inheritTip', defaultMessage: 'Use the inherited value: {value}', description: 'The tooltip of the Inherit button of a workflow option. {value} is the value it would have.' }),
-  on: msg({ id: 'workflow.form.on', defaultMessage: 'On', description: 'A workflow option’s value: on.' }),
-  off: msg({ id: 'workflow.form.off', defaultMessage: 'Off', description: 'A workflow option’s value: off.' }),
   focusedPick: msg({ id: 'workflow.form.focusedPick', defaultMessage: 'Command that chooses the tests (optional)', description: 'The placeholder and label of a field under “Each card’s focused tests” (G20) in Project Settings → Workflow: the project’s command that lists the tests a change needs. Left empty, each card’s builder names its tests.' }),
   focusedRun: msg({ id: 'workflow.form.focusedRun', defaultMessage: 'Command that runs them', description: 'The placeholder and label of a field under “Each card’s focused tests” (G20) in Project Settings → Workflow: the project’s command that runs a list of tests.' }),
-  defaultBranch: msg({ id: 'workflow.form.defaultBranch', defaultMessage: 'The repository’s default branch', description: 'The placeholder of the target branch field in Project Settings → Workflow: left empty, the default branch.' }),
   labels: msg({ id: 'workflow.form.labels', defaultMessage: 'Labels, separated by commas', description: 'The placeholder of the labels field of “Your OK before merging”.' }),
   noIdentity: msg({ id: 'workflow.form.noIdentity', defaultMessage: 'No name and email are set in git config yet.', description: 'Under “Commits use the project’s identity” when git has no identity configured.' }),
   identity: msg({ id: 'workflow.form.identity', defaultMessage: 'Commits as {name} <{email}>.', description: 'Under “Commits use the project’s identity”: the identity used, from git config.' }),
@@ -82,9 +80,6 @@ const T = {
   checkCommand: msg({ id: 'workflow.form.checkCommand', defaultMessage: 'Command', description: 'The placeholder of a check’s command field (Project Settings → Workflow → Checks pass before review).' }),
   addCheck: msg({ id: 'workflow.form.addCheck', defaultMessage: 'Add Check', description: 'A button under the checks of “Checks pass before review”.' }),
   removeCheck: msg({ id: 'workflow.form.removeCheck', defaultMessage: 'Remove', description: 'The tooltip of the button removing a check from “Checks pass before review”.' }),
-  labelsValue: msg({ id: 'workflow.form.labelsValue', defaultMessage: 'Cards with these labels: {labels}', description: 'A value of “Your OK before merging” in the list of what changes before saving workflow options. {labels} is a list of card labels.' }),
-  identityValue: msg({ id: 'workflow.form.identityValue', defaultMessage: 'On, as {name} <{email}>', description: 'A value of “Commits use the project’s identity” in the list of what changes before saving workflow options: on, with the name and email commits use.' }),
-  noneValue: msg({ id: 'workflow.form.noneValue', defaultMessage: 'None', description: 'An empty value in the list of what changes before saving workflow options: no checks, no commands, no folders.' }),
   noChecks: msg({ id: 'workflow.form.noChecks', defaultMessage: 'No checks.', description: 'Under “Checks pass before review” when it has none.' }),
   retargetChoice: msg({ id: 'workflow.form.retargetChoice', defaultMessage: 'Also retarget what can move from {from} to {to}: {cards, plural, one {# card} other {# cards}} and {slots, plural, one {# free slot} other {# free slots}}', description: 'HI-2680: a tick box in the dialog before saving workflow options that change Work merges into: after saving, move the Todo cards with no work of their own and the free slots still on the old branch {from} to the new one {to}. Card and slot counts.' }),
   retargetCard: msg({ id: 'workflow.form.retargetCard', defaultMessage: '{card} {title}: to the new branch', description: 'HI-2680: a card the retarget moves to the new Work merges into, in the dialog before saving. {card} is its key (HI-12).' }),
@@ -104,14 +99,10 @@ const T = {
   carried: msg({ id: 'workflow.form.carried', defaultMessage: 'Agents’ old worktrees finish their current work first: {agents}. Then they work in slots too.', description: 'Under “Where cards are built” (G11) while agents still hold their worktrees from before 1.0 (#1441), kept until their current card or lane ends. {agents} is a list of agent names (glossary 2.5: slot).' }),
   readOnly: msg({ id: 'workflow.form.readOnly', defaultMessage: '{agents} can’t be given review copies by their coding agent, so they review the builder’s folder read-only.', description: 'Under “Reviewers” (G17) when some reviewing agents use a coding agent that Combwork can’t give review copies (folders at the exact revision, glossary 2.5: review copy). {agents} is a list of agent names.' }),
   stageName: msg({ id: 'workflow.form.stageName', defaultMessage: 'Name of the stage {stage}', description: 'Accessible name of a stage’s name box under “Stage names” (glossary 2.2: stage). {stage} is its default name.' }),
-  stageNamesValue: msg({ id: 'workflow.form.stageNamesValue', defaultMessage: '{n, plural, =0 {The default names} one {# stage renamed} other {# stages renamed}}', description: 'A value of “Stage names” in the list of what changes before saving workflow options, and in a preset’s preview (glossary 2.2: stage).' }),
-  customWakesValue: msg({ id: 'workflow.form.customWakesValue', defaultMessage: 'Custom: {events}', description: 'An inherited value of the workflow option “Wake the Assistant for” (HI-3211) set to Custom: the events ticked, joined as a list (e.g. “A card fails review and A lane ends”).' }),
   fileLocksNote: msg({ id: 'workflow.form.fileLocksNote', defaultMessage: 'Applies to agents working in the same folder, outside a slot.', description: 'Under the workflow option “File locks”: a slot is a folder Combwork lends to a card or its lane (glossary 2.5: slot), so agents in different slots never share a file.' }),
   loopsReadNote: msg({ id: 'workflow.form.loopsReadNote', defaultMessage: 'Read when a loop starts: a loop already running keeps its own, and one started with its own (“rounds: 5, wait: 2h”) keeps those.', description: 'Under the workflow options “Rounds” and “Wait (hours)” (Card loops), when a change applies. “rounds: 5, wait: 2h” is what the user types to an agent: keep it in English.' }),
   overMax: msg({ id: 'workflow.form.overMax', defaultMessage: 'This project has {count, plural, one {# agent} other {# agents}}: none is removed, but no agent can be added until it has fewer than {max, number}.', description: 'Under the workflow option “Maximum agents” (HI-2001) when the project already has more agents ({count}) than it is set to ({max}): nobody can add one (HI-2058), neither the user nor the Assistant.' }),
   stepWaitNote: msg({ id: 'workflow.form.stepWaitNote', defaultMessage: 'A design left unchecked longer shows its card as stalled; one already posted keeps its wait.', description: 'Under the workflow option “Design check wait (minutes)” (Card loops), when a change applies.' }),
-  hoursValue: msg({ id: 'workflow.form.hoursValue', defaultMessage: '{n, plural, one {# hour} other {# hours}}', description: 'The value of the workflow option “Wait (hours)” (Card loops) in words, as in the Inherit box and a preset preview.' }),
-  minutesValue: msg({ id: 'workflow.form.minutesValue', defaultMessage: '{n, plural, one {# minute} other {# minutes}}', description: 'The value of the workflow option “Design check wait (minutes)” (Card loops) in words, as in the Inherit box.' }),
   notEnforced: msg({ id: 'workflow.form.notEnforced', defaultMessage: 'Workflow rules aren’t enforced (Settings → Advanced). These options are saved, and apply once the rules are enforced again.', description: 'A note atop Project Settings → Workflow while the switch "Workflow rules are enforced" is off.' }),
   invalid: msg({ id: 'workflow.form.invalid', defaultMessage: 'These options can’t be used, so every rule is off in this project:', description: 'A note atop Project Settings → Workflow: the saved options contradict each other or can’t be read; the reason follows.' }),
   save: msg({ id: 'workflow.form.save', defaultMessage: 'Save…', description: 'The button saving the workflow options (it shows what changes first).' }),
@@ -781,7 +772,7 @@ function WorkflowEditor({ source, project, at, onDirty }: { source: FormSource; 
       case 'reviewerMode':
         return select('reviewerMode', [['lane', tr(V.reviewerMode.lane)], ['pool', tr(V.reviewerMode.pool)]])
       case 'target':
-        return <DraftText value={effective.target} placeholder={tr(T.defaultBranch)} onCommit={(v) => set('target', v.trim())} />
+        return <DraftText value={effective.target} placeholder={tr(VT.defaultBranch)} onCommit={(v) => set('target', v.trim())} />
       case 'okBefore':
         return (
           <div className="workflow-stack">
@@ -1061,41 +1052,8 @@ export function ChoicePreview({ choice, name, options, effective, valueText, onU
   )
 }
 
-/** An option's value in words (the rows' Inherit tips, a preview), as its platform names it. */
-export function optionValueText(key: OptionKey, v: unknown, platform: PlatformId): string {
-  if (typeof v === 'boolean') return tr(v ? T.on : T.off)
-  if (key === 'review') return tr(accepts(platform) && v === 'none' ? VALUE_TEXT.review.noneNone : VALUE_TEXT.review[v as keyof typeof VALUE_TEXT.review])
-  const values = (VALUE_TEXT as Record<string, Record<string, ReturnType<typeof msg>>>)[key]
-  if (values && typeof v === 'string' && values[v]) return tr(values[v])
-  // A structured value with what it holds (HR6's round 3: the labels, the identity), not only its kind.
-  if (key === 'okBefore') {
-    const ok = v as OkBefore
-    return ok.mode === 'labels' ? tr(T.labelsValue, { labels: ok.labels.length ? fmt.list(ok.labels) : tr(T.noneValue) }) : tr(VALUE_TEXT.okBefore[ok.mode])
-  }
-  if (key === 'identity') {
-    const id = v as WorkflowOptions['identity']
-    return id ? tr(T.identityValue, { name: id.name, email: id.email }) : tr(T.off)
-  }
-  if (key === 'stageNames') return tr(T.stageNamesValue, { n: Object.keys((v as StageNames | undefined) ?? {}).length })
-  // HI-3284: the guards by name (the user's own words), or none.
-  if (key === 'mergeGuards') return Array.isArray(v) && v.length ? fmt.list((v as MergeGuard[]).map((g) => g.name)) : tr(T.noneValue)
-  if (key === 'reviewers' || key === 'loopRounds' || key === 'maxAgents') return fmt.number(v as number)
-  if (key === 'simplifyAt' || key === 'churnStopAt') return v === 0 ? tr(T.off) : fmt.number(v as number)
-  if (key === 'loopWaitHours') return tr(T.hoursValue, { n: v as number })
-  if (key === 'loopStepWaitMinutes') return tr(T.minutesValue, { n: v as number })
-  if (key === 'assistantWakes') {
-    const w = v as AssistantWakes
-    return w.level === 'custom' ? tr(T.customWakesValue, { events: w.events.length ? fmt.list(w.events.map((e) => tr(WAKE_EVENT_TEXT[e]))) : tr(T.noneValue) }) : tr(VALUE_TEXT.assistantWakes[w.level])
-  }
-  if (key === 'fileLocks') {
-    const mode = FILE_LOCK_MODES.find((m) => m.value === v)
-    return mode ? tr(mode.text.label) : String(v)
-  }
-  if (key === 'commands') return Object.keys(v as Record<string, string>).length ? fmt.list(Object.entries(v as Record<string, string>).map(([name, command]) => `${name} (${command})`)) : tr(T.noneValue) // i18n-ignore: a check's name and command, shown as they are
-  if (Array.isArray(v)) return v.length ? fmt.list(v.map(String)) : tr(T.noneValue)
-  if (key === 'target') return (v as string) || tr(T.defaultBranch)
-  return String(v)
-}
+// The value text moved to workflowValueText.ts (HI-3620), kept importable from here.
+export { optionValueText }
 
 /** What never turns off, whatever the options (§16.6.4: data safety). */
 function NeverOff() {
