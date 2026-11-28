@@ -590,6 +590,8 @@ interface CombworkMessageValues {
   'settings.advanced.cw.outage.resumesPerHour.title': undefined
   'settings.advanced.cw.outage.waitMinutes.desc': undefined
   'settings.advanced.cw.outage.waitMinutes.title': undefined
+  'settings.advanced.cw.preview.captureSeconds.desc': undefined
+  'settings.advanced.cw.preview.captureSeconds.title': undefined
   'settings.advanced.cw.preview.enabled.desc': undefined
   'settings.advanced.cw.preview.enabled.title': undefined
   'settings.advanced.cw.preview.portRange.desc': undefined

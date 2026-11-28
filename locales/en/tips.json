@@ -1915,6 +1915,14 @@
     "defaultMessage": "Address a pull request’s comments",
     "description": "A tip's title (HI-3554): a pull request's comments show on its card, and chosen ones become a fix card."
   },
+  "tips.previewAgents.text": {
+    "defaultMessage": "With the Preview on and a project's dev server command set, its agents can start the preview of the slot or review copy they work in, read its page, take screenshots and read its console's errors, on a page of their own that never moves yours.",
+    "description": "A tip (HI-3616). The Preview runs web projects' dev servers; a slot is an agent's own working folder for a card, a review copy a reviewer's."
+  },
+  "tips.previewAgents.title": {
+    "defaultMessage": "Agents look at their own preview",
+    "description": "A tip's title (HI-3616): agents can run and look at the web preview of the place they work in."
+  },
   "tips.previewTab.text": {
     "defaultMessage": "Turn on Settings → Advanced → Preview: run projects' dev servers, set the dev server's command in Project Settings → Preview, and the Preview tab runs it and shows its page in a guarded view that reaches only its own server and the internet.",
     "description": "A tip (HI-3615). Names of Combwork's menus, views, settings and commands (Preview: run projects' dev servers is an advanced setting's title): keep them as Combwork shows them."

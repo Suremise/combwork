@@ -192,6 +192,8 @@ export const PREVIEW_ENABLED = 'cw.preview.enabled'
 export const PREVIEW_PORT_RANGE = 'cw.preview.portRange'
 /** How long a preview's server gets to listen on its port, in seconds (HI-3614): read by main's previewApp. */
 export const PREVIEW_START_SECONDS = 'cw.preview.startSeconds'
+/** How long an agent's capture of a preview (a screenshot, a snapshot, a page load) may take, in seconds (HI-3616). */
+export const PREVIEW_CAPTURE_SECONDS = 'cw.preview.captureSeconds'
 
 /**
  * Whether a lane's end lets its builder finish its turn, tells it, and ends its CLI with the CLI's own exit (HI-1706):
@@ -1304,6 +1306,22 @@ const SOURCES: readonly AdvancedSource[] = [
     default: 60,
     min: 5,
     max: 600,
+    unit: 's',
+    applies: 'now'
+  },
+  {
+    id: PREVIEW_CAPTURE_SECONDS,
+    group: 'cw',
+    title: msg({ id: 'settings.advanced.cw.preview.captureSeconds.title', defaultMessage: "Preview: longest an agent's capture takes", description: "An advanced setting's title (Settings → Advanced), listed under Combwork, followed by its value in seconds (\"10 s\"). The Preview runs web projects' development servers; agents can take screenshots and read their pages." }),
+    desc: msg({
+      id: 'settings.advanced.cw.preview.captureSeconds.desc',
+      defaultMessage: "How long an agent's look at its preview may take: loading the page, a screenshot and its encoding, or reading the page's text. Past it the agent is told the capture timed out, and nothing is saved.",
+      description: "What the advanced setting \"Preview: longest an agent's capture takes\" does (Settings → Advanced, under Combwork)."
+    }),
+    kind: 'number',
+    default: 10,
+    min: 2,
+    max: 120,
     unit: 's',
     applies: 'now'
   },

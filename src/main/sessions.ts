@@ -4,10 +4,11 @@ import { maskText } from '../shared/redact'
 import { randomUUID, randomBytes } from 'crypto'
 import { StepTimes } from './stepTimes'
 import { fmt, msg, onLanguageChange, tr } from '../shared/i18n'
-import { COPIES_REVIEW, PROMPT_AS_TYPED, PROMPT_CLEAR_DRAFT, RESUME_IDLE_ASK, RESUME_IDLE_MINUTES, SIGN_FAIL_FAST, SIGN_TIMEOUT, drawnWaitId, englishText, overrideId, shownText, withValues, type Text, type TextPart } from '../shared/advanced'
+import { COPIES_REVIEW, PREVIEW_ENABLED, PROMPT_AS_TYPED, PROMPT_CLEAR_DRAFT, RESUME_IDLE_ASK, RESUME_IDLE_MINUTES, SIGN_FAIL_FAST, SIGN_TIMEOUT, drawnWaitId, englishText, overrideId, shownText, withValues, type Text, type TextPart } from '../shared/advanced'
 import { launchPolicy, MCP_ISOLATION, terminalPreset, type LaunchPolicy } from '../shared/launchPolicy'
 import { capturedText, errorText, combworkError, CombworkError, shownError } from './combworkError'
 import { advanced } from './advanced'
+import { previewConfigOf } from '../shared/preview'
 import { withSessionSigner, type SessionSigner } from './signer/signerRules'
 import { folderChanging, folderSteady, inFolder } from './folderFence'
 import { basename, dirname, isAbsolute, join, resolve } from 'path'
@@ -1955,6 +1956,11 @@ class SessionManager {
       // the signature, so a workflow change that changes its list asks for a restart (restartForTools restarts it).
       const hidden = this.workflowToolsHidden(projectPath, side, pc)
       mcpServers[TOOLS_SERVER] = { ...mcpServers[TOOLS_SERVER], env: { ...mcpServers[TOOLS_SERVER].env, CW_SIDE: side, ...(hidden.length ? { CW_WORKFLOW_HIDDEN: hidden.join(',') } : {}) } }
+    }
+    // HI-3616: cw_preview, only with the Preview on and the project's preview set up. Part of the signature, so turning
+    // either on or off asks running agents for a restart, as a tool list's change does.
+    if (mcpServers[TOOLS_SERVER] && !assistant && advanced.get<boolean>(PREVIEW_ENABLED) === true && previewConfigOf(pc.preview)) {
+      mcpServers[TOOLS_SERVER] = { ...mcpServers[TOOLS_SERVER], env: { ...mcpServers[TOOLS_SERVER].env, CW_PREVIEW: '1' } }
     }
 
     // Its connection (HI-2106; the Assistant's too): what it launches with, and the account it launches on, its own or

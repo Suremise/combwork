@@ -480,6 +480,8 @@ interface CombworkMessageValues {
   'tips.planLimitsProviders.title': undefined
   'tips.prComments.text': undefined
   'tips.prComments.title': undefined
+  'tips.previewAgents.text': undefined
+  'tips.previewAgents.title': undefined
   'tips.previewTab.text': undefined
   'tips.previewTab.title': undefined
   'tips.progressCard.text': undefined

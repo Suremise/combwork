@@ -60,6 +60,24 @@ export class PreviewShows<W extends ShownWindow, G extends ShownGuard> {
     return e ? e.guard.catch(() => null) : null
   }
 
+  /**
+   * The preview's guard for agents' captures (HI-3616): opened now if it has none, nothing attached to any window. A
+   * closing or ended entry is refused.
+   */
+  ensure(id: string): Promise<G> {
+    let e = this.entries.get(id)
+    if (e?.closing || e?.ended) return Promise.reject(new Error('closing')) // i18n-ignore: a reason, never shown (the caller says notRunning)
+    if (!e) {
+      e = { guard: this.deps.open(id), attached: null, wanted: null, intent: 0, loaded: false, closing: null, ended: false }
+      const made = e
+      made.guard.catch(() => {
+        if (this.entries.get(id) === made && !made.closing && !made.ended) this.entries.delete(id)
+      })
+      this.entries.set(id, e)
+    }
+    return e.guard
+  }
+
   /** Whether the preview has an entry (shown, opening or closing). */
   has(id: string): boolean {
     return this.entries.has(id)

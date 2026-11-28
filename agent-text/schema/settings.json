@@ -1445,6 +1445,12 @@
   "settings.advanced.cw.outage.waitMinutes.title": {
     "placeholders": {}
   },
+  "settings.advanced.cw.preview.captureSeconds.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.preview.captureSeconds.title": {
+    "placeholders": {}
+  },
   "settings.advanced.cw.preview.enabled.desc": {
     "placeholders": {}
   },

@@ -209,6 +209,17 @@ export const API = {
     severalAccounts: agentMsg({ id: 'api.connection.severalAccounts', text: 'Several accounts are named "{name}": use its id ({ids}).' }),
     severalNamed: agentMsg({ id: 'api.connection.severalNamed', text: 'Several connections are named "{name}": use its id ({ids}).' })
   },
+  // cw_preview (HI-3616): an agent's own place's preview.
+  preview: {
+    agentsOnly: agentMsg({ id: 'api.preview.agentsOnly', text: "cw_preview is a project agent's own tool: it reaches the preview of the place its session works in." }),
+    off: agentMsg({ id: 'api.preview.off', text: "The Preview is off: the user can turn it on in Settings → Advanced (Preview: run projects' dev servers)." }),
+    notOwnPlace: agentMsg({ id: 'api.preview.notOwnPlace', text: 'cw_preview reaches only your own place (the slot you build in, or the review copy you review in): it takes no project, place, folder or agent.' }),
+    notRunning: agentMsg({ id: 'api.preview.notRunning', text: "Your place's preview isn't running: start it first (action start)." }),
+    badPath: agentMsg({ id: 'api.preview.badPath', text: "path is a page of the preview's own server, starting with / (no //, no spaces or backslashes)." }),
+    tooLarge: agentMsg({ id: 'api.preview.tooLarge', text: 'The screenshot is too large to save, even as a JPEG at half size: take the viewport (no full), or a smaller page. Nothing was saved.' }),
+    timedOut: agentMsg({ id: 'api.preview.timedOut', text: "The capture took longer than Settings → Advanced → Preview: longest an agent's capture takes allows. Nothing was saved: try again." }),
+    badAction: agentMsg({ id: 'api.preview.badAction', text: 'action is one of {actions}.' })
+  },
   console: {
     anAgent: agentMsg({ id: 'api.console.anAgent', text: 'an agent', note: 'A developer console source\'s label when it has none.' }),
     detailMax: agentMsg({ id: 'api.console.detailMax', text: 'At most {max} events in full at a time' }),

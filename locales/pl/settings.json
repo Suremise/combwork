@@ -582,6 +582,8 @@
   "settings.advanced.cw.outage.resumesPerHour.title": "Wznawianie po zerwaniu połączenia: wznowienia na godzinę",
   "settings.advanced.cw.outage.waitMinutes.desc": "Jak długo Combwork czeka na powrót połączenia, zanim przestanie czekać i da Ci znać.",
   "settings.advanced.cw.outage.waitMinutes.title": "Wznawianie po zerwaniu połączenia: czekaj najwyżej",
+  "settings.advanced.cw.preview.captureSeconds.desc": "Ile może trwać spojrzenie agenta na jego podgląd: wczytanie strony, zrzut ekranu i jego kodowanie albo odczytanie tekstu strony. Po tym czasie agent dowiaduje się, że przechwytywanie trwało za długo, i nic nie jest zapisywane.",
+  "settings.advanced.cw.preview.captureSeconds.title": "Podgląd: najdłuższy czas przechwytywania przez agenta",
   "settings.advanced.cw.preview.enabled.desc": "Pozwala Combwork uruchamiać serwer deweloperski projektu webowego, czyli polecenie ustawione w Ustawienia projektu → Podgląd, w folderze projektu, slocie lub kopii do recenzji, każdy na własnym wolnym porcie, uruchamiany tylko na żądanie i zatrzymywany wraz z końcem swojego slotu lub recenzji. Po wyłączeniu Ustawienia projektu nie mają sekcji Podgląd, żaden podgląd się nie uruchamia, a działające są zatrzymywane.",
   "settings.advanced.cw.preview.enabled.title": "Podgląd: uruchamiaj serwery deweloperskie projektów",
   "settings.advanced.cw.preview.portRange.desc": "Serwery podglądu dostają porty spośród 1000 portów od tego, we wszystkich projektach i oknach Combwork. Wersja deweloperska Combwork używa 1000 kolejnych, dopóki ta wartość jest domyślna, więc obie nigdy się nie spotykają. Port, na którym nasłuchuje inny program, jest pomijany, podobnie jak porty samego Combwork.",

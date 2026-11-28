@@ -582,6 +582,8 @@
   "settings.advanced.cw.outage.resumesPerHour.title": "连接中断后恢复：每小时恢复次数",
   "settings.advanced.cw.outage.waitMinutes.desc": "Combwork 等待连接恢复的时长，超过后会停止等待并通知你。",
   "settings.advanced.cw.outage.waitMinutes.title": "连接中断后恢复：最长等待",
+  "settings.advanced.cw.preview.captureSeconds.desc": "智能体查看其预览可用的时限：加载页面、截图及其编码，或读取页面的文本。超过时限，智能体会被告知截取超时，且不会保存任何内容。",
+  "settings.advanced.cw.preview.captureSeconds.title": "预览：智能体截取的最长时间",
   "settings.advanced.cw.preview.enabled.desc": "让 Combwork 运行 Web 项目的开发服务器（在“项目设置”→“预览”中设置的命令），可在项目文件夹、槽位或评审副本中运行，每个都使用自己的空闲端口，仅在需要时启动，并随其槽位或评审结束而停止。关闭后，项目设置中没有“预览”部分，不会启动任何预览，正在运行的也会停止。",
   "settings.advanced.cw.preview.enabled.title": "预览：运行项目的开发服务器",
   "settings.advanced.cw.preview.portRange.desc": "预览服务器从此端口起的 1,000 个端口中获得端口，覆盖 Combwork 的所有项目和窗口。只要此值保持默认，Combwork 的开发版本就使用其后的 1,000 个端口，因此两者永不重叠。其他程序正在监听的端口会被跳过，Combwork 自己的端口也是。",

@@ -446,6 +446,8 @@
   "tips.planLimitsProviders.title": "Les limites de chaque forfait dans la barre d’état",
   "tips.prComments.text": "La carte d’une pull request montre ses commentaires, revues et fils de revue sur GitHub, avec qui a écrit chacun. Coche ceux à traiter et clique sur Traiter les retours : une carte de correction sur la branche de la pull request les reprend, cités comme les mots de quelqu’un d’autre.",
   "tips.prComments.title": "Traiter les commentaires d’une pull request",
+  "tips.previewAgents.text": "Avec l’aperçu activé et la commande du serveur de développement d’un projet définie, ses agents peuvent démarrer l’aperçu du slot ou de la copie de revue où ils travaillent, lire sa page, prendre des captures d’écran et lire les erreurs de sa console, sur une page à eux qui ne déplace jamais la vôtre.",
+  "tips.previewAgents.title": "Les agents regardent leur propre aperçu",
   "tips.previewTab.text": "Activez Paramètres → Avancé → Aperçu : exécuter les serveurs de développement des projets, définissez la commande du serveur de développement dans Paramètres du projet → Aperçu, et l’onglet Aperçu l’exécute et affiche sa page dans une vue protégée qui n’atteint que son propre serveur et internet.",
   "tips.previewTab.title": "Voir la page d’un projet web dans Combwork",
   "tips.progressCard.text": "Une exécution du panneau Progression montre sous l’agent la carte et la révision sur laquelle elle a tourné, par exemple #1061 · a3f2c1d : clique sur la carte pour l’ouvrir, ou sur la révision pour la copier.",

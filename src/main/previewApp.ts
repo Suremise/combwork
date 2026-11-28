@@ -24,6 +24,7 @@ import { combworkError } from './combworkError'
 import { emit, emitTo } from './events'
 import { PreviewGuard } from './previewGuard'
 import { PreviewShows } from './previewShown'
+import { removeShots, setShotMaxForTests } from './previewCapture'
 import { openableUrl } from '../shared/previewPolicy'
 import { createLogger, userText } from './logger'
 import { onPlaceEnded, setPreviewHoldCheck } from './placeEnds'
@@ -171,7 +172,8 @@ function watchPlace(folder: string, changed: () => void): () => void {
   try {
     w = watch(folder, { recursive: true }, (_e, file) => {
       const f = String(file ?? '').replace(/\\/g, '/')
-      if (/^\.git(\/|$)/.test(f) || /(^|\/)node_modules(\/|$)/.test(f)) return
+      // Not git's, nor installed packages, nor Combwork's own (.combwork: its agents' and board's files, HI-3616).
+      if (/^\.(git|combwork)(\/|$)/.test(f) || /(^|\/)node_modules(\/|$)/.test(f)) return
       if (timer) return
       timer = setTimeout(() => {
         timer = null
@@ -383,7 +385,20 @@ async function closeShown(id: string): Promise<boolean> {
   const proved = await shows.close(id)
   triedOf.delete(id)
   shownIn.delete(id)
+  // Its agents' screenshots go with it (HI-3616).
+  const v = runner?.views().find((x) => x.id === id)
+  if (v) await removeShots(shotsDirOf(v))
   return proved
+}
+
+/** Where agents' screenshots of previews go: Combwork's temp folder, preview\<project>-<place> (HI-3616). */
+export const shotsRoot = (): string => join(app.getPath('temp'), 'combwork-preview')
+export const shotsDirOf = (v: PreviewView): string => join(shotsRoot(), `${basename(v.projectPath)}-${v.place.name}`.replace(/[^\w.-]/g, '-'))
+
+/** HI-3616: the runner and the guarded pages, for the agents' tool (previewAgent.ts), refused while the Preview is off. */
+export function previewForAgents(): { runner: PreviewRunner; guard: (id: string) => Promise<PreviewGuard> } {
+  assertOn()
+  return { runner: runnerNow(), guard: (id) => shows.ensure(id) }
 }
 
 /** The view's place in its window: the tab's area in the window's CSS pixels, scaled by its zoom, in whole pixels. */
@@ -456,8 +471,10 @@ export async function openTried(id: string, url: unknown): Promise<boolean> {
 }
 
 /** Test copies only: a shown preview's guard, for its refusals and its proxy's process (ended as a crash would). */
-export async function previewTest(op: { op: 'refusals' | 'killGuard' | 'shown' | 'tried' | 'capture'; id: string; file?: string }): Promise<unknown> {
+export async function previewTest(op: { op: 'refusals' | 'killGuard' | 'shown' | 'tried' | 'capture' | 'shotMax'; id: string; file?: string; bytes?: number | null }): Promise<unknown> {
   if (app.isPackaged) throw new Error('Not allowed') // i18n-ignore: a test channel, never shown
+  // HI-3616: a screenshot's byte limit for this copy's tests (null: SHOT.maxBytes again).
+  if (op.op === 'shotMax') return setShotMaxForTests(op.bytes ?? null)
   const g = shows.has(op.id) ? await shows.guard(op.id) : null
   if (op.op === 'shown') return { shown: !!g?.alive && shownIn.has(op.id), viewDestroyed: !g?.view || g.view.webContents.isDestroyed() }
   if (op.op === 'tried') return [...(triedOf.get(op.id) ?? [])]
@@ -479,6 +496,8 @@ let offAdvanced: (() => void) | null = null
 /** Starts listening for places' ends and the switch (index.ts, once). Nothing runs until a preview is asked for. */
 export function startPreviews(): void {
   if (offEnds) return
+  // Screenshots a previous run left (HI-3616).
+  void removeShots(shotsRoot())
   // Awaited by the pools and the project's removal: the slot or copy is settled only once its preview's server is gone.
   offEnds = onPlaceEnded((e) => {
     if (!runner) return
@@ -496,6 +515,7 @@ export function startPreviews(): void {
 
 /** Combwork quitting: every preview's server ended. */
 export async function stopPreviews(): Promise<void> {
+  void removeShots(shotsRoot())
   offEnds?.()
   offAdvanced?.()
   offEnds = offAdvanced = null

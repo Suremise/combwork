@@ -398,6 +398,8 @@ export const AREAS = [
   { paths: ['tests/e2e/reviewerpool.cjs', 'src/main/reviewerPool.ts', 'src/shared/workflow/reviewerPool.ts', 'src/main/laneStart.ts', 'src/shared/laneBrief.ts', 'src/renderer/src/components/LaneStartDialog.tsx', 'src/main/loopReviewer.ts'], suites: ['reviewerpool'] },
   { paths: ['tests/e2e/isolatedcheck.cjs', 'src/main/copies.ts', 'src/main/copiesApp.ts', 'src/main/workflow/launcher.ts', 'src/main/progressReporters/wrapper.ts', 'src/main/processTree.ts', 'src/main/progressReporters/report.mts', 'src/main/workflow/runLink.ts', 'src/main/workflow/runChecks.ts'], suites: ['isolatedcheck', 'progressreport'] },
   { paths: ['tests/e2e/slotcards.cjs', 'tests/e2e/slotrecovery.cjs', 'src/main/slotCards.ts', 'src/main/finishPath.ts', 'src/main/laneStart.ts', 'src/main/platform/git/gitPlatform.ts', 'src/main/workflow/service.ts'], suites: ['slotcards', 'slotrecovery', 'lanestart'] },
+  // HI-3616: cw_preview, agents' own previews (the tool, its route, captures and replies).
+  { paths: ['tests/e2e/previewagent.cjs', 'src/main/previewAgent.ts', 'src/main/previewCapture.ts', 'src/shared/previewReplies.ts', 'src/main/previewGuard.ts', 'src/main/previewShown.ts', 'src/main/previewApp.ts'], suites: ['previewagent'] },
   // HI-3615: the Preview's network guard (its proxy, partition and view) and tab.
   { paths: ['tests/e2e/previewguard.cjs', 'src/main/previewGuard.ts', 'src/main/previewShown.ts', 'src/main/previewProxy.ts', 'src/main/previewProxyCore.ts', 'src/shared/previewPolicy.ts', 'src/main/previewApp.ts'], suites: ['previewguard', 'previewtab'] },
   // HI-3614: the Preview runner (its places, ports, supervisor jobs, stamp and Project Settings → Preview).

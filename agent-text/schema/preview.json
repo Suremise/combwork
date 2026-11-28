@@ -1,0 +1,126 @@
+{
+  "preview.reply.changedAfterLoad": {
+    "placeholders": {
+      "at": "plain",
+      "loaded": "plain"
+    }
+  },
+  "preview.reply.changedDuring": {
+    "placeholders": {}
+  },
+  "preview.reply.console": {
+    "placeholders": {
+      "shown": "plain",
+      "total": "plain"
+    }
+  },
+  "preview.reply.cut": {
+    "placeholders": {
+      "height": "plain"
+    }
+  },
+  "preview.reply.goto": {
+    "placeholders": {
+      "url": "plain"
+    }
+  },
+  "preview.reply.jpeg": {
+    "placeholders": {
+      "quality": "plain"
+    }
+  },
+  "preview.reply.log": {
+    "placeholders": {}
+  },
+  "preview.reply.more": {
+    "placeholders": {
+      "n": "plain"
+    }
+  },
+  "preview.reply.noCommit": {
+    "placeholders": {}
+  },
+  "preview.reply.noConsole": {
+    "placeholders": {}
+  },
+  "preview.reply.noLog": {
+    "placeholders": {}
+  },
+  "preview.reply.png": {
+    "placeholders": {}
+  },
+  "preview.reply.screenshot": {
+    "placeholders": {
+      "path": "plain",
+      "size": "plain",
+      "width": "plain",
+      "height": "plain",
+      "format": "plain",
+      "scaled": "select",
+      "scale": "plain"
+    }
+  },
+  "preview.reply.snapshot": {
+    "placeholders": {
+      "title": "plain",
+      "url": "plain"
+    }
+  },
+  "preview.reply.sourceClean": {
+    "placeholders": {
+      "commit": "plain"
+    }
+  },
+  "preview.reply.sourceDirty": {
+    "placeholders": {
+      "commit": "plain",
+      "tree": "plain"
+    }
+  },
+  "preview.reply.sourceNone": {
+    "placeholders": {}
+  },
+  "preview.reply.sourceUnknown": {
+    "placeholders": {}
+  },
+  "preview.reply.stale": {
+    "placeholders": {
+      "at": "plain"
+    }
+  },
+  "preview.reply.stamp": {
+    "placeholders": {
+      "place": "plain",
+      "card": "select",
+      "source": "plain",
+      "state": "plain"
+    }
+  },
+  "preview.reply.stateNone": {
+    "placeholders": {}
+  },
+  "preview.reply.stateRunning": {
+    "placeholders": {
+      "url": "plain"
+    }
+  },
+  "preview.reply.stateStarting": {
+    "placeholders": {}
+  },
+  "preview.reply.stateStopped": {
+    "placeholders": {
+      "kind": "select",
+      "code": "select",
+      "first": "plain",
+      "last": "plain",
+      "port": "plain",
+      "pid": "plain",
+      "ports": "plain",
+      "seconds": "plain",
+      "detail": "plain"
+    }
+  },
+  "preview.reply.untrusted": {
+    "placeholders": {}
+  }
+}

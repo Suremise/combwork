@@ -143,6 +143,8 @@ import { apiOutcome, appMetrics, clock as metricsClock, knownRoute, metricsHandl
 import { metricsReport } from './metricsUsage'
 import { apiLabel, beginWork, hookLabel } from './mainStalls'
 import type { GuidanceSeries, MetricOutcome, MetricsPart, MetricsQuery, MetricsReport } from '../shared/metrics'
+import { agentPreview, PreviewRefused } from './previewAgent'
+import { previewOn } from './previewApp'
 import { agentForToken, agentToken, agentTokenFile, currentAgentRun, onAgentTokenEnded, type AgentIdentity, type EndedLaunch } from './agentTokens'
 import { AttemptGuard, captureFence, issueAttempt, type RequestFence } from './attemptFence'
 import { API_EVENTS, apiEventFor, publicRun } from './apiEvents'
@@ -4770,6 +4772,22 @@ function intParam(query: URLSearchParams, name: string, fallback: number, min: n
   const n = Number(query.get(name))
   return query.has(name) && Number.isFinite(n) ? Math.min(max, Math.max(min, Math.floor(n))) : fallback
 }
+
+// cw_preview (HI-3616): an agent's own place's preview, never another's (previewAgent.ts).
+route('POST', '/v1/preview', async ({ body }) => {
+  const a = agentCaller()
+  if (!a) throw new HttpError(403, apiSaid(API.preview.agentsOnly))
+  if (!previewOn()) throw new HttpError(403, apiSaid(API.preview.off))
+  const ws = workspaceFor(a.projectPath) ?? requireWorkspace()
+  try {
+    const r = await agentPreview(ws, a.projectPath, a.agentId, body && typeof body === 'object' ? (body as Record<string, unknown>) : {})
+    // Its card named by its key in the stamp.
+    return { ...r, names: namesOf(r.stamp.card !== null ? [r.stamp.card] : []) }
+  } catch (e) {
+    if (e instanceof PreviewRefused) throw new HttpError(e.status, apiSaid(API.preview[e.code], e.values))
+    throw e
+  }
+})
 
 route('GET', '/v1/console/sources', async ({ query }) => {
   consoleAllowed()

@@ -478,6 +478,8 @@
   "tips.planLimitsProviders.title": "Every plan's limits in the status bar",
   "tips.prComments.text": "A pull request’s card shows its comments, reviews and review threads on GitHub, with who wrote each. Tick the ones to act on and click Address feedback: a fix card on the pull request’s branch takes them, quoted as someone else’s words.",
   "tips.prComments.title": "Address a pull request’s comments",
+  "tips.previewAgents.text": "With the Preview on and a project's dev server command set, its agents can start the preview of the slot or review copy they work in, read its page, take screenshots and read its console's errors, on a page of their own that never moves yours.",
+  "tips.previewAgents.title": "Agents look at their own preview",
   "tips.previewTab.text": "Turn on Settings → Advanced → Preview: run projects' dev servers, set the dev server's command in Project Settings → Preview, and the Preview tab runs it and shows its page in a guarded view that reaches only its own server and the internet.",
   "tips.previewTab.title": "See a web project's page in Combwork",
   "tips.progressCard.text": "A run in the Progress panel shows the card and the revision it ran on under the agent, such as #1061 · a3f2c1d: click the card to open it, or the revision to copy it.",
