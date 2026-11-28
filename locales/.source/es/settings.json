@@ -588,6 +588,8 @@
   "settings.advanced.cw.outage.resumesPerHour.title": "Resuming after a connection drops: resumes in an hour",
   "settings.advanced.cw.outage.waitMinutes.desc": "How long Combwork waits for the connection to come back before it stops waiting and tells you.",
   "settings.advanced.cw.outage.waitMinutes.title": "Resuming after a connection drops: wait at most",
+  "settings.advanced.cw.preview.captureSeconds.desc": "How long an agent's look at its preview may take: loading the page, a screenshot and its encoding, or reading the page's text. Past it the agent is told the capture timed out, and nothing is saved.",
+  "settings.advanced.cw.preview.captureSeconds.title": "Preview: longest an agent's capture takes",
   "settings.advanced.cw.preview.enabled.desc": "Lets Combwork run a web project's development server, the command set in Project Settings → Preview, in the project folder, a slot or a review copy, each on a free port of its own, started only when asked and stopped with its slot's or review's end. Turned off, Project Settings has no Preview section, no preview starts, and the ones running are stopped.",
   "settings.advanced.cw.preview.enabled.title": "Preview: run projects' dev servers",
   "settings.advanced.cw.preview.portRange.desc": "Preview servers get their ports from the 1,000 ports from this one, across every project and window of Combwork. A development build of Combwork uses the 1,000 after them while this is left at its default, so the two never share. A port another program listens on is skipped, and so are Combwork's own.",

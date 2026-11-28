@@ -12,7 +12,9 @@
 //   origin cancelled: the URL is offered in Combwork's own bar, opened only by the user's click there.
 // - Closing: the view's page closed, closeAllConnections, the proxy ended. A new generation gets a new partition.
 
-import { app, session, utilityProcess, WebContentsView, type Session, type UtilityProcess } from 'electron'
+import { app, BrowserWindow, session, utilityProcess, WebContentsView, type Session, type UtilityProcess } from 'electron'
+import type { ConsoleEntry } from './previewCapture'
+import type { PreviewSource } from '../shared/preview'
 import { join } from 'path'
 import { createLogger } from './logger'
 import { checkUrl, openableUrl, sameOrigin } from '../shared/previewPolicy'
@@ -24,6 +26,17 @@ const log = createLogger('preview')
 const READY_MS = 15_000
 /** How often its health is asked, and how long an answer may take. */
 const PING_MS = 5_000
+
+/** The agents' page of a preview (HI-3616): its offscreen window, its console's errors and warnings, its last load. */
+export interface AgentPage {
+  win: BrowserWindow
+  console: ConsoleEntry[]
+  /** Every error and warning since it was made (the list keeps the newest 50). */
+  consoleTotal: number
+  loadedAt: number | null
+  /** The source when its last load began (HI-3616 round 1), null when it couldn't be read: what a capture compares with. */
+  loadSource: PreviewSource | null
+}
 
 /** What refused something: a request's layer, or the partition's permission and download handlers. */
 export type Layer = 'webRequest' | 'proxy' | 'permission' | 'download'
@@ -178,24 +191,9 @@ export class PreviewGuard {
       })
     if (this.closed) throw new Error('closed while starting') // i18n-ignore: as above
     // 3. The view, only now.
-    const view = new WebContentsView({ webPreferences: { partition: undefined, session: ses, sandbox: true, contextIsolation: true, nodeIntegration: false, nodeIntegrationInSubFrames: false, nodeIntegrationInWorker: false, webSecurity: true, allowRunningInsecureContent: false, webviewTag: false, navigateOnDragDrop: false, spellcheck: false, devTools: true, safeDialogs: true } })
+    const view = new WebContentsView({ webPreferences: this.prefs() })
     this.viewNow = view
-    const wc = view.webContents
-    wc.setWebRTCIPHandlingPolicy('disable_non_proxied_udp')
-    wc.setWindowOpenHandler(({ url }) => {
-      this.tried(url)
-      return { action: 'deny' }
-    })
-    const ownPort = this.own.ports[0]
-    const leaving = (e: { preventDefault: () => void; url: string; isMainFrame?: boolean }): void => {
-      if (e.isMainFrame === false || sameOrigin(e.url, ownPort)) return
-      e.preventDefault()
-      this.tried(e.url)
-    }
-    wc.on('will-navigate', leaving)
-    wc.on('will-redirect', leaving)
-    wc.on('will-frame-navigate', leaving)
-    wc.on('render-process-gone', (_e, d) => log.warn(`a preview's page ended (${d.reason})`))
+    this.harden(view.webContents, (url) => this.tried(url))
     // Its health: an answer to each ping within the next.
     this.lastPong = Date.now()
     this.ping = setInterval(() => {
@@ -203,6 +201,73 @@ export class PreviewGuard {
       this.proxy?.postMessage({ type: 'ping', n: Date.now() })
     }, PING_MS)
     this.ping.unref?.()
+  }
+
+  /** A page's preferences on this partition: sandboxed, isolated, no Node anywhere, no preload, web security on. */
+  private prefs(offscreen = false): Electron.WebPreferences {
+    return { partition: undefined, session: this.ses!, sandbox: true, contextIsolation: true, nodeIntegration: false, nodeIntegrationInSubFrames: false, nodeIntegrationInWorker: false, webSecurity: true, allowRunningInsecureContent: false, webviewTag: false, navigateOnDragDrop: false, spellcheck: false, devTools: !offscreen, safeDialogs: true, ...(offscreen ? { offscreen: true, backgroundThrottling: false } : {}) }
+  }
+
+  /**
+   * A page of this partition's handlers: WebRTC's UDP only through the proxy, window.open denied, a navigation off its own
+   * origin cancelled (`tried` told of it).
+   */
+  private harden(wc: Electron.WebContents, tried: (url: string) => void): void {
+    wc.setWebRTCIPHandlingPolicy('disable_non_proxied_udp')
+    wc.setWindowOpenHandler(({ url }) => {
+      tried(url)
+      return { action: 'deny' }
+    })
+    const ownPort = this.own.ports[0]
+    const leaving = (e: { preventDefault: () => void; url: string; isMainFrame?: boolean }): void => {
+      if (e.isMainFrame === false || sameOrigin(e.url, ownPort)) return
+      e.preventDefault()
+      tried(e.url)
+    }
+    wc.on('will-navigate', leaving)
+    wc.on('will-redirect', leaving)
+    wc.on('will-frame-navigate', leaving)
+    wc.on('render-process-gone', (_e, d) => log.warn(`a preview's page ended (${d.reason})`))
+  }
+
+  /** The agents' page (HI-3616), once made. */
+  private agentNow: AgentPage | null = null
+
+  /**
+   * The agents' own page of this preview (HI-3616): an offscreen window on the same partition, so behind the same proxy and
+   * handlers, never shown, never the user's view (an agent's goto never moves the page the user looks at). Made on first
+   * use, at `size`; its console's errors and warnings recorded from then on. A page leaving its origin is refused, with no
+   * bar (no user is there to click it).
+   */
+  async agentPage(size: { width: number; height: number }): Promise<AgentPage> {
+    if (this.closed || !this.ses) throw new Error('closed') // i18n-ignore: a reason, never shown (the caller says notRunning)
+    if (this.agentNow && !this.agentNow.win.isDestroyed()) return this.agentNow
+    const win = new BrowserWindow({ show: false, width: size.width, height: size.height, useContentSize: true, frame: false, skipTaskbar: true, focusable: false, webPreferences: this.prefs(true) })
+    const wc = win.webContents
+    this.harden(wc, () => undefined)
+    wc.setFrameRate(10)
+    const page: AgentPage = { win, console: [], consoleTotal: 0, loadedAt: null, loadSource: null }
+    wc.on('console-message', (e) => {
+      const level = e.level === 'error' ? 'error' : e.level === 'warning' ? 'warning' : null
+      if (!level) return
+      page.consoleTotal++
+      page.console.push({ level, text: String(e.message ?? ''), at: Date.now() })
+      if (page.console.length > 50) page.console.shift()
+    })
+    wc.on('did-finish-load', () => (page.loadedAt = Date.now()))
+    // Its own DevTools session (the snapshot's tree, a full page's size), attached as it is made.
+    try {
+      wc.debugger.attach('1.3')
+    } catch (e) {
+      log.warn(`the agents' page's DevTools session didn't attach: ${String(e)}`)
+    }
+    this.agentNow = page
+    return page
+  }
+
+  /** The agents' page if it was made (and isn't closed). */
+  get agentPageNow(): AgentPage | null {
+    return this.agentNow && !this.agentNow.win.isDestroyed() ? this.agentNow : null
   }
 
   private tried(url: string): void {
@@ -284,6 +349,9 @@ export class PreviewGuard {
       if (proxyGone) this.ending = null
     }
     if (view && !view.webContents.isDestroyed()) view.webContents.close({ waitForBeforeUnload: false })
+    const agent = this.agentNow
+    this.agentNow = null
+    if (agent && !agent.win.isDestroyed()) agent.win.destroy()
     if (this.ses) await bounded(this.ses.closeAllConnections())
     if (!proxyGone) log.warn("A preview's network guard couldn't be proved ended: tried again at its place's next use")
     return proxyGone

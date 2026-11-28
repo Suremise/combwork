@@ -143,7 +143,7 @@ const prose = (seed, n) => {
    * project's workflow left out of its launch (HI-2694: CW_WORKFLOW_HIDDEN, comma-separated).
    */
   const toolList = (role = 'agent', side = undefined, hidden = undefined) => {
-    const extra = { CW_DEV_CONSOLE: '1', ...(side ? { CW_SIDE: side } : {}), ...(hidden ? { CW_WORKFLOW_HIDDEN: hidden } : {}), ...(role.startsWith('assistant') ? { CW_ROLE: 'assistant', CW_ASSISTANT_CONTROL: 'projects', CW_ASSISTANT_SETTINGS: role === 'assistant+settings' ? '1' : '0', CW_JOURNAL: role === 'assistant-nojournal' ? '0' : '1', CW_API_TOKEN_FILE: asTokenFile, CW_API_TOKEN: '', CW_PROJECT: '' } : { CW_API_TOKEN_FILE: path.join(userData, 'agent-api.json'), CW_PROJECT: 'alpha', CW_AGENT_ID: coder.id }) }
+    const extra = { CW_DEV_CONSOLE: '1', CW_PREVIEW: '1', ...(side ? { CW_SIDE: side } : {}), ...(hidden ? { CW_WORKFLOW_HIDDEN: hidden } : {}), ...(role.startsWith('assistant') ? { CW_ROLE: 'assistant', CW_ASSISTANT_CONTROL: 'projects', CW_ASSISTANT_SETTINGS: role === 'assistant+settings' ? '1' : '0', CW_JOURNAL: role === 'assistant-nojournal' ? '0' : '1', CW_API_TOKEN_FILE: asTokenFile, CW_API_TOKEN: '', CW_PROJECT: '' } : { CW_API_TOKEN_FILE: path.join(userData, 'agent-api.json'), CW_PROJECT: 'alpha', CW_AGENT_ID: coder.id }) }
     const out = execFileSync(process.execPath, [path.join(lib.ROOT, 'out', 'main', 'cw-mcp.js')], {
       input: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list', params: {} }) + '\n',
       env: lib.childEnv({ CW_API_URL: API, CW_WORKSPACE: ws, ...extra }),
@@ -153,9 +153,12 @@ const prose = (seed, n) => {
   }
   /** A tool's description as the agent (or the Assistant) is given it. */
   const toolDescription = (name, role = 'agent') => toolList(role).find((t) => t.name === name)?.description ?? ''
+  /** The tools offered only when the user turns them on: checked against each limit, left out of a role's totals. */
+  const OPT_IN = ['cw_console', 'cw_preview']
   // The tools' descriptions stay short (HI-2012): every description and parameter description, at any depth of its
   // schema, and each role's total, within toolLimits.cjs. The Assistant is measured with Change settings on (all its own);
-  // cw_console (offered only with the developer console on, as here) is checked but left out of the totals.
+  // cw_console (offered only with the developer console on, as here) and cw_preview (HI-3616: only with the Preview on and
+  // the project set up for it, as here) are checked but left out of the totals.
   {
     const limits = require('./toolLimits.cjs')
     const paramTexts = (schema) => {
@@ -173,15 +176,15 @@ const prose = (seed, n) => {
       const over = []
       let total = 0
       const tools = toolList(list)
-      // The whole list as the CLI gets it, in bytes (HI-2553), cw_console left out as in the totals below.
-      const listBytes = Buffer.byteLength(JSON.stringify(tools.filter((t) => t.name !== 'cw_console')), 'utf8')
+      // The whole list as the CLI gets it, in bytes (HI-2553), cw_console and cw_preview left out as in the totals below.
+      const listBytes = Buffer.byteLength(JSON.stringify(tools.filter((t) => !OPT_IN.includes(t.name))), 'utf8')
       console.log(`tool list (${role}): ${listBytes} bytes`)
       check(`tool list (${role}): ${listBytes} bytes, within ${limits.listBytes[role]} (raise it only on purpose: toolLimits.cjs)`, listBytes <= limits.listBytes[role])
       for (const t of tools) {
         const ex = limits.exceptions[t.name] ?? {}
         const descMax = ex.description ?? limits.description
         const paramMax = ex.parameter ?? limits.parameter
-        const counted = t.name !== 'cw_console'
+        const counted = !OPT_IN.includes(t.name)
         if (counted) total += t.description.length
         if (t.description.length > descMax) over.push(`${t.name} ${t.description.length}/${descMax}`)
         for (const [at, d] of paramTexts(t.inputSchema)) {
@@ -208,8 +211,8 @@ const prose = (seed, n) => {
     // only those; each side's list measured with and without them.
     const SOLO = 'cw_focused_skip,cw_report_merge,cw_start_review,cw_verdict'
     for (const side of ['both', 'builder', 'reviewer']) {
-      const full = toolList('agent', side).filter((t) => t.name !== 'cw_console')
-      const solo = toolList('agent', side, SOLO).filter((t) => t.name !== 'cw_console')
+      const full = toolList('agent', side).filter((t) => !OPT_IN.includes(t.name))
+      const solo = toolList('agent', side, SOLO).filter((t) => !OPT_IN.includes(t.name))
       console.log(`tool list (${side}, Solo): ${solo.length} tools, ${Buffer.byteLength(JSON.stringify(solo), 'utf8')} bytes (with every workflow tool: ${full.length}, ${Buffer.byteLength(JSON.stringify(full), 'utf8')})`)
       check(`tools by workflow (${side}): Solo leaves out exactly its four, where the side has them`, names(full).filter((n) => !names(solo).includes(n)).join(',') === names(full).filter((n) => SOLO.split(',').includes(n)).join(','), names(solo).join(' '))
     }

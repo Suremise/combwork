@@ -582,6 +582,8 @@
   "settings.advanced.cw.outage.resumesPerHour.title": "接続切断後の再開：1時間あたりの再開回数",
   "settings.advanced.cw.outage.waitMinutes.desc": "Combworkが接続の回復を待つ時間です。これを過ぎると待機をやめて知らせます。",
   "settings.advanced.cw.outage.waitMinutes.title": "接続切断後の再開：最長待機時間",
+  "settings.advanced.cw.preview.captureSeconds.desc": "エージェントが自分のプレビューを確認するのにかけられる時間です。ページの読み込み、スクリーンショットとそのエンコード、ページのテキストの読み取りが対象です。これを超えると、エージェントにはキャプチャが時間切れになったと伝えられ、何も保存されません。",
+  "settings.advanced.cw.preview.captureSeconds.title": "プレビュー：エージェントのキャプチャにかけられる最長時間",
   "settings.advanced.cw.preview.enabled.desc": "Webプロジェクトの開発サーバー（「プロジェクト設定」→「プレビュー」で設定したコマンド）を、プロジェクトフォルダー、スロット、またはレビュー用コピーで、それぞれ専用の空きポートでCombworkに実行させます。求められたときだけ起動し、スロットやレビューの終了とともに停止します。オフにすると、プロジェクト設定に「プレビュー」セクションはなくなり、プレビューは起動せず、実行中のものは停止します。",
   "settings.advanced.cw.preview.enabled.title": "プレビュー：プロジェクトの開発サーバーを実行",
   "settings.advanced.cw.preview.portRange.desc": "プレビューサーバーは、Combworkのすべてのプロジェクトとウィンドウを通して、このポートから始まる1,000個のポートからポートを受け取ります。この値が既定のままの間、Combworkの開発ビルドはその次の1,000個を使うので、両者が重なることはありません。ほかのプログラムが待ち受けているポートと、Combwork自身のポートは飛ばされます。",

@@ -2355,6 +2355,14 @@
     "defaultMessage": "Resuming after a connection drops: wait at most",
     "description": "An advanced setting's title (Settings → Advanced), followed by its value in minutes (\"120 min\")."
   },
+  "settings.advanced.cw.preview.captureSeconds.desc": {
+    "defaultMessage": "How long an agent's look at its preview may take: loading the page, a screenshot and its encoding, or reading the page's text. Past it the agent is told the capture timed out, and nothing is saved.",
+    "description": "What the advanced setting \"Preview: longest an agent's capture takes\" does (Settings → Advanced, under Combwork)."
+  },
+  "settings.advanced.cw.preview.captureSeconds.title": {
+    "defaultMessage": "Preview: longest an agent's capture takes",
+    "description": "An advanced setting's title (Settings → Advanced), listed under Combwork, followed by its value in seconds (\"10 s\"). The Preview runs web projects' development servers; agents can take screenshots and read their pages."
+  },
   "settings.advanced.cw.preview.enabled.desc": {
     "defaultMessage": "Lets Combwork run a web project's development server, the command set in Project Settings → Preview, in the project folder, a slot or a review copy, each on a free port of its own, started only when asked and stopped with its slot's or review's end. Turned off, Project Settings has no Preview section, no preview starts, and the ones running are stopped.",
     "description": "What the advanced setting \"Preview: run projects' dev servers\" does (Settings → Advanced, under Combwork). A slot is a worktree Combwork lends to a card or a lane; a review copy is a copy of a project at the revision a reviewer reviews. Project Settings → Preview is a section: use its names as translated there."

@@ -297,6 +297,7 @@ export const SUITES = [
   { name: 'planusage' },
   { name: 'presetstep' },
   { name: 'preview' },
+  { name: 'previewagent' },
   { name: 'previewguard' },
   { name: 'previewtab' },
   { name: 'prfinish' },

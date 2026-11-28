@@ -446,6 +446,8 @@
   "tips.planLimitsProviders.title": "Los límites de cada plan en la barra de estado",
   "tips.prComments.text": "La tarjeta de una pull request muestra sus comentarios, revisiones e hilos de revisión en GitHub, con quién escribió cada uno. Marca los que quieras atender y haz clic en Atender comentarios: una tarjeta de corrección en la rama de la pull request se encarga de ellos, citados como palabras de otra persona.",
   "tips.prComments.title": "Atender los comentarios de una pull request",
+  "tips.previewAgents.text": "Con la vista previa activada y el comando del servidor de desarrollo de un proyecto establecido, sus agentes pueden iniciar la vista previa del slot o de la copia de revisión en que trabajan, leer su página, hacer capturas de pantalla y leer los errores de su consola, en una página propia que nunca mueve la tuya.",
+  "tips.previewAgents.title": "Los agentes miran su propia vista previa",
   "tips.previewTab.text": "Activa Configuración → Avanzado → Vista previa: ejecutar los servidores de desarrollo de los proyectos, define el comando del servidor de desarrollo en Configuración del proyecto → Vista previa, y la pestaña Vista previa lo ejecuta y muestra su página en una vista protegida que solo llega a su propio servidor y a internet.",
   "tips.previewTab.title": "Ver la página de un proyecto web en Combwork",
   "tips.progressCard.text": "Una ejecución del panel Progreso muestra bajo el agente la tarjeta y la versión en la que se ejecutó, como #1061 · a3f2c1d: haz clic en la tarjeta para abrirla, o en la versión para copiarla.",

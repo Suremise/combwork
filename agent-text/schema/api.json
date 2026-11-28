@@ -1664,6 +1664,38 @@
   "api.own.typing": {
     "placeholders": {}
   },
+  "api.preview.agentsOnly": {
+    "placeholders": {}
+  },
+  "api.preview.badAction": {
+    "placeholders": {
+      "actions": "plain"
+    }
+  },
+  "api.preview.badPath": {
+    "placeholders": {}
+  },
+  "api.preview.notOwnPlace": {
+    "placeholders": {}
+  },
+  "api.preview.notOwned": {
+    "placeholders": {}
+  },
+  "api.preview.notRunning": {
+    "placeholders": {}
+  },
+  "api.preview.off": {
+    "placeholders": {}
+  },
+  "api.preview.placeChanged": {
+    "placeholders": {}
+  },
+  "api.preview.timedOut": {
+    "placeholders": {}
+  },
+  "api.preview.tooLarge": {
+    "placeholders": {}
+  },
   "api.project.nameRequired": {
     "placeholders": {}
   },

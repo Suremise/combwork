@@ -16,6 +16,7 @@ import { join } from 'path'
 import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
 import { bindFree, parseNetstat, readListeners } from '../src/main/previewPorts'
 import { PreviewRunner, rangeOf, type Launched, type Listener, type RunnerDeps } from '../src/main/previewRunner'
+import { checkOp, closeOps, opsRunning, runOp } from '../src/main/previewCapture'
 import { previewSource } from '../src/main/previewSource'
 import { previewConfigOf, sameSource, suggestPreviewCommand, type PreviewEnd, type PreviewPlace, type PreviewSource, type PreviewView } from '../src/shared/preview'
 import { tempDir } from './tempDir'
@@ -456,6 +457,43 @@ describe("a preview's lifetime and its ports' owners (HI-3614 round 1)", () => {
     expect(r.at(folder)).toMatchObject({ held: false })
     expect(await r.retryHeldJob('preview-0a1b')).toBe(true)
     expect(teardowns).toBeGreaterThanOrEqual(4)
+  })
+
+  it("an agent's capture still running past its close's bound keeps the place held, the next lease refused, until it can no longer write there (HI-3616 round 2)", async () => {
+    // The teardown as the app has it for captures: the preview's operations closed, its answer the proof (closeShown).
+    const { r, table, launches } = fakeRunner({ teardown: (id) => closeOps(id, 20) })
+    const log: string[] = []
+    const folder = place('slot-a').folder
+    const first = r.start('P', place('slot-a', 'old', folder), { command: 'x' })
+    await waitUntil(() => launches.length === 1)
+    table.push({ port: 53000, pid: 101 })
+    launches[0].answer({ ...fakeServer(101, log, 'old'), job: 'preview-cap' })
+    const v = await first
+    // A capture's filesystem step held (its mkdir or write, say) past the close's bound.
+    let release = (): void => undefined
+    const held = new Promise<void>((done) => (release = done))
+    let wrote = false
+    const capture = runOp(v.id, 60_000, async (op) => {
+      await held
+      checkOp(op)
+      wrote = true
+    })
+    capture.catch(() => undefined)
+    // Its lease ends: the server's end is proved, the capture's isn't: held, the job named.
+    expect(await r.stopWhere((x) => x.place.generation === 'old', { kind: 'placeEnded' })).toEqual({ stopped: 1, held: ['preview-cap'] })
+    expect(r.at(folder)).toMatchObject({ id: v.id, held: true })
+    // The pool asks again: still held; the slot's next lease: refused, nothing launched.
+    expect(await r.retryHeldJob('preview-cap')).toBe(false)
+    table.length = 0
+    expect(await r.start('P', place('slot-a', 'new', folder), { command: 'x' })).toMatchObject({ state: 'stopped', end: { kind: 'placeHeld', preview: v.id } })
+    expect(launches.length).toBe(1)
+    // The held step ends: cancelled, it writes nothing; the next question proves it, and the place is free.
+    release()
+    await vi.waitFor(() => expect(opsRunning(v.id)).toBe(0))
+    expect(wrote).toBe(false)
+    expect(await r.retryHeldJob('preview-cap')).toBe(true)
+    expect(r.at(folder)).toMatchObject({ held: false })
+    expect(r.heldPorts()).toEqual([])
   })
 
   it("keeps its place and ports held when its server's end can't be proved: a new lease's start there is refused until it is", async () => {

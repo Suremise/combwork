@@ -24,6 +24,7 @@ import { combworkError } from './combworkError'
 import { emit, emitTo } from './events'
 import { PreviewGuard } from './previewGuard'
 import { PreviewShows } from './previewShown'
+import { closeOps, removeShots, setShotMaxForTests } from './previewCapture'
 import { openableUrl } from '../shared/previewPolicy'
 import { createLogger, userText } from './logger'
 import { onPlaceEnded, setPreviewHoldCheck } from './placeEnds'
@@ -41,6 +42,7 @@ import { endLeaseJob, journalPath, LeaseJob } from './workflow/queueJobs'
 import { defaultProbe } from './workflow/queueProcs'
 import { workspaceFor, WorkspaceService } from './workspace'
 import { msg } from '../shared/i18n'
+import { CW_DIR } from '../shared/defaults'
 import { PREVIEW_ENABLED, PREVIEW_PORT_RANGE, PREVIEW_START_SECONDS } from '../shared/advanced'
 import { PREVIEW_LOCKFILES, PREVIEW_PORT_DEFAULT, previewConfigOf, suggestPreviewCommand, type PreviewConfig, type PreviewEnd, type PreviewPlace, type PreviewSuggestion, type PreviewView } from '../shared/preview'
 
@@ -171,7 +173,8 @@ function watchPlace(folder: string, changed: () => void): () => void {
   try {
     w = watch(folder, { recursive: true }, (_e, file) => {
       const f = String(file ?? '').replace(/\\/g, '/')
-      if (/^\.git(\/|$)/.test(f) || /(^|\/)node_modules(\/|$)/.test(f)) return
+      // Not git's, nor installed packages, nor Combwork's own (.combwork: its agents' and board's files, HI-3616).
+      if (/^\.(git|combwork)(\/|$)/.test(f) || /(^|\/)node_modules(\/|$)/.test(f)) return
       if (timer) return
       timer = setTimeout(() => {
         timer = null
@@ -249,9 +252,13 @@ function admission(ws: WorkspaceService, projectPath: string, place: PreviewPlac
  * Starts the preview of a place (or gives the one running there): the tab's Start, the agent tool's start. It is
  * registered with its workspace at once (a closing finds it), and admitted again before its server starts.
  */
-export async function startPreview(ws: WorkspaceService, projectPath: string, folder?: string | null): Promise<PreviewView> {
+export async function startPreview(ws: WorkspaceService, projectPath: string, folder?: string | null, expect?: { generation: string }): Promise<PreviewView> {
   assertOn()
   const place = await placeOf(ws, projectPath, folder)
+  // An agent's start is for its own lease (HI-3616 round 1): the place under another generation now is another's.
+  if (expect && place.generation !== expect.generation) throw new PlaceMoved()
+  // Screenshots an earlier preview of the place left (one that ended with Combwork, HI-3616), before a new one runs.
+  if (runner?.at(place.folder)?.state !== 'running') await removeShots(shotsDirIn(place.folder))
   const cfg = await configOf(ws, projectPath)
   // Checked again after those awaits: the switch, and the workspace.
   assertOn()
@@ -380,10 +387,40 @@ function runningView(projectPath: string, id: string): PreviewView {
 
 /** A preview's guarded page closed (the runner's teardown, at its every end): true once its guard's end is proved. */
 async function closeShown(id: string): Promise<boolean> {
+  // Agents' captures first (HI-3616 rounds 1 and 2): none starts from now, those running are cancelled and awaited. One
+  // still running past the bound is not proved ended: the teardown answers false, so the runner keeps the place held
+  // (as for an unproved server or guard: one hold for all of a place's work) and asks again until it is.
+  const drained = await closeOps(id, CLOSE_OPS_MS)
   const proved = await shows.close(id)
   triedOf.delete(id)
   shownIn.delete(id)
-  return proved
+  // Its agents' screenshots go with it (HI-3616), once nothing of theirs can still write there.
+  const v = runner?.views().find((x) => x.id === id)
+  if (v && drained) await removeShots(shotsDirIn(v.place.folder))
+  return proved && drained
+}
+
+/**
+ * Where agents' screenshots of a place's preview go (HI-3616): the place's own .combwork folder, which git leaves out
+ * and the preview's watcher skips. Never a temp folder: a CLI asks before it reads a file outside its folders (Claude
+ * Code, unwatched, waits on that for good), and the place is its folder (a reviewer's copy, one it was given).
+ */
+export const shotsDirIn = (folder: string): string => join(folder, CW_DIR, 'preview-shots')
+/** How long a preview's close waits for its agents' captures to stop (each stops at its next step). */
+const CLOSE_OPS_MS = 5000
+
+/** A start asked for under a place's generation that is no longer the place's (HI-3616 round 1: the caller's lease ended). */
+export class PlaceMoved extends Error {
+  constructor() {
+    // agent-protocol: an error's class name, never said (previewAgent.ts answers placeChanged in its words)
+    super('place moved') // i18n-ignore: as above
+  }
+}
+
+/** HI-3616: the runner and the guarded pages, for the agents' tool (previewAgent.ts), refused while the Preview is off. */
+export function previewForAgents(): { runner: PreviewRunner; guard: (id: string) => Promise<PreviewGuard> } {
+  assertOn()
+  return { runner: runnerNow(), guard: (id) => shows.ensure(id) }
 }
 
 /** The view's place in its window: the tab's area in the window's CSS pixels, scaled by its zoom, in whole pixels. */
@@ -456,8 +493,10 @@ export async function openTried(id: string, url: unknown): Promise<boolean> {
 }
 
 /** Test copies only: a shown preview's guard, for its refusals and its proxy's process (ended as a crash would). */
-export async function previewTest(op: { op: 'refusals' | 'killGuard' | 'shown' | 'tried' | 'capture'; id: string; file?: string }): Promise<unknown> {
+export async function previewTest(op: { op: 'refusals' | 'killGuard' | 'shown' | 'tried' | 'capture' | 'shotMax'; id: string; file?: string; bytes?: number | null }): Promise<unknown> {
   if (app.isPackaged) throw new Error('Not allowed') // i18n-ignore: a test channel, never shown
+  // HI-3616: a screenshot's byte limit for this copy's tests (null: SHOT.maxBytes again).
+  if (op.op === 'shotMax') return setShotMaxForTests(op.bytes ?? null)
   const g = shows.has(op.id) ? await shows.guard(op.id) : null
   if (op.op === 'shown') return { shown: !!g?.alive && shownIn.has(op.id), viewDestroyed: !g?.view || g.view.webContents.isDestroyed() }
   if (op.op === 'tried') return [...(triedOf.get(op.id) ?? [])]
