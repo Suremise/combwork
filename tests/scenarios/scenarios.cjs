@@ -7,7 +7,7 @@
 // commands: those runs check the harness, the board rules and Combwork's own costs (benchmarks) for free. The real CLIs are the model trials (opt-in, see README.md).
 //
 // Fixture version: bump when a scenario's setup or checks change, so results can be compared across versions.
-const FIXTURES_VERSION = 143
+const FIXTURES_VERSION = 144
 
 /**
  * long-doc-section's design document (#817): about 40,000 characters in 36 sections, one of which (Retry policy) holds
@@ -6663,5 +6663,74 @@ module.exports.SCENARIOS.push({
       return [`${tool}: reached Combwork with its arguments`, calls.some((a) => Object.entries(sent).every(([k, v]) => JSON.stringify(a[k]) === JSON.stringify(v))), JSON.stringify(calls)]
     })
 })
+
+// HI-3616: cw_preview, an agent's own place's web preview. The project has its dev server's command set and the Preview
+// on; the agent is asked what its page shows. It should look with cw_preview (start, then read the page), never run the
+// server or fetch the page itself, and say what the page shows, not what the source means to show.
+const PREVIEW_SITE = [
+  "const http = require('http')",
+  "const pages = {",
+  // The heading the script writes: the user object has no name, so it reads "Welcome, undefined".
+  "  '/': '<title>Alpha</title><h1 id=\"h\">Loading</h1><p>The alpha app.</p><script src=\"/app.js\"></script>',",
+  "  '/app.js': 'const user = JSON.parse(\\'{\"nick\":\"guest\"}\\'); document.getElementById(\"h\").textContent = \"Welcome, \" + user.name',",
+  // A word drawn on a canvas: no text a page's tree has, only its pixels.
+  "  '/banner': '<title>Banner</title><body style=\"margin:0;background:#fff\"><canvas id=\"c\" width=\"900\" height=\"300\"></canvas><script>const x = document.getElementById(\"c\").getContext(\"2d\"); x.fillStyle = \"#123\"; x.font = \"bold 120px sans-serif\"; x.fillText(String.fromCharCode(...[79, 82, 66, 73, 84].map((n) => n)), 60, 200)</script></body>'",
+  "}",
+  "http.createServer((q, r) => {",
+  "  const p = pages[q.url.split('?')[0]]",
+  "  r.writeHead(p ? 200 : 404, { 'content-type': q.url.endsWith('.js') ? 'text/javascript' : 'text/html' })",
+  "  r.end(p ?? 'not found')",
+  "}).listen(Number(process.env.PORT), '127.0.0.1', () => console.log('alpha listening on ' + process.env.PORT))",
+  ''
+].join('\n')
+const previewFiles = { 'site.js': PREVIEW_SITE, 'README.md': '# alpha\n\nA small web app. `node site.js` serves it on `PORT`; Combwork\'s Preview runs it (Project Settings → Preview).\n' }
+const previewSetup = async (c) => {
+  const r = await c.inv('preview:setConfig', c.alpha, { command: 'node site.js' })
+  if (!r || r.command !== 'node site.js') throw new Error(`setup: the preview's command wasn't set: ${JSON.stringify(r)}`)
+}
+const previewCalls = (o, action) => ran(o, 'cw_preview').filter((x) => argsOf(x).action === action)
+/** A shell command that ran the dev server or fetched its page itself, past the preview. */
+const ranServerItself = (o) =>
+  o.tools.filter((t) => !t.isError && /bash|shell|powershell|exec|command/i.test(t.name) && /\bnode\s+site\.js|npm\s+(run\s+)?(dev|start)|curl|Invoke-WebRequest|iwr\b|wget|127\.0\.0\.1:\d+|localhost:\d+/i.test(t.input))
+module.exports.SCENARIOS.push(
+  {
+    id: 'preview-snapshot',
+    title: "What a web project's page shows (HI-3616): the agent looks with cw_preview (start, then read the page) and says what it shows, never running or fetching the server itself",
+    files: previewFiles,
+    advanced: { 'cw.preview.enabled': true },
+    setup: previewSetup,
+    prompt: () => "alpha's home page should greet the visitor with the heading \"Welcome, guest\". Its preview is set up in Combwork. Look at the running page and tell me, in one sentence, what its heading actually says. Change nothing.",
+    fake: 'cw cw_preview {"action":"start"} then cw cw_preview {"action":"snapshot"}',
+    expect: (o) => [
+      ['started its own preview with cw_preview', previewCalls(o, 'start').length > 0, o.combworkCalls.map((x) => `${x.tool}${x.tool === 'cw_preview' ? ` ${argsOf(x).action}` : ''}`).join(',')],
+      ['read the running page (snapshot or screenshot)', previewCalls(o, 'snapshot').length + previewCalls(o, 'screenshot').length > 0, o.combworkCalls.map((x) => x.tool).join(',')],
+      ["didn't run the dev server or fetch its page itself", ranServerItself(o).length === 0, ranServerItself(o).map((t) => `${t.name} ${t.input.slice(0, 120)}`).join(' | ')],
+      ['said what the page shows (Welcome, undefined)', /Welcome, undefined/i.test(o.finalReply), o.finalReply.slice(0, 200)],
+      ['changed no files', o.gitStatus.trim() === '', o.gitStatus]
+    ],
+    fakeSkips: ['said what the page shows (Welcome, undefined)']
+  },
+  {
+    id: 'preview-screenshot',
+    title: "A word only the page's pixels have (HI-3616): the agent takes a cw_preview screenshot of /banner, opens the file it names, and reads the word",
+    files: previewFiles,
+    advanced: { 'cw.preview.enabled': true },
+    setup: previewSetup,
+    prompt: () => "alpha's /banner page draws a word on a canvas. Its preview is set up in Combwork. Take a screenshot of that page as it renders and tell me the word, in one sentence. Change nothing.",
+    fake: 'cw cw_preview {"action":"start"} then cw cw_preview {"action":"goto","path":"/banner"} then cw cw_preview {"action":"screenshot"}',
+    expect: (o) => {
+      const opened = o.tools.filter((t) => !/^mcp__combwork__|^cw_|^combwork · /.test(t.name) && /shot-\d+-\d+\.(png|jpg)/i.test(t.input))
+      return [
+        ['loaded /banner in its preview', previewCalls(o, 'goto').some((x) => argsOf(x).path === '/banner'), o.combworkCalls.map((x) => `${x.tool}${x.tool === 'cw_preview' ? ` ${argsOf(x).action}` : ''}`).join(',')],
+        ['took a screenshot with cw_preview', previewCalls(o, 'screenshot').length > 0, o.combworkCalls.map((x) => x.tool).join(',')],
+        ['opened the screenshot file the reply named', opened.length > 0, o.tools.map((t) => t.name).join(',')],
+        ["didn't run the dev server or fetch its page itself", ranServerItself(o).length === 0, ranServerItself(o).map((t) => `${t.name} ${t.input.slice(0, 120)}`).join(' | ')],
+        ['read the word (ORBIT)', /\bORBIT\b/i.test(o.finalReply), o.finalReply.slice(0, 200)],
+        ['changed no files', o.gitStatus.trim() === '', o.gitStatus]
+      ]
+    },
+    fakeSkips: ['opened the screenshot file the reply named', 'read the word (ORBIT)']
+  }
+)
 
 module.exports.helpers = { asksToEndTurn, launchedIn, laneStartLanded,readOf, called, ran, retargetWays, asksTheUser, questionsToUser, relaysOk, laneRunsOn, leftoversByOwner, askedToCommit, read, moved, history, field, cardIs, namesCard, namesCards, movesOf, openAsks, laneStartsOf, startedWithBrief, movedInto, runs, commandsOf, testRunsIn, verdictOf, LANES_RUNNING_TAIL, checkRunsOf, mergedInto, shotsOpened }

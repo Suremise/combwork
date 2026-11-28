@@ -164,6 +164,8 @@ describe('a launch', () => {
       await advanced.set(PREVIEW_ENABLED, true)
       const on = await sessions.effective(project, agent as never)
       expect(on.mcpServers.combwork?.env?.CW_PREVIEW).toBe('1')
+      // Claude Code sees an image it opens (its descriptor's attachments): no CW_PREVIEW_IMAGES.
+      expect(on.mcpServers.combwork?.env?.CW_PREVIEW_IMAGES).toBeUndefined()
       expect((await env('assistant', w.assistantHome)).CW_PREVIEW).toBeUndefined()
       write()
       const unset = await sessions.effective(project, agent as never)

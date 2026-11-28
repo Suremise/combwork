@@ -34,6 +34,8 @@ const FAKE_CLAUDE_ONLY = [
   'card-loop-outside-job',
   // HI-2944: a start's warning of the target folder's changes; the repository and the start's reply after the server.
   'start-target-changes',
+  // HI-3616: cw_preview's replies and the MCP log after the server; reading a screenshot is the model trials'.
+  'preview-snapshot', 'preview-screenshot',
   // Overrides, intents, old moves, presets.
   'assistant-override-reason', 'assistant-override-none', 'assistant-override-unneeded', 'intent-put-back', 'intent-submit-commit', 'intent-review-request', 'pool-reviewer-wake', 'old-move-submit', 'old-move-review', 'preset-solo-card', 'solo-ab-card', 'preset-pair-lane',
   // The Assistant's board work.

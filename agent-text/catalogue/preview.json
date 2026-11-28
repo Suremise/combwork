@@ -30,6 +30,10 @@
   "preview.reply.noConsole": {
     "text": "No errors or warnings since it loaded."
   },
+  "preview.reply.noImages": {
+    "text": "Your CLI doesn't show images: read the page with action snapshot instead.",
+    "note": "After a screenshot's line, for a CLI whose descriptor says it doesn't read images (HI-3616)."
+  },
   "preview.reply.noLog": {
     "text": "Its server has logged nothing."
   },

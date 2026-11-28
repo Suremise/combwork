@@ -73,6 +73,7 @@ const T = {
   screenshot: agentMsg({ id: 'preview.reply.screenshot', text: 'Screenshot: {path} ({size}, {width}×{height} {format}{scaled, select, yes {, at {scale}%} other {}}). Read the file to see it.' }),
   png: agentMsg({ id: 'preview.reply.png', text: 'PNG', note: "A screenshot's format (preview.reply.screenshot's {format})." }),
   jpeg: agentMsg({ id: 'preview.reply.jpeg', text: 'JPEG {quality}', note: "A screenshot's format and its quality, 80 or 60 (preview.reply.screenshot's {format})." }),
+  noImages: agentMsg({ id: 'preview.reply.noImages', text: "Your CLI doesn't show images: read the page with action snapshot instead.", note: "After a screenshot's line, for a CLI whose descriptor says it doesn't read images (HI-3616)." }),
   cut: agentMsg({ id: 'preview.reply.cut', text: 'The page is {height} px tall: cut at 6000.' }),
   console: agentMsg({ id: 'preview.reply.console', text: '{shown} of {total} errors and warnings, newest last:' }),
   noConsole: agentMsg({ id: 'preview.reply.noConsole', text: 'No errors or warnings since it loaded.' })
@@ -117,8 +118,8 @@ function notesText(n: CaptureNotes): string[] {
   return [...(n.changedAfterLoad ? [say(T.changedAfterLoad, { at: hms(n.changedAfterLoad), loaded: hms(n.loadedAt) })] : []), ...(n.changedDuring ? [say(T.changedDuring)] : [])]
 }
 
-/** A cw_preview reply as the agent reads it. */
-export function previewReplyText(r: AgentPreviewReply): string {
+/** A cw_preview reply as the agent reads it; `seesImages`: whether its CLI sees an image it opens. */
+export function previewReplyText(r: AgentPreviewReply, o: { seesImages?: boolean } = {}): string {
   const head = stampText(r.stamp)
   switch (r.action) {
     case 'start':
@@ -131,7 +132,7 @@ export function previewReplyText(r: AgentPreviewReply): string {
     case 'snapshot':
       return [head, ...notesText(r.notes), say(T.untrusted), say(T.snapshot, { title: r.title || '-', url: r.url }), r.tree, ...(r.more ? [say(T.more, { n: String(r.more) })] : [])].join('\n')
     case 'screenshot':
-      return [head, say(T.screenshot, { path: r.path, size: sizeOf(r.bytes), width: String(r.width), height: String(r.height), format: r.format === 'png' ? say(T.png) : say(T.jpeg, { quality: String(r.quality) }), scaled: r.scale < 1 ? 'yes' : 'no', scale: String(Math.round(r.scale * 100)) }), ...(r.cutFrom ? [say(T.cut, { height: String(r.cutFrom) })] : []), ...notesText(r.notes)].join('\n')
+      return [head, say(T.screenshot, { path: r.path, size: sizeOf(r.bytes), width: String(r.width), height: String(r.height), format: r.format === 'png' ? say(T.png) : say(T.jpeg, { quality: String(r.quality) }), scaled: r.scale < 1 ? 'yes' : 'no', scale: String(Math.round(r.scale * 100)) }), ...(r.cutFrom ? [say(T.cut, { height: String(r.cutFrom) })] : []), ...(o.seesImages === false ? [say(T.noImages)] : []), ...notesText(r.notes)].join('\n')
     case 'console':
       return [head, ...notesText(r.notes), ...(r.entries.length ? [say(T.untrusted), say(T.console, { shown: String(r.entries.length), total: String(r.total) }), ...r.entries.map((e) => `[${e.level}] ${e.text}`)] : [say(T.noConsole)])].join('\n')
   }

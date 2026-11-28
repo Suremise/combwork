@@ -43,6 +43,9 @@
   "preview.reply.noConsole": {
     "placeholders": {}
   },
+  "preview.reply.noImages": {
+    "placeholders": {}
+  },
   "preview.reply.noLog": {
     "placeholders": {}
   },

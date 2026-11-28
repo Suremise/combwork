@@ -1957,18 +1957,19 @@ class SessionManager {
       const hidden = this.workflowToolsHidden(projectPath, side, pc)
       mcpServers[TOOLS_SERVER] = { ...mcpServers[TOOLS_SERVER], env: { ...mcpServers[TOOLS_SERVER].env, CW_SIDE: side, ...(hidden.length ? { CW_WORKFLOW_HIDDEN: hidden.join(',') } : {}) } }
     }
-    // HI-3616: cw_preview, only with the Preview on and the project's preview set up. Part of the signature, so turning
-    // either on or off asks running agents for a restart, as a tool list's change does.
-    if (mcpServers[TOOLS_SERVER] && !assistant && advanced.get<boolean>(PREVIEW_ENABLED) === true && previewConfigOf(pc.preview)) {
-      mcpServers[TOOLS_SERVER] = { ...mcpServers[TOOLS_SERVER], env: { ...mcpServers[TOOLS_SERVER].env, CW_PREVIEW: '1' } }
-    }
-
     // Its connection (HI-2106; the Assistant's too): what it launches with, and the account it launches on, its own or
     // (decision H) its CLI's first usable here. A change of account asks for a restart; `connection` is null for an
     // account on the CLI's own home (Copilot's sign-in, a test home).
     // An Assistant that names no CLI yet (a new workspace's, HI-2108): the first usable account's, as a new agent's
     // (decision A); Settings' old choice only where none is usable.
     const cli = launchCli(forAgent, workspace.config, assistant)
+    // HI-3616: cw_preview, only with the Preview on and the project's preview set up, and whether its CLI sees an image it
+    // opens (its descriptor's attachments: else a screenshot's reply says so). Part of the signature, so turning either on
+    // or off asks running agents for a restart, as a tool list's change does.
+    if (mcpServers[TOOLS_SERVER] && !assistant && advanced.get<boolean>(PREVIEW_ENABLED) === true && previewConfigOf(pc.preview)) {
+      const sees = (providerDescriptor(cli).capabilities.terminal?.attachments ?? []).includes('image')
+      mcpServers[TOOLS_SERVER] = { ...mcpServers[TOOLS_SERVER], env: { ...mcpServers[TOOLS_SERVER].env, CW_PREVIEW: '1', ...(sees ? {} : { CW_PREVIEW_IMAGES: '0' }) } }
+    }
     const choice = resolveAgentConnection(workspace.config, cli, forAgent?.connection, allAccounts(), allConnections())
     const connection = choice.ok ? (choice.account.home ? null : choice.account.id) : `!${choice.why}`
     const l = agentLaunchSettings(cli, choice.ok ? choice.connection : null, s, choice.ok && choice.account.kind === 'server')

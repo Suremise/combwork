@@ -358,6 +358,8 @@ const JOURNAL = process.env.CW_JOURNAL === '1'
 const DEV_CONSOLE = process.env.CW_DEV_CONSOLE === '1'
 /** HI-3616: the Preview on and the project's preview set up: cw_preview is offered only then (a project agent's alone). */
 const PREVIEW = process.env.CW_PREVIEW === '1'
+/** Whether this CLI sees an image it opens (its descriptor's attachments, set at launch): else a screenshot says so. */
+const PREVIEW_IMAGES = process.env.CW_PREVIEW_IMAGES !== '0'
 
 /** Seconds from Combwork's environment for this server: a whole number above 0, else the default. */
 const envSeconds = (name: string, fallback: number): number => {
@@ -1608,7 +1610,7 @@ const tools: Tool[] = [
       },
       required: ['action']
     },
-    run: async (a) => named((await api('POST', '/v1/preview', { action: a.action, ...(a.path !== undefined ? { path: a.path } : {}), ...(a.fresh ? { fresh: true } : {}), ...(a.full ? { full: true } : {}) })) as AgentPreviewReply, previewReplyText)
+    run: async (a) => named((await api('POST', '/v1/preview', { action: a.action, ...(a.path !== undefined ? { path: a.path } : {}), ...(a.fresh ? { fresh: true } : {}), ...(a.full ? { full: true } : {}) })) as AgentPreviewReply, (r) => previewReplyText(r, { seesImages: PREVIEW_IMAGES }))
   },
   {
     name: 'cw_console',
