@@ -1,4 +1,3 @@
-import { PresetsNotice } from './components/WorkflowOptions'
 import { NewProjectsNotice } from './components/PresetStep'
 import { fmt, msg, tr } from '@shared/i18n'
 import { useAntivirusOffer } from './components/Antivirus'
@@ -13,7 +12,6 @@ import { AboutDialog, AgentSetupDialog, DiagnosticsDialog, CommandPalette, Compa
 import { ConnectionsIntroBanner, useProviderWarnings } from './components/ConnectionChoice'
 import { AddAgentDialog, AgentSettingsDialog, askWorkflowToolsRestart, HandOverDialog, MergeDialog, TemplateAgentDialog } from './components/AgentDialogs'
 import { BranchMergeDialog } from './components/BranchMerge'
-import { BoardUpgradeAsk, BoardUpgradeBanner } from './components/BoardUpgrade'
 import { WorkspaceOpening } from './components/WorkspaceOpening'
 import { CloseCommandPanel, ClosingAgentsPanel } from './components/CloseCommandPanel'
 import { ArchiveAllDialog, BoardView, MoveToDoingDialog, TaskDialog, TaskStartDialog } from './components/Board'
@@ -590,8 +588,6 @@ export function App() {
           <ProvidersBanner />
           <ConnectionsIntroBanner />
           <MovedBanner />
-          <BoardUpgradeBanner />
-          <PresetsNotice />
           <NewProjectsNotice />
           {workspace && <ProjectView visible={activity === 'projects'} />}
           {main && (
@@ -625,7 +621,6 @@ export function App() {
       <AdminSnippetDialog />
       <MoveRepairDialog />
       <SetAsideDialog />
-      <BoardUpgradeAsk />
       <WorkspaceOpening />
       <ClosingAgentsPanel />
       <CloseCommandPanel />

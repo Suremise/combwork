@@ -233,6 +233,27 @@ describe('lending and releasing (#1429)', { timeout: timing('test.hang') }, () =
     expect(closed).toBe(true)
   })
 
+  it("a lease's end that can't prove a preview's server gone keeps the slot held for its job until a settle proves it (HI-3614 round 2)", async () => {
+    const w = world()
+    const pool = new SlotPool({ ...w.pool.deps, ended: async () => ({ holdJob: 'preview-held' }) })
+    const r = await lent({ ...w, pool }, { agent: 'a1', card: 1 })
+    w.steer.settle = false
+    expect(await pool.release(r.lease.id, 'done')).toBe(true)
+    expect(w.store.slot('slot-a')?.job).toBe('preview-held')
+    // The next card doesn't get it while the job isn't proved ended, refresh or not.
+    await pool.refresh()
+    expect(w.store.slot('slot-a')?.job).toBe('preview-held')
+    const other = await lent({ ...w, pool }, { agent: 'a2', card: 2 })
+    expect(other.slot.name).toBe('slot-b')
+    // Proved by a later settle: the job is cleared, and the slot is lent again.
+    w.steer.settle = true
+    await pool.refresh()
+    expect(w.steer.settledJobs).toContain('preview-held')
+    expect(w.store.slot('slot-a')?.job).toBeNull()
+    const third = await lent({ ...w, pool }, { agent: 'a3', card: 3 })
+    expect(third.slot.name).toBe('slot-a')
+  })
+
   it("records the slot's head as its lease ends, and tells the app (#1434: its builder's session is stopped)", async () => {
     const w = world()
     const r = await lent(w, { agent: 'a1', card: 1 })

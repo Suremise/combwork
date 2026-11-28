@@ -47,11 +47,11 @@ const fresh = await import('../src/main/freshStarts')
 const { sessions } = await import('../src/main/sessions')
 const { tellListeners } = await import('../src/main/events')
 const { coalescing } = await import('../src/main/coalesce')
+const store = await import('../src/main/boardStore')
 
 const user = { kind: 'user' } as const
 const wsPath = join(base, 'ws')
 const alpha = join(wsPath, 'alpha')
-const tasksDir = join(wsPath, '.combwork', 'tasks')
 const BOARD = 200
 let w: ReturnType<typeof createWorkspaceService>
 const run = <T>(fn: () => Promise<T>): Promise<T> => inWorkspace(w, fn)
@@ -92,11 +92,13 @@ beforeAll(async () => {
     mkdirSync(join(wsPath, p, '.combwork'), { recursive: true })
     writeFileSync(join(wsPath, p, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Builder' }, { id: 'a2', name: 'Reviewer' }] }))
   }
-  // A board of 200 cards' files from before 0.9, a quarter archived: moved into the database as the board is first used.
-  mkdirSync(tasksDir, { recursive: true })
-  for (let n = 1; n <= BOARD; n++) writeFileSync(join(tasksDir, `${n}.json`), JSON.stringify(card(n)))
   w = createWorkspaceService()
   await w.open(wsPath)
+  // A board of 200 cards, a quarter archived, saved as they are.
+  await store.boardWrite(w, async () => {
+    for (let n = 1; n <= BOARD; n++) store.putCard(w, n, JSON.parse(JSON.stringify(card(n))))
+    store.boardChanged(w)
+  })
   await run(() => tasks.boardPlaces(w))
 })
 afterAll(async () => disposeWorkspaceService(w))

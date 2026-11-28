@@ -340,14 +340,11 @@ interface CombworkMessageValues {
   'board.duration.seconds': { s: string | number }
   'board.error.archive': undefined
   'board.error.change': undefined
-  'board.error.inUse': undefined
   'board.error.move': undefined
   'board.error.newer': undefined
   'board.error.noWorkspace': undefined
   'board.error.unarchive': undefined
   'board.error.unavailable': { error: string | number }
-  'board.error.upgradeFirst': undefined
-  'board.error.upgradeFirstStart': undefined
   'board.export.command': undefined
   'board.export.done': { n: number }
   'board.export.failed': undefined
@@ -1080,17 +1077,6 @@ interface CombworkMessageValues {
   'board.toolbar.more': undefined
   'board.toolbar.search': undefined
   'board.toolbar.startLane': undefined
-  'board.upgrade.askDetail': undefined
-  'board.upgrade.askMessage': undefined
-  'board.upgrade.askTitle': undefined
-  'board.upgrade.banner': undefined
-  'board.upgrade.bannerButton': undefined
-  'board.upgrade.done': undefined
-  'board.upgrade.doneDetail': undefined
-  'board.upgrade.learnMore': undefined
-  'board.upgrade.notNow': undefined
-  'board.upgrade.upgrade': undefined
-  'board.upgrade.upgrading': undefined
   'board.view.intro': undefined
   'board.view.noWorkspace': undefined
   'board.view.title': undefined

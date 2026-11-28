@@ -13,6 +13,7 @@ process.env.CODEX_HOME = join(base, 'codex-home')
 process.env.COPILOT_HOME = join(base, 'copilot-home')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
+const { writeCard } = await import('./boardDb')
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')
 const { usageHistory } = await import('../src/main/usageHistory')
 const { laneCosts } = await import('../src/main/cardCosts')
@@ -46,14 +47,14 @@ describe("a lane's cost, kept while nothing it is made from changed (HI-3294)", 
     writeFileSync(file(3), transcript(sid(3), [5000]))
     const rec = (n: number, a: { id: string; name: string }) => ({ id: sid(n), agent: 'claude-code', agentId: a.id, agentName: a.name, name: `s${n}`, createdAt: iso(0), lastActiveAt: iso(3) })
     writeFileSync(join(p, '.combwork', 'sessions.json'), JSON.stringify({ version: 1, sessions: [rec(1, B), rec(2, R), rec(3, OTHER)], deleted: [], deletedUsage: [] }))
-    mkdirSync(join(wsPath, '.combwork', 'tasks'), { recursive: true })
     const card = { number: 1, title: 'Card 1', description: '', project: 'proj', agent: null, column: 'doing', order: 1, labels: [], blocked: null, blockedBy: [], links: [], comments: [], history: [], held: [{ agent: B.id, name: B.name, role: 'build', from: iso(0), to: iso(2) }], archived: false, createdAt: iso(0), createdBy: 'You', updatedAt: iso(0) }
-    writeFileSync(join(wsPath, '.combwork', 'tasks', '1.json'), JSON.stringify(card))
+    mkdirSync(join(wsPath, '.combwork'), { recursive: true })
     const lane = { id: 'lane-1', project: 'proj', name: null, builder: B, reviewer: R, cards: [1], rounds: 10, waitMinutes: 30, state: 'active', startedBy: 'You', startedAt: iso(-1), updatedAt: iso(-1), endedAt: null, mergeCommit: null }
     writeFileSync(join(wsPath, '.combwork', 'lanes.json'), JSON.stringify({ version: 1, lanes: [lane] }))
     usageHistory.start()
     w = createWorkspaceService()
     await w.open(wsPath)
+    await writeCard(w, 1, card)
     await run(() => usageHistory.opened(w))
   })
   afterAll(async () => {

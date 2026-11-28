@@ -26,7 +26,6 @@ const ALLOWED: Record<string, Record<string, string>> = {
   'src/main/projectAgents.ts': { result: "Remove's reply (RemovedAgent.worktree)", worktreeOf: "worktreeOf's answer, from legacyWorktree" },
   'src/main/servers.ts': { body: "an Agent API request's worktree, refused (#1451)" },
   'src/main/taskStart.ts': { target: "a card start's request for a new agent (refused by add-agent, #1451)" },
-  'src/main/workflow/upgrade.ts': { at: "an adoption's place (AdoptionAt.worktree)" },
   'src/renderer/src/actions.ts': { r: "Remove All's reply (RemovedAgent.worktree)" },
   'src/renderer/src/components/AgentDialogs.tsx': { target: "the Merge dialog's unused worktree (store.mergeFor)" },
   'src/renderer/src/components/MoveRepair.tsx': { T: 'a message key' },

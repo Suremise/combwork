@@ -2,7 +2,7 @@
 // A Git project: the header (None · Git with Git chosen and None available, its tooltip (#1419); the fact line naming the
 // repository's root; "Workflow: Git · …" with no preset chosen, then Solo, then Custom (from Solo) as the options are saved,
 // which opens Workflow), the five sections in order, opening at Changes; Project Settings → Workflow's Open Version
-// Control and the presets notice's Choose… land on Workflow. A None project (no repository): Workflow only, where it
+// Control lands on Workflow. A None project (no repository): Workflow only, where it
 // opens, no Initialise repository…; Git chosen there shows only Initialise repository…, saving nothing, gone with the tab
 // or None (HI-1905). A subfolder of a larger repository (a second workspace kept in
 // git): the whole-repository line. A narrow tab: the sections folded to icons, the selected one named, each reached
@@ -11,7 +11,6 @@
 const lib = require('./lib.cjs')
 const fs = require('fs')
 const path = require('path')
-const { DatabaseSync } = require('node:sqlite')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
 const HUNG_MS = lib.timing('hang.ui')
 
@@ -25,16 +24,6 @@ let failed = 0
 const check = (name, ok, extra = '') => {
   if (!ok) failed++
   console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${ok || !extra ? '' : ` (${extra})`}`)
-}
-
-/** Writes to the workspace's board from outside Combwork, as the upgrade would have (its marks). */
-function board(sql, ...args) {
-  const db = new DatabaseSync(path.join(ws, '.combwork', 'combwork.db'), { timeout: lib.timing('db.busyMs') })
-  try {
-    db.prepare(sql).run(...args)
-  } finally {
-    db.close()
-  }
 }
 
 ;(async () => {
@@ -168,17 +157,6 @@ function board(sql, ...args) {
     await shots('git-de', page.locator('.vc-view'))
     await speak()
     check('back in English', !!(await lib.until(async () => (await vcTab.count()) === 1, HUNG_MS)))
-
-    // --- The presets notice (after an upgrade from 0.9): Choose… opens the first named project's tab at Workflow.
-    await inv('workflow:setOptions', alpha, { preset: null, options: {} })
-    board("INSERT INTO board_meta (key, value) VALUES ('adoption_upto', '1') ON CONFLICT (key) DO UPDATE SET value = excluded.value")
-    await page.reload()
-    await lib.appReady(page)
-    await page.getByText('plain', { exact: true }).first().click()
-    const notice = page.locator('.presets-notice')
-    check('the presets notice names alpha', !!(await lib.until(async () => (await notice.count()) > 0 && (await text(notice)).includes('alpha'), HUNG_MS)), await text(page.locator('.main-area')))
-    await notice.getByRole('button', { name: 'Choose…' }).click()
-    check('Choose… opens alpha’s Version Control tab at Workflow', !!(await lib.until(async () => (await page.locator('.project-header', { hasText: 'alpha' }).count()) > 0 && (await page.locator('.tab.active', { hasText: 'Version Control' }).count()) === 1 && (await selected()) === 'workflow' && (await page.locator('[data-vc-workflow] .workflow-form').count()) === 1, HUNG_MS)))
 
     // --- The queues, from models main gives in place of its own (#1416's round 1): alpha's queue paused; plain's (None)
     // as each step sets it. A read of plain's can be held, to see what shows meanwhile.

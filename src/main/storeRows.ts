@@ -1,6 +1,6 @@
 import { existsSync } from 'original-fs'
 import { resolve } from 'path'
-import { boardLock, inBoardWrite, upgradeWaiting, withLeasedDb, workspaceDb } from './boardStore'
+import { boardLock, inBoardWrite, withLeasedDb, workspaceDb } from './boardStore'
 import { beginWrite, countedWrite } from './dbWrites'
 import { transaction, type Db } from './db'
 import { withFileLock } from './fsutil'
@@ -14,8 +14,8 @@ const log = createLogger('stores')
  * (schema/sessionDeliveryTables.ts; lanes, watches and metrics theirs: storeTables.ts, #1212), and `store_rows` is gone;
  * their few values stay in `store_meta`, per scope (a session host). Here: the move in of a store's old JSON file
  * (`openTable`), a typed save's lock and transaction (`saveTable`, `writeStore`, `withStoreLock`: under the board's lock,
- * so never inside one of the board's transactions on their shared connection), the values (`storeValue`), and the read
- * of a 0.9 file's `store_rows` while its upgrade to 1.0 waits (`readStore`). Each store tells its own events, as before.
+ * so never inside one of the board's transactions on their shared connection), and the values (`storeValue`). Each store
+ * tells its own events, as before.
  *
  * `scope` keeps a store's entries apart where it has more than one set in a workspace (a set per session host).
  */
@@ -23,50 +23,8 @@ const log = createLogger('stores')
 /** The stores still here: lanes, watches and metrics are in their typed tables (#1212, storeTables.ts). */
 export type StoreName = 'deliveries' | 'sessions'
 
-/**
- * A row to save: its key, its JSON document, and its place (`ord`: by default its place in the list; a store whose
- * entries have a place of their own, metrics' buckets by their start, gives it, so an entry leaving the front doesn't
- * move every other row).
- */
-export interface StoreRow {
-  key: string
-  doc: string
-  ord?: number
-}
-
-/** A store's entries in order, each its key and its JSON document, with its values. */
-export interface StoreData {
-  rows: { key: string; doc: string }[]
-  meta: Map<string, string>
-}
-
-/**
- * Row keys for a store's entries, one each and never the same twice (#1018 round 1): an entry's own id where it has one
- * not taken yet, else `#<its place>` (made unique too). An entry's id comes from its file or memory, so it can be
- * anything, a `#1` or another's id included: nothing an entry says can make two share a key.
- */
-export function rowKeys(entries: readonly unknown[]): string[] {
-  const used = new Set<string>()
-  return entries.map((e, i) => {
-    const id = e && typeof e === 'object' && typeof (e as { id?: unknown }).id === 'string' ? (e as { id: string }).id : ''
-    let key = id && !used.has(id) ? id : `#${i}`
-    while (used.has(key)) key += '#'
-    used.add(key)
-    return key
-  })
-}
-
-/** For tests: a save that fails as it is written (a full disk); a save held before it takes the lock (to race it); a read that fails. */
-export const storeTestHooks: { failSave: ((store: StoreName, scope: string) => boolean) | null; beforeSave: ((store: StoreName, scope: string) => Promise<void>) | null; failRead: ((store: StoreName) => boolean) | null } = { failSave: null, beforeSave: null, failRead: null }
-
-/** A 0.9 file's store entries and values as last committed (`store_rows`: read only while its upgrade to 1.0 waits). */
-export function readStore(workspacePath: string, store: StoreName, scope = ''): StoreData {
-  if (storeTestHooks.failRead?.(store)) throw new Error(`SQLITE_IOERR: disk I/O error (test, ${store})`) // i18n-ignore: a test's stand-in for SQLite's error
-  const db = workspaceDb(resolve(workspacePath)).reader
-  const rows = db.prepare('SELECT key, doc FROM store_rows WHERE store = ? AND scope = ? ORDER BY ord, key').all(store, scope) as { key: string; doc: string }[] // i18n-ignore: SQL
-  const meta = new Map((db.prepare('SELECT key, value FROM store_meta WHERE store = ? AND scope = ?').all(store, scope) as { key: string; value: string }[]).map((r) => [r.key, r.value])) // i18n-ignore: SQL
-  return { rows: rows.map((r) => ({ key: r.key, doc: r.doc })), meta }
-}
+/** For tests: a save that fails as it is written (a full disk); a save held before it takes the lock (to race it). */
+export const storeTestHooks: { failSave: ((store: StoreName, scope: string) => boolean) | null; beforeSave: ((store: StoreName, scope: string) => Promise<void>) | null } = { failSave: null, beforeSave: null }
 
 /**
  * Runs `fn` in one transaction on the workspace database's writer, under the board's lock (#1061): for a store that
@@ -151,8 +109,7 @@ export interface StoreTable<T> {
  * openStore for a store kept in a typed table of its own (#1211): its file moved in the first time (and, `whenEmpty`,
  * when found while the scope has none), in one transaction marked `imported` and checked there (the table has what was
  * written, beside what it had: a save that landed while its file couldn't be moved in, its workspace closed (HI-1713)),
- * the file then kept as a backup; a file found after that kept so, unread. Nothing while the workspace's
- * upgrade to 1.0 waits. The caller reads the table after. `db`: the connection to use throughout, a save's lease's
+ * the file then kept as a backup; a file found after that kept so, unread. The caller reads the table after. `db`: the connection to use throughout, a save's lease's
  * (#1381), so a workspace closed while the file is read doesn't take it away (else the workspace's, as it is then).
  * `refuse`: the file must stay where it is now (a removed project's, #1161): asked under the board's lock, after the file
  * is read and before anything is written or renamed. Returns false when it refused (nothing moved, nothing renamed).
@@ -160,7 +117,6 @@ export interface StoreTable<T> {
 export async function openTable<T>(workspacePath: string, store: StoreName, scope: string, file: string, readFile: () => Promise<T | null>, table: StoreTable<T>, opts: { whenEmpty?: boolean; db?: Db; refuse?: () => boolean } = {}): Promise<boolean> {
   const path = resolve(workspacePath)
   const conn = (): Db => opts.db ?? workspaceDb(path)
-  if (opts.db ? !!opts.db.pending : upgradeWaiting(path)) return true
   if (opts.refuse?.()) return false
   const toMove = (db: Writer): boolean => storeValue(db, store, scope, 'imported') === null || (!!opts.whenEmpty && table.count(db, scope) === 0 && existsSync(file))
   const first = toMove(conn().writer)

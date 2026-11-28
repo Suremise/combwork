@@ -1110,6 +1110,8 @@ export const QUERIES: Record<string, SchemaQuery> = {
   'actions.ofCard': { sql: 'SELECT * FROM card_actions WHERE card = ?', args: [1], index: 'card_actions_card' },
   'rulesets.byId': { sql: 'SELECT data FROM rulesets WHERE id = ?', args: ['r1'], index: 'PRIMARY KEY' },
   'folderCommits.of': { sql: 'SELECT sha, card, how FROM folder_commits WHERE folder = ? ORDER BY id', args: ['D:\\ws\\p'], index: 'folder_commits_seen' },
+  // HI-3475: one commit's attribution, for the Files tab's History (factStore.folderCommitCard).
+  'folderCommits.card': { sql: 'SELECT card FROM folder_commits WHERE folder = ? AND sha = ?', args: ['D:\\ws\\p', 'ffff'], index: 'sqlite_autoindex_folder_commits_1' },
   'paths.ofCard': { sql: 'SELECT path FROM card_paths WHERE card = ? AND kind = ? ORDER BY ord', args: [1, 'declared'], index: 'PRIMARY KEY' },
   'paths.cardsOf': { sql: 'SELECT card FROM card_paths WHERE path = ?', args: ['src/a.txt'], index: 'card_paths_path' },
   // factStore.ts: a lane as the runtime reads it (lanes.ts's row and what the runtime keeps beside it), a card's lanes.

@@ -2,6 +2,7 @@ import { PROJECT_KEYBINDING_CATEGORIES, SESSION_LAYOUTS, projectSessionView, res
 import { PROVIDERS, adminSnippetProvider, providerDescriptor } from '@shared/providers'
 import { batchCounts, type BatchCounts } from '@shared/startAll'
 import { appTakesTerminalKey } from '@shared/terminalInput'
+import { advancedDef, advancedRow, PREVIEW_ENABLED } from '@shared/advanced'
 import type { ProjectInfo, ProviderId, SessionLayout, ToastTarget } from '@shared/types'
 import { tilePageCount } from '@shared/tiles'
 import { APP_NAME } from '@shared/appName'
@@ -125,13 +126,17 @@ const tab = (t: ProjectTab) => () => {
 // The strip's tabs (#974: Settings isn't one); from Project Settings, the next is the first and the previous the last.
 const TAB_ORDER: ProjectTab[] = STRIP_TABS.map((t) => t.id)
 
+/** HI-3615: whether the Preview is on (Settings → Advanced): its tab and command only then. */
+const previewOn = (): boolean => advancedRow(advancedDef(PREVIEW_ENABLED)!, get().advanced).value === true
+
 function cycleTab(delta: number): void {
   const p = get().selectedProject
   if (!p) return
-  const at = TAB_ORDER.indexOf(get().projectTabs[p] ?? 'session')
-  const i = at >= 0 ? at : delta > 0 ? -1 : TAB_ORDER.length
+  const order = previewOn() ? TAB_ORDER : TAB_ORDER.filter((t) => t !== 'preview')
+  const at = order.indexOf(get().projectTabs[p] ?? 'session')
+  const i = at >= 0 ? at : delta > 0 ? -1 : order.length
   showView('projects')
-  setProjectTab(p, TAB_ORDER[(i + delta + TAB_ORDER.length) % TAB_ORDER.length])
+  setProjectTab(p, order[(i + delta + order.length) % order.length])
 }
 
 /** Focus agent N (1-based) of the selected project and show it. */
@@ -251,6 +256,38 @@ const COMMAND_DEFS: CommandDef[] = [
   { id: 'project.tab.tasks', name: msg({ id: 'shell.command.project.tab.tasks', defaultMessage: 'Go to Tasks', description: 'A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Project category.' }), category: 'project', keybinding: 'Alt+4', when: hasProject, run: tab('tasks') },
   { id: 'project.tab.sessions', name: msg({ id: 'shell.command.project.tab.sessions', defaultMessage: 'Go to Sessions', description: 'A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Project category.' }), category: 'project', keybinding: 'Alt+5', when: hasProject, run: tab('sessions') },
   { id: 'project.tab.files', name: msg({ id: 'shell.command.project.tab.files', defaultMessage: 'Go to Files', description: 'A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Project category.' }), category: 'project', keybinding: 'Alt+6', when: hasProject, run: tab('files') },
+  {
+    id: 'files.toggleHistory',
+    name: msg({ id: 'shell.command.files.toggleHistory', defaultMessage: 'Toggle File History', description: "HI-3475: a command (the command palette, Settings → Keyboard Shortcuts), in the Project category: shows the Files tab and shows or hides its History panel (the commits that changed the file or folder selected)." }),
+    category: 'project',
+    when: hasProject,
+    run: () => {
+      const show = !get().filesHistory
+      if (show) tab('files')()
+      set({ filesHistory: show })
+    }
+  },
+  {
+    id: 'files.toggleBlame',
+    name: msg({ id: 'shell.command.files.toggleBlame', defaultMessage: 'Toggle Blame by Card', description: "HI-3476: a command (the command palette, Settings → Keyboard Shortcuts), in the Project category: shows the Files tab and shows or hides, beside the file's editor, which card and agent last changed each line." }),
+    category: 'project',
+    when: hasProject,
+    run: () => {
+      const show = !get().filesBlame
+      if (show) tab('files')()
+      set({ filesBlame: show })
+    }
+  },
+  {
+    id: 'files.compareWith',
+    name: msg({ id: 'shell.command.files.compareWith', defaultMessage: 'Compare File With…', description: "HI-3478: a command (the command palette, Settings → Keyboard Shortcuts), in the Project category: shows the Files tab and opens Compare with… for the file it shows (its version on the target branch, another branch, tag or commit, or the project folder's copy)." }),
+    category: 'project',
+    when: hasProject,
+    run: () => {
+      tab('files')()
+      set({ filesCompareAsk: get().filesCompareAsk + 1 })
+    }
+  },
   { id: 'project.tab.images', name: msg({ id: 'shell.command.project.tab.images', defaultMessage: 'Go to Attachments', description: 'A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Project category.' }), category: 'project', keybinding: 'Alt+7', when: hasProject, run: tab('images') },
   { id: 'project.tab.changes', name: msg({ id: 'shell.command.project.tab.changes', defaultMessage: 'Go to Version Control', description: 'A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Project category: shows the Version Control tab (glossary 2.1).' }), category: 'project', keybinding: 'Alt+8', when: hasProject, run: tab('changes') },
   { id: 'project.tab.activity', name: msg({ id: 'shell.command.project.tab.activity', defaultMessage: 'Go to Activity', description: "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Project category: shows the Activity tab, the project's live work as a tree." }), category: 'project', keybinding: 'Alt+9', when: hasProject, run: tab('activity') },
@@ -259,6 +296,7 @@ const COMMAND_DEFS: CommandDef[] = [
   { id: 'project.tab.skills', name: msg({ id: 'shell.command.project.tab.skills', defaultMessage: 'Go to Skills', description: 'A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Project category.' }), category: 'project', when: hasProject, run: tab('skills') },
   { id: 'project.tab.templates', name: msg({ id: 'shell.command.project.tab.templates', defaultMessage: 'Go to Templates', description: 'A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Project category.' }), category: 'project', when: hasProject, run: tab('templates') },
   { id: 'project.tab.mcp', name: msg({ id: 'shell.command.project.tab.mcp', defaultMessage: 'Go to MCP', description: 'A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Project category.' }), category: 'project', when: hasProject, run: tab('mcp') },
+  { id: 'project.tab.preview', name: msg({ id: 'shell.command.project.tab.preview', defaultMessage: 'Go to Preview', description: "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Project category: shows the Preview tab (only while the Preview is turned on in Settings → Advanced)." }), category: 'project', when: () => hasProject() && previewOn(), hidden: () => !previewOn(), run: tab('preview') },
   { id: 'project.tab.settings', name: msg({ id: 'shell.command.project.tab.settings', defaultMessage: 'Go to Project Settings', description: 'A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Project category.' }), category: 'project', keybinding: 'Alt+0', when: hasProject, run: tab('settings') },
   { id: 'project.storage', name: msg({ id: 'shell.command.project.storage', defaultMessage: 'Project Storage and Clean Up…', description: 'A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Project category. The … says it opens a dialog first: keep it.' }), category: 'project', when: hasProject, run: () => openProjectSettings(get().selectedProject!, 'storage') },
   { id: 'project.tab.next', name: msg({ id: 'shell.command.project.tab.next', defaultMessage: 'Next Project Tab', description: 'A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Project category.' }), category: 'project', keybinding: 'Mod+Tab', when: hasProject, run: () => cycleTab(1) }, // i18n-ignore: a shortcut's keys

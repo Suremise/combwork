@@ -106,6 +106,9 @@ export const API = {
     saidNoCode: agentMsg({ id: 'api.card.saidNoCode', text: 'Confirmed as no code', note: 'A line of a card change\'s reply and history (stored, said in the Default).' }),
     saidReviewed: agentMsg({ id: 'api.card.saidReviewed', text: 'Reviewed' }),
     saidSkipsReview: agentMsg({ id: 'api.card.saidSkipsReview', text: 'Skips review' }),
+    saidSource: agentMsg({ id: 'api.card.saidSource', text: '{set, select, yes {Linked to {kind, select, pr {pull request} other {issue}} #{number}} other {GitHub source cleared}}', note: 'HI-3584: a line of the Assistant\'s card change\'s reply: it set the card\'s GitHub source (set yes, kind pr or issue, its number) or cleared it.' }),
+    linkedSource: agentMsg({ id: 'api.card.linkedSource', text: '{set, select, yes {linked it to {kind, select, pr {pull request} other {issue}} #{number}} other {cleared its GitHub source}}', note: 'HI-3584: what the Assistant\'s card change did, one of a list joined with commas (stored).' }),
+    sourceArg: agentMsg({ id: 'api.card.sourceArg', text: 'source is a GitHub pull request or issue of the project: #12 or its address; null clears it.', note: 'HI-3584: cw_create_task or cw_update_task was given a source that is not text or null.' }),
     saidTarget: agentMsg({ id: 'api.card.saidTarget', text: "{own, select, yes {Merges into {target}} other {Merges into the project's branch}}", note: 'HI-2556: a card update set its Merges into: own yes, {target} (a branch); else the project\'s Work merges into.' }),
     targetReleased: agentMsg({ id: 'api.card.targetReleased', text: "{target} is released ({tag}, merged into {into}): {card}'s start there is refused unless the user OKs work on {target} (a hotfix), given as override.released {target}.{has, select, yes { Did you mean {suggest}?} other {}}", note: 'HI-3148: below a card update or new card whose Merges into ({target}) is already released: tagged ({tag}) and merged into the default branch ({into}). {suggest}: a branch that exists and isn’t released.' }),
     ownTarget: agentMsg({ id: 'api.card.ownTarget', text: "{card} now has a target of its own, {target}: it stays on {target} when the project's target (project.workflow.target, now {default}) changes, even to {target}. To have it follow the project's instead, change project.workflow.target first, then set the card's target to \"\" (its project's).", note: 'HI-3017: below a card update (HI-3043: or a new card) that gave the card a target other than its project\'s ({default}). Setting cards before the project pinned them, unnoticed (HI-3004\'s trials of assistant-retarget-release).' }),
@@ -206,6 +209,19 @@ export const API = {
     severalAccounts: agentMsg({ id: 'api.connection.severalAccounts', text: 'Several accounts are named "{name}": use its id ({ids}).' }),
     severalNamed: agentMsg({ id: 'api.connection.severalNamed', text: 'Several connections are named "{name}": use its id ({ids}).' })
   },
+  // cw_preview (HI-3616): an agent's own place's preview.
+  preview: {
+    agentsOnly: agentMsg({ id: 'api.preview.agentsOnly', text: "cw_preview is a project agent's own tool: it reaches the preview of the place its session works in." }),
+    off: agentMsg({ id: 'api.preview.off', text: "The Preview is off: the user can turn it on in Settings → Advanced (Preview: run projects' dev servers)." }),
+    notOwnPlace: agentMsg({ id: 'api.preview.notOwnPlace', text: 'cw_preview reaches only your own place (the slot you build in, or the review copy you review in): it takes no project, place, folder or agent.' }),
+    notRunning: agentMsg({ id: 'api.preview.notRunning', text: "Your place's preview isn't running: start it first (action start)." }),
+    placeChanged: agentMsg({ id: 'api.preview.placeChanged', text: 'Your place changed meanwhile (its lease ended or passed on): nothing was done. Call again to reach your place as it is now.' }),
+    notOwned: agentMsg({ id: 'api.preview.notOwned', text: "Another program listens on its port now, so Combwork stopped the preview and loaded nothing: start it again (action start)." }),
+    badPath: agentMsg({ id: 'api.preview.badPath', text: "path is a page of the preview's own server, starting with / (no //, no spaces or backslashes)." }),
+    tooLarge: agentMsg({ id: 'api.preview.tooLarge', text: 'The screenshot is too large to save, even as a JPEG at half size: take the viewport (no full), or a smaller page. Nothing was saved.' }),
+    timedOut: agentMsg({ id: 'api.preview.timedOut', text: "The capture took longer than Settings → Advanced → Preview: longest an agent's capture takes allows. Nothing was saved: try again." }),
+    badAction: agentMsg({ id: 'api.preview.badAction', text: 'action is one of {actions}.' })
+  },
   console: {
     anAgent: agentMsg({ id: 'api.console.anAgent', text: 'an agent', note: 'A developer console source\'s label when it has none.' }),
     detailMax: agentMsg({ id: 'api.console.detailMax', text: 'At most {max} events in full at a time' }),
@@ -226,6 +242,7 @@ export const API = {
     hidden: agentMsg({ id: 'api.doc.hidden', text: '{path} is in Combwork\'s or git\'s own folder: read shared notes as shared:<path>' }),
     noHeadings: agentMsg({ id: 'api.doc.noHeadings', text: '{doc} has no headings.' }),
     noSection: agentMsg({ id: 'api.doc.noSection', text: 'No section "{asked}" in {doc}. Closest: {list}.' }),
+    notBundled: agentMsg({ id: 'api.doc.notBundled', text: 'Combwork ships no {path}: its own guide is combwork:USER_GUIDE.md', note: 'HI-3622: a combwork: path that names no document Combwork ships (only its user guide).' }),
     notFound: agentMsg({ id: 'api.doc.notFound', text: 'Not found: {path}' }),
     notMarkdown: agentMsg({ id: 'api.doc.notMarkdown', text: '{path} isn\'t a Markdown file (.md)' }),
     outside: agentMsg({ id: 'api.doc.outside', text: '{path} isn\'t inside {where, select, shared {the shared notes} other {the project}}: give a path relative to it' }),

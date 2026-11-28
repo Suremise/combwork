@@ -228,21 +228,6 @@ describe("the 1.0 step: 0.9's store_rows moved into the tables", () => {
 })
 
 describe('reads and saves', () => {
-  it('while the tables are not there (a 0.9 file waiting for its upgrade), a store reads its store_rows', async () => {
-    const ws = workspace()
-    const db = board.workspaceDb(ws).writer
-    // As a 0.9 file has them: store_rows' rows, and none of the tables.
-    db.exec('PRAGMA foreign_keys = OFF')
-    for (const t of ['lane_frozen', 'lane_cards', 'lanes']) db.exec(`DROP TABLE ${t}`)
-    // A 1.0 file has no store_rows (#1211's step drops it): made again as 0.9's step 2 makes it.
-    db.exec('CREATE TABLE IF NOT EXISTS store_rows (store TEXT NOT NULL, scope TEXT NOT NULL, key TEXT NOT NULL, ord INTEGER NOT NULL, doc TEXT NOT NULL, PRIMARY KEY (store, scope, key)) STRICT, WITHOUT ROWID')
-    db.prepare("INSERT INTO store_rows (store, scope, key, ord, doc) VALUES ('lanes', '', 'lane-1', 0, ?)").run(JSON.stringify(LANE))
-    db.prepare("INSERT INTO store_meta (store, scope, key, value) VALUES ('lanes', '', 'imported', '{}')").run()
-    const got = tables.readTable(ws, 'lanes')
-    expect([got.docs, got.meta.get('imported')]).toEqual([[LANE], '{}'])
-    board.closeBoard(ws)
-  })
-
   it('write only the entries that changed, keep the order given, and remove those left out', async () => {
     const ws = workspace()
     const lane = (id: string, rounds = 10) => ({ ...LANE, id, rounds })

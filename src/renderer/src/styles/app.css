@@ -3869,6 +3869,83 @@ p.hint {
   font-size: 12px;
   margin-top: 6px;
 }
+/* The Preview tab (HI-3615): its header and bar, then the area main puts the guarded page's native view at. */
+.preview-tab {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+.preview-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+.preview-place {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.preview-stamp {
+  font-size: 12px;
+  color: var(--fg-muted);
+}
+.preview-stale {
+  font-size: 12px;
+  color: var(--warning);
+}
+.preview-tried {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+}
+.preview-status {
+  padding: 16px;
+  color: var(--fg-muted);
+}
+.preview-area {
+  flex: 1;
+  min-height: 0;
+}
+.preview-setup {
+  padding: 24px;
+  max-width: 640px;
+}
+/* Project Settings → Preview (HI-3614): its fields labelled on the left, the hints and switch under them. */
+.preview-settings {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: 720px;
+  margin-top: 10px;
+}
+.preview-settings .field {
+  display: grid;
+  grid-template-columns: 90px 1fr;
+  align-items: center;
+  gap: 10px;
+}
+.preview-settings .field .input {
+  width: 100%;
+}
+.preview-settings .field-hint,
+.preview-settings .field-error {
+  margin-top: 0;
+  margin-left: 100px;
+}
+.preview-settings .preview-hmr-label {
+  white-space: nowrap;
+}
+.preview-settings .preview-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: 100px;
+}
 .number-field {
   width: 100%;
 }
@@ -17081,4 +17158,241 @@ button.progress-lane-retry {
 }
 .file-restore-commits > .git-row.current {
   background: var(--accent-soft);
+}
+
+/* HI-3475: the Files tab's History panel, right of the file or folder shown, and a commit's diff opened from it over
+   the editor (which stays beneath, hidden, its edits kept). */
+.editor-host[hidden] {
+  display: none !important;
+}
+.files-main {
+  flex-direction: row;
+  min-height: 0;
+}
+.files-main-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.file-history {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-left: 1px solid var(--border);
+}
+.file-history-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--border);
+}
+.file-history-head .path {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.file-history-head .spacer {
+  flex: 1;
+}
+.file-history-list {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 4px 0;
+}
+.history-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 2px 6px;
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--border);
+}
+.history-row.selected {
+  background: var(--accent-soft);
+}
+.history-main {
+  min-width: 0;
+  cursor: pointer;
+}
+.history-subject {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.history-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 6px;
+}
+.history-card {
+  padding: 0 4px;
+  font-weight: 600;
+}
+.history-side {
+  display: flex;
+  align-items: flex-start;
+  gap: 2px;
+}
+.history-intro,
+.history-files {
+  grid-column: 1 / -1;
+}
+.history-files .row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  padding: 2px 4px 2px 18px;
+}
+.history-files .row .label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.history-files .row.selected {
+  background: var(--accent-soft);
+}
+.history-more {
+  margin: 6px 8px;
+}
+.history-diff {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.history-diff-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  min-width: 0;
+}
+.history-diff-head strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.history-diff > .faint.small {
+  padding: 0 8px;
+}
+
+/* HI-3476: Blame by card: a column beside the editor, one entry per run of lines a commit last changed, aligned to the
+   editor's lines as it scrolls; the older the commit, the fainter. */
+.blame-wrap {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+}
+.blame-wrap.on {
+  display: grid;
+  grid-template-columns: min(240px, 40%) minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
+}
+.blame-wrap > .blame-bar {
+  grid-column: 1 / -1;
+  grid-row: 1;
+  margin: 0;
+}
+.blame-wrap.on > .blame-column,
+.blame-wrap.on > .blame-editor {
+  grid-row: 2;
+}
+.blame-editor {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+}
+.blame-editor > .monaco {
+  position: absolute;
+  inset: 0;
+}
+.blame-column {
+  position: relative;
+  overflow: hidden;
+  border-right: 1px solid var(--border);
+  font-size: 12px;
+}
+.blame-loading {
+  position: absolute;
+  top: 2px;
+  right: 6px;
+}
+.blame-block {
+  position: absolute;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 0 6px;
+  overflow: hidden;
+  border-top: 1px solid var(--border);
+  opacity: calc(1 - var(--blame-age, 0) * 0.55);
+}
+.blame-block.uncommitted {
+  opacity: 0.8;
+}
+.blame-card {
+  padding: 0 3px;
+  min-height: 0;
+  height: 16px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 14px;
+}
+.blame-who {
+  all: unset;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+  line-height: 18px;
+}
+.blame-who:hover {
+  text-decoration: underline;
+}
+
+/* HI-3478: Compare with…'s picker: what to compare the file with. */
+.compare-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 360px;
+}
+.compare-choices {
+  max-height: 50vh;
+  overflow: auto;
+}
+.compare-choice {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 6px;
+  cursor: pointer;
+}
+.compare-choice:hover,
+.compare-choice:focus {
+  background: var(--accent-soft);
+}
+.compare-choice .label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.compare-heading {
+  padding: 6px 6px 2px;
 }

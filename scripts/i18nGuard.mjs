@@ -66,6 +66,7 @@ export const EXCLUDED = [
   [/^src\/main\/exitLog\.ts$/, "log lines and Copy Diagnostics' report, in English (#985)"],
   [/^src\/main\/mainStalls\.ts$/, 'log lines of combwork.log, in English (#1109)'],
   [/^src\/main\/db\.ts$/, 'SQL statements and settings, no text (#1017)'],
+  [/^src\/main\/previewProxy(Core)?\.ts$/, "the Preview's filtering proxy (HI-3615): HTTP's own status lines and its refusals' bodies, which only a page's script or DevTools sees, no window text"],
   [/^src\/main\/providers\/codex\/(threads\/logWorker|retryLog)\.ts$/, "reading Codex's log for a retry wait (HI-1972): SQL, reasons for no answer and combwork.log lines, no window text"],
   [/^src\/main\/schema\//, "combwork.db's 1.0 tables and the card JSON contract: SQL, no text (#1208)"],
   [/^src\/main\/trash\.ts$/, 'test-only'],

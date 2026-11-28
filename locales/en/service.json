@@ -235,6 +235,50 @@
     "defaultMessage": "git rm --cached failed: {why}",
     "description": "An error untracking the project's .combwork folder from git: the git command (git rm --cached: keep it) failed; {why} is git's own first line, or why git can't run."
   },
+  "service.fileBlame.invalid": {
+    "defaultMessage": "That was asked for wrongly: nothing was read.",
+    "description": "HI-3476: an error from the Files tab's Blame: the request was malformed (not reached from the window)."
+  },
+  "service.fileBlame.unsupported": {
+    "defaultMessage": "This folder's version control can't say who changed each line.",
+    "description": "HI-3476: an error from the Files tab's Blame: the folder's version control has no blame."
+  },
+  "service.fileCompare.invalid": {
+    "defaultMessage": "That was asked for wrongly: nothing was read.",
+    "description": "HI-3478: an error from the Files tab's Compare with…: the request was malformed (not reached from the window), or the name typed can't be a branch, tag or commit (it starts with a dash, or holds spaces or range characters)."
+  },
+  "service.fileCompare.noRef": {
+    "defaultMessage": "{ref} isn't a branch, tag or commit here.",
+    "description": "HI-3478: an error from the Files tab's Compare with…: what the user typed or chose ({ref}) doesn't name a commit in the repository."
+  },
+  "service.fileCompare.unsupported": {
+    "defaultMessage": "This folder's version control can't compare a file with another version.",
+    "description": "HI-3478: an error from the Files tab's Compare with…: the folder's version control has no such read."
+  },
+  "service.fileHistory.cancelled": {
+    "defaultMessage": "Stopped: the file or its text changed meanwhile.",
+    "description": "HI-3476: why a blame of a file in the Files tab stopped: the file shown, or its text in the editor, changed, so its answer was no longer wanted (the window drops it; rarely seen)."
+  },
+  "service.fileHistory.failed": {
+    "defaultMessage": "Git couldn't read the history: {why}",
+    "description": "HI-3475: an error in the Files tab's History panel: git's own command failed; {why} is git's error line, in English."
+  },
+  "service.fileHistory.invalid": {
+    "defaultMessage": "That was asked for wrongly: nothing was read.",
+    "description": "HI-3475: an error from the Files tab's History panel: the request was malformed (not reached from the window)."
+  },
+  "service.fileHistory.noCommit": {
+    "defaultMessage": "Git has no commit {commit}: it may be gone. Refresh the history.",
+    "description": "HI-3475: an error in the Files tab's History panel: a commit the panel showed ({commit}, a short id) isn't in the repository any more."
+  },
+  "service.fileHistory.timedOut": {
+    "defaultMessage": "Git was still reading the history after {seconds, number} seconds, so Combwork stopped it. Try again, or raise Settings → Advanced → Git: longest a history read takes.",
+    "description": "HI-3475: an error in the Files tab's History panel: reading a page of history, a commit's diff or its merge ran past the advanced setting's time ({seconds}) and git was ended. Keep the setting's name as Settings → Advanced shows it."
+  },
+  "service.fileHistory.unsupported": {
+    "defaultMessage": "This folder's version control has no history to show.",
+    "description": "HI-3475: an error from the Files tab's History panel: the folder's version control can't read a file's history."
+  },
   "service.files.badName": {
     "defaultMessage": "\"{name}\" is not a valid name",
     "description": "An error making or renaming a file or folder: {name} is empty, . or .., or has a character Windows can't have in a name."
@@ -1903,14 +1947,6 @@
     "defaultMessage": "Uncommitted changes where {target} is checked out",
     "description": "HI-2944: a warning's title when a card or lane starts: the folder the branch {target} is checked out in (where the merge queue merges into it) has uncommitted changes."
   },
-  "service.templates.v09": {
-    "defaultMessage": "1.0 templates don’t pin agents to worktrees, so the Combwork templates take their place. A copy of {n, plural, one {the template} other {the # templates}} is kept with the 0.9 board backup.",
-    "description": "A quiet notice once after the upgrade to 1.0: the {n} agent templates saved in 0.9 aren't used; a copy of each was put in the folder of the board's 0.9 backup. \"The Combwork templates\" are Combwork's own templates (the Templates view's Combwork group)."
-  },
-  "service.templates.v09Title": {
-    "defaultMessage": "Your 0.9 agent templates aren’t used in 1.0",
-    "description": "A quiet notice's title, once after the upgrade to 1.0: the agent templates saved in 0.9 aren't listed or loaded any more (a copy is kept)."
-  },
   "service.transcripts.busy": {
     "defaultMessage": "This session is being archived or deleted. Try again in a moment.",
     "description": "An error opening a session's conversation in the Sessions tab while it is being archived or deleted."
@@ -2026,6 +2062,14 @@
   "service.workspace.folderExists": {
     "defaultMessage": "A folder named \"{name}\" already exists",
     "description": "An error making a project: the workspace already has a folder called {name}."
+  },
+  "service.workspace.formatUnknown": {
+    "defaultMessage": "Combwork couldn't read this workspace's board to check its version: {error}. Try opening it again.",
+    "description": "An error opening a workspace: Combwork reads the version of the workspace's task board before opening it, and couldn't ({error}: the reason, in English). Nothing in the folder was changed."
+  },
+  "service.workspace.from09": {
+    "defaultMessage": "This workspace is from Combwork 0.9, which this version can't open.",
+    "description": "An error opening a workspace whose task board was saved by Combwork 0.9: this version doesn't upgrade such a workspace any more. Nothing in the folder was changed."
   },
   "service.workspace.holdsOpen": {
     "defaultMessage": "The workspace {workspace}, open in another window, is inside {folder}. Close it first to open {name} as a workspace.",

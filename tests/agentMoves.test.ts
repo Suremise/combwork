@@ -8,7 +8,6 @@ import { join } from 'path'
 import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
-import { as09, writeCard } from './boardDb'
 import { commit, gitRepo, sh } from './workflow/harness'
 import { timing } from './timing.cjs'
 
@@ -23,7 +22,6 @@ const { FactStore } = await import('../src/main/workflow/factStore')
 const { advanced } = await import('../src/main/advanced')
 const service = await import('../src/main/workflow/service')
 const { ENFORCE } = service
-const { adoptNow } = await import('../src/main/workflow/adoption')
 const { runCardIntent } = await import('../src/main/cardIntents')
 const { allOff } = await import('../src/shared/workflow/options')
 const { foldCard } = await import('../src/shared/workflow/facts')
@@ -500,46 +498,5 @@ describe('a failed review by either route: back to Doing, its builder holding it
       const now = await inWorkspace(w, () => tasks.getTask(card))
       expect([now.column, now.review?.agent, now.history.length, now.comments.length, now.held?.length, facts(w, card).length]).toEqual([was.column, 'a2', was.history.length, was.comments.length, was.held?.length, had])
     }
-  })
-})
-
-describe("S40: an upgraded lane's old moves (#1268)", () => {
-  const at = new Date(Date.UTC(2026, 9, 1)).toISOString()
-  const card09 = (number: number, column: string, agent: string | null): Record<string, unknown> => ({ number, title: `Card ${number}`, description: '', project: 'p', agent, ...(agent ? { agentName: agent === 'b1' ? 'B1' : 'R1' } : {}), column, order: number, labels: [], blocked: null, blockedBy: [], links: [], comments: [], history: [], archived: false, createdAt: at, createdBy: 'You', updatedAt: at })
-
-  it('cards in flight at the upgrade, adopted, go on by the old moves: Doing submitted, Review passed, Passed reported merged', async () => {
-    const ws = join(base, `ws-${++n}`)
-    // A lane in the project folder, as the spike's S40 (the upgrade's options: review by an agent, not checked).
-    const p = gitRepo(join(ws, 'p'))
-    writeFileSync(join(p, '.gitignore'), '.combwork/\n')
-    commit(p, { 'src/b.txt': 'b1\n' }, 'B1 builds')
-    mkdirSync(join(p, '.combwork'), { recursive: true })
-    writeFileSync(join(p, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'b1', name: 'B1' }, { id: 'r1', name: 'R1 (reviewer)' }] }))
-    const w0 = await open(ws)
-    for (const c of [card09(1, 'doing', 'b1'), card09(2, 'review', 'b1'), card09(3, 'passed', 'b1')]) await writeCard(w0, c.number as number, c)
-    // As 0.9 left it, then upgraded and adopted.
-    opened.splice(opened.indexOf(w0), 1)
-    await disposeWorkspaceService(w0)
-    store.closeBoard(ws)
-    as09(store.boardFile(ws))
-    const w = await open(ws)
-    await inWorkspace(w, () => store.upgradeBoard(w))
-    const adopted = await inWorkspace(w, () => adoptNow(w))
-    expect(adopted).toMatchObject({ adopted: 3, failed: 0 })
-    const b1 = { kind: 'agent', name: 'B1 (p)', self: { project: 'p', agentId: 'b1' }, scope: 'p' } as const
-    const r1 = { kind: 'agent', name: 'R1 (p)', self: { project: 'p', agentId: 'r1' }, scope: 'p' } as const
-    // The reviewer passes the adopted submission by its old verdict.
-    const pass = await update(w, 2, r1, { review: 'passed', column: 'passed' }, 'PASSED')
-    expect(pass.card.column).toBe('passed')
-    expect(stage(w, 2)).toBe('approved')
-    // The builder reports the Passed card merged by its old move to Done (the upgrade's options: not checked).
-    const done = await update(w, 3, b1, { column: 'done' }, 'Merged')
-    expect(done.card.column).toBe('done')
-    expect(stage(w, 3)).toBe('done')
-    // And submits the card in Doing by its old move to Review, once it has a change of its own.
-    commit(p, { 'src/c.txt': 'c\n' }, 'card 1', { trailer: (await service.workflowFor(w, p))!.store.card(1).key })
-    const sub = await update(w, 1, b1, { column: 'review' }, 'Ready')
-    expect(sub.card.column).toBe('review')
-    expect(kinds(w, 1)).toContain('Submitted')
   })
 })

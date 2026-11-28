@@ -4,11 +4,11 @@ import { maskText } from '../shared/redact'
 import { randomUUID, randomBytes } from 'crypto'
 import { StepTimes } from './stepTimes'
 import { fmt, msg, onLanguageChange, tr } from '../shared/i18n'
-import { COPIES_REVIEW, PROMPT_AS_TYPED, PROMPT_CLEAR_DRAFT, RESUME_IDLE_ASK, RESUME_IDLE_MINUTES, SIGN_FAIL_FAST, SIGN_TIMEOUT, drawnWaitId, englishText, overrideId, shownText, withValues, type Text, type TextPart } from '../shared/advanced'
+import { COPIES_REVIEW, PREVIEW_ENABLED, PROMPT_AS_TYPED, PROMPT_CLEAR_DRAFT, RESUME_IDLE_ASK, RESUME_IDLE_MINUTES, SIGN_FAIL_FAST, SIGN_TIMEOUT, drawnWaitId, englishText, overrideId, shownText, withValues, type Text, type TextPart } from '../shared/advanced'
 import { launchPolicy, MCP_ISOLATION, terminalPreset, type LaunchPolicy } from '../shared/launchPolicy'
 import { capturedText, errorText, combworkError, CombworkError, shownError } from './combworkError'
-import { assertUpgraded } from './boardStore'
 import { advanced } from './advanced'
+import { previewConfigOf } from '../shared/preview'
 import { withSessionSigner, type SessionSigner } from './signer/signerRules'
 import { folderChanging, folderSteady, inFolder } from './folderFence'
 import { basename, dirname, isAbsolute, join, resolve } from 'path'
@@ -1957,13 +1957,19 @@ class SessionManager {
       const hidden = this.workflowToolsHidden(projectPath, side, pc)
       mcpServers[TOOLS_SERVER] = { ...mcpServers[TOOLS_SERVER], env: { ...mcpServers[TOOLS_SERVER].env, CW_SIDE: side, ...(hidden.length ? { CW_WORKFLOW_HIDDEN: hidden.join(',') } : {}) } }
     }
-
     // Its connection (HI-2106; the Assistant's too): what it launches with, and the account it launches on, its own or
     // (decision H) its CLI's first usable here. A change of account asks for a restart; `connection` is null for an
     // account on the CLI's own home (Copilot's sign-in, a test home).
     // An Assistant that names no CLI yet (a new workspace's, HI-2108): the first usable account's, as a new agent's
     // (decision A); Settings' old choice only where none is usable.
     const cli = launchCli(forAgent, workspace.config, assistant)
+    // HI-3616: cw_preview, only with the Preview on and the project's preview set up, and whether its CLI sees an image it
+    // opens (its descriptor's attachments: else a screenshot's reply says so). Part of the signature, so turning either on
+    // or off asks running agents for a restart, as a tool list's change does.
+    if (mcpServers[TOOLS_SERVER] && !assistant && advanced.get<boolean>(PREVIEW_ENABLED) === true && previewConfigOf(pc.preview)) {
+      const sees = (providerDescriptor(cli).capabilities.terminal?.attachments ?? []).includes('image')
+      mcpServers[TOOLS_SERVER] = { ...mcpServers[TOOLS_SERVER], env: { ...mcpServers[TOOLS_SERVER].env, CW_PREVIEW: '1', ...(sees ? {} : { CW_PREVIEW_IMAGES: '0' }) } }
+    }
     const choice = resolveAgentConnection(workspace.config, cli, forAgent?.connection, allAccounts(), allConnections())
     const connection = choice.ok ? (choice.account.home ? null : choice.account.id) : `!${choice.why}`
     const l = agentLaunchSettings(cli, choice.ok ? choice.connection : null, s, choice.ok && choice.account.kind === 'server')
@@ -2257,14 +2263,10 @@ class SessionManager {
 
   /**
    * Refuses a start while Combwork quits, while the project's workspace is closing or switching, or while a fence holds the
-   * project (it is being removed, or a template is replacing its agents), while its workspace's move is being repaired,
-   * or while its workspace's upgrade to 1.0 waits.
+   * project (it is being removed, or a template is replacing its agents), or while its workspace's move is being repaired.
    */
   private assertStartsAllowed(projectPath: string): void {
     if (this.shuttingDown || workspaceFor(projectPath)?.closing) throw combworkError(msg({ id: 'session.start.closing', defaultMessage: "Combwork is stopping this workspace's agents, so none can start now.", description: 'Starting an agent is refused: Combwork is quitting, or its workspace is closing.' }), undefined, { kind: 'conflict' })
-    // Its workspace's upgrade to 1.0 waits (#1207): combwork.db takes no writes, so the session couldn't be recorded.
-    const ws = workspaceFor(projectPath)?.path
-    if (ws) assertUpgraded(ws)
     if (workspaceFor(projectPath)?.openGate?.held) throw combworkError(msg({ id: 'session.start.openCommands', defaultMessage: "This workspace's open commands are still running: agents start once they're done or you move on.", description: "Starting an agent is refused while the commands the user set to run as the workspace opens are running (Settings → Workspace → When this workspace opens, run), shown in a dialog with Don't wait." }), undefined, { kind: 'conflict' })
     if (workspaceFor(projectPath)?.repairingMove) throw combworkError(msg({ id: 'session.start.repairing', defaultMessage: 'Combwork is repairing this moved workspace: start the agent when Repair has finished.', description: "Starting an agent is refused while Repair… fixes a moved workspace's paths." }), undefined, { kind: 'conflict' })
     const why = this.fenced.get(resolve(projectPath).toLowerCase())?.at(-1)

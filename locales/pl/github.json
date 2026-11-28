@@ -101,6 +101,7 @@
   "github.shipped.cancel": "Zamknij",
   "github.shipped.close": "{count, plural, one {Zamknij # issue} few {Zamknij # issues} many {Zamknij # issues} other {Zamknij # issues}}",
   "github.shipped.desc": "Karty z issue na GitHubie, które zostały scalone z wydaną gałęzią. Gdy jej wydanie zostanie opublikowane na GitHubie, każde otwarte issue zostanie zamknięte z komentarzem „Fixed in {version}” z twojego konta GitHub.",
+  "github.shipped.doubt": "{reason, select, earlier {Issue #{issue} · {card}: pominięte, bo nie dało się ustalić, czy wcześniejsze wydanie {tag} je zawierało} other {Issue #{issue} · {card}: pominięte, bo nie dało się odczytać, czy jego merge jest w {tag}}}",
   "github.shipped.failed": "Nie udało się zamknąć wydanych issues",
   "github.shipped.line": "Wydana gałąź",
   "github.shipped.loading": "Pytanie GitHuba…",

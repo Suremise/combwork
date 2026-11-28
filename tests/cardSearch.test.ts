@@ -3,14 +3,14 @@
 // case and script, a phrase, quotes, and the forms it doesn't answer (a number, a key, words under three characters, letters
 // SQLite folds apart from what `toLowerCase` makes of their capitals); every write keeps it (a card made, edited, labelled,
 // moved to another project, deleted; a comment isn't searched, so isn't in it); the search uses the index (EXPLAIN QUERY
-// PLAN on the board's own connection); and the upgrade indexes the cards a 0.9 board had. Each test makes its own board.
+// PLAN on the board's own connection). Each test makes its own board.
 import { mkdirSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterAll, describe, expect, it } from 'vitest'
 import * as electron from 'electron'
 import { DatabaseSync } from 'node:sqlite'
 import { tempDir } from './tempDir'
-import { as09, editCard } from './boardDb'
+import { editCard } from './boardDb'
 
 const base = tempDir('cw-card-search-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
@@ -30,7 +30,6 @@ const opened: WS[] = []
 afterAll(async () => {
   for (const w of opened) await disposeWorkspaceService(w)
   store.closeAllBoards()
-  store.boardTestHooks.upgradeAnswer = null
 })
 
 async function open(ws: string): Promise<WS> {
@@ -176,20 +175,5 @@ describe("the board's full-text search", () => {
     const db = store.workspaceDb(w.path!).reader
     const plan = (db.prepare(`EXPLAIN QUERY PLAN ${QUERIES['board.search'].sql}`).all(store.searchMatch('usage')) as { detail: string }[]).map((r) => r.detail)
     expect(plan).toEqual(['SCAN card_search VIRTUAL TABLE INDEX 0:M5'])
-  })
-
-  it("indexes a 0.9 board's cards as it is upgraded", async () => {
-    const ws = workspace()
-    const old = await open(ws)
-    const numbers = await inWorkspace(old, async () => [(await tasks.createTask({ title: 'From before the upgrade', project: 'alpha', labels: ['legacy'] }, user)).number])
-    opened.splice(opened.indexOf(old), 1)
-    await disposeWorkspaceService(old)
-    store.closeBoard(ws)
-    as09(store.boardFile(ws))
-    store.boardTestHooks.upgradeAnswer = 'yes'
-    const w2 = await open(ws)
-    await inWorkspace(w2, () => tasks.allTasks(w2))
-    expect([...inWorkspace(w2, () => store.searchCards(w2, 'before the upgrade'))!]).toEqual(numbers)
-    expect([...inWorkspace(w2, () => store.searchCards(w2, 'legacy'))!]).toEqual(numbers)
   })
 })

@@ -11,15 +11,17 @@ import { LANE_MAX_ROUNDS, LOOP_STEP_WAIT_MAX_MINUTES, LOOP_WAIT_MAX_HOURS } from
 import { CHURN_MAX } from '@shared/loopLimits'
 import { compile, mustCompile } from '@shared/workflow/compile'
 import { STAGE_TEXT, stageNameProblems, stageNameProblemText, type StageNames } from '@shared/workflow/stages'
-import { guardProblems, guardProblemText, type MergeGuard } from '@shared/workflow/mergeGuards'
+import { guardProblems, guardProblemText } from '@shared/workflow/mergeGuards'
 import { MergeGuardsEditor } from './MergeGuardsEditor'
 import type { StageId } from '@shared/workflow/facts'
 import { shownText } from '@shared/advanced'
 import { fmt, msg, tr, type Msg } from '@shared/i18n'
 import { call, errorMessage } from '../api'
-import { agentProviderOf, cardLabelOf, chooseTab, confirm, focusWorkflowOption, notify, openWorkflowOption, set as setStore, setActivity, useStore, workflowFormAt } from '../store'
+import { agentProviderOf, cardLabelOf, chooseTab, confirm, focusWorkflowOption, notify, set as setStore, setActivity, useStore, workflowFormAt } from '../store'
 import { loadReleaseOffers, ReleaseOfferRow, useReleaseOffers } from '../releaseOffers'
 import { cx } from '../util'
+import { RT, retargetSkippedText } from '../retargetText'
+import { optionValueText, VT } from '../workflowValueText'
 import { SlotCopyLevel, SlotsAndCopies } from './SlotsAndCopies'
 import { GithubHosts } from './GithubHosts'
 import { GithubLink } from './GithubLink'
@@ -32,7 +34,7 @@ import { overlayTemplateWorkflow } from '@shared/workflow/templateOptions'
 import { PLATFORM_NAME } from '@shared/platform/switching'
 import { isVersionBranch } from '@shared/nextVersion'
 import { MissingBranches, missingSaveText, newlyNamed, NextVersionButton, startNextVersion } from './NextVersion'
-import { afterSave, saveOff } from './workflowFormState'
+import { afterSave, afterStale, saveOff } from './workflowFormState'
 import { TabPanel, Tabs } from './Tabs'
 import { shownTab } from '@shared/tabs'
 
@@ -69,11 +71,8 @@ const T = {
   from: ORIGIN_TEXT,
   inherit: msg({ id: 'workflow.form.inherit', defaultMessage: 'Inherit', description: 'A button beside a workflow option set for this project: stop setting it here, and use the workspace’s or Combwork’s value.' }),
   inheritTip: msg({ id: 'workflow.form.inheritTip', defaultMessage: 'Use the inherited value: {value}', description: 'The tooltip of the Inherit button of a workflow option. {value} is the value it would have.' }),
-  on: msg({ id: 'workflow.form.on', defaultMessage: 'On', description: 'A workflow option’s value: on.' }),
-  off: msg({ id: 'workflow.form.off', defaultMessage: 'Off', description: 'A workflow option’s value: off.' }),
   focusedPick: msg({ id: 'workflow.form.focusedPick', defaultMessage: 'Command that chooses the tests (optional)', description: 'The placeholder and label of a field under “Each card’s focused tests” (G20) in Project Settings → Workflow: the project’s command that lists the tests a change needs. Left empty, each card’s builder names its tests.' }),
   focusedRun: msg({ id: 'workflow.form.focusedRun', defaultMessage: 'Command that runs them', description: 'The placeholder and label of a field under “Each card’s focused tests” (G20) in Project Settings → Workflow: the project’s command that runs a list of tests.' }),
-  defaultBranch: msg({ id: 'workflow.form.defaultBranch', defaultMessage: 'The repository’s default branch', description: 'The placeholder of the target branch field in Project Settings → Workflow: left empty, the default branch.' }),
   labels: msg({ id: 'workflow.form.labels', defaultMessage: 'Labels, separated by commas', description: 'The placeholder of the labels field of “Your OK before merging”.' }),
   noIdentity: msg({ id: 'workflow.form.noIdentity', defaultMessage: 'No name and email are set in git config yet.', description: 'Under “Commits use the project’s identity” when git has no identity configured.' }),
   identity: msg({ id: 'workflow.form.identity', defaultMessage: 'Commits as {name} <{email}>.', description: 'Under “Commits use the project’s identity”: the identity used, from git config.' }),
@@ -81,9 +80,6 @@ const T = {
   checkCommand: msg({ id: 'workflow.form.checkCommand', defaultMessage: 'Command', description: 'The placeholder of a check’s command field (Project Settings → Workflow → Checks pass before review).' }),
   addCheck: msg({ id: 'workflow.form.addCheck', defaultMessage: 'Add Check', description: 'A button under the checks of “Checks pass before review”.' }),
   removeCheck: msg({ id: 'workflow.form.removeCheck', defaultMessage: 'Remove', description: 'The tooltip of the button removing a check from “Checks pass before review”.' }),
-  labelsValue: msg({ id: 'workflow.form.labelsValue', defaultMessage: 'Cards with these labels: {labels}', description: 'A value of “Your OK before merging” in the list of what changes before saving workflow options. {labels} is a list of card labels.' }),
-  identityValue: msg({ id: 'workflow.form.identityValue', defaultMessage: 'On, as {name} <{email}>', description: 'A value of “Commits use the project’s identity” in the list of what changes before saving workflow options: on, with the name and email commits use.' }),
-  noneValue: msg({ id: 'workflow.form.noneValue', defaultMessage: 'None', description: 'An empty value in the list of what changes before saving workflow options: no checks, no commands, no folders.' }),
   noChecks: msg({ id: 'workflow.form.noChecks', defaultMessage: 'No checks.', description: 'Under “Checks pass before review” when it has none.' }),
   retargetChoice: msg({ id: 'workflow.form.retargetChoice', defaultMessage: 'Also retarget what can move from {from} to {to}: {cards, plural, one {# card} other {# cards}} and {slots, plural, one {# free slot} other {# free slots}}', description: 'HI-2680: a tick box in the dialog before saving workflow options that change Work merges into: after saving, move the Todo cards with no work of their own and the free slots still on the old branch {from} to the new one {to}. Card and slot counts.' }),
   retargetCard: msg({ id: 'workflow.form.retargetCard', defaultMessage: '{card} {title}: to the new branch', description: 'HI-2680: a card the retarget moves to the new Work merges into, in the dialog before saving. {card} is its key (HI-12).' }),
@@ -91,9 +87,11 @@ const T = {
   retargetLane: msg({ id: 'workflow.form.retargetLane', defaultMessage: '{hasCard, select, yes {{lane}, with its card {card} {title}: to the new branch} other {{lane}: its next cards start from the new branch}}', description: 'HI-2753: a running lane (a card loop) that the retarget moves to the new Work merges into, in the dialog before saving: with its card in flight ({card}, its key, and {title}), both in one step, or with none in flight. {lane} names the lane (its name and builder). Keep the select keys.' }),
   retargetSlot: msg({ id: 'workflow.form.retargetSlot', defaultMessage: '{slot}: free, to the new branch', description: 'HI-2680: a free slot the retarget moves to the new Work merges into (its folder detached at the new branch), in the dialog before saving. {slot} is its name (slot-a).' }),
   retargetStays: msg({ id: 'workflow.form.retargetStays', defaultMessage: 'These stay on {from}:', description: 'HI-2680: in the dialog before saving workflow options, above what the retarget leaves on the old branch {from}, each with why.' }),
-  retargetKeep: msg({ id: 'workflow.form.retargetKeep', defaultMessage: '{what}: {why, select, work {it has work on its branch} started {already started} lane {a running lane keeps its branch until it ends} queued {it is in the merge queue} notInTarget {it has commits {to} doesn’t have} reviewed {its reviewed work would bring other commits} noLine {it works in the project folder} line {its branch was made from {from}, so it keeps merging there} lent {lent} dirty {it has changes not committed} busy {in use} unmerged {it holds commits {from} lacks} targetChanged {the target changed meanwhile} refused {not allowed now} changed {it changed meanwhile} moved {it moved meanwhile} gone {its folder is gone} setAside {set aside: look at its folder} other {Combwork can’t tell}}', description: 'HI-2680, HI-2753: a card, slot or lane the retarget leaves where it is, and why (a select: keep the keys). {what} is its name; {from} the old branch, {to} the new one. queued: in the merge queue; notInTarget: a started card with commits the new branch lacks; reviewed: a reviewed card whose change would differ on the new branch; noLine: it has no branch of its own; line (HI-3112): a card put back whose branch, made from the old branch {from}, still holds history the new one lacks, so it keeps merging into {from};' }),
   retargetDone: msg({ id: 'workflow.form.retargetDone', defaultMessage: '{skipped, plural, =0 {Moved to {to}: {cards, plural, one {# card} other {# cards}} and {slots, plural, one {# slot} other {# slots}}} other {Moved to {to}: {cards, plural, one {# card} other {# cards}} and {slots, plural, one {# slot} other {# slots}}; # left where they were}}', description: 'HI-2680: a notification after the retarget: how many cards and slots moved to the new branch {to}, and how many were left (each listed with why in its text).' }),
-  retargetSkipped: msg({ id: 'workflow.form.retargetSkipped', defaultMessage: '{what}: {why, select, targetChanged {the target changed meanwhile} refused {not allowed now} changed {it changed meanwhile} busy {in use} dirty {it has changes not committed} moved {it moved meanwhile} unmerged {it holds commits the old branch lacks} gone {its folder is gone} setAside {set aside until you remove it: look at its folder first} failed {it couldn’t be moved; Combwork looks at it again} other {Combwork can’t tell}}', description: 'HI-2680: a line of the notification after the retarget: a card or slot left where it was ({what}: its key or name), and why (a select: keep the keys).' }),
+  removalUses: msg({ id: 'workflow.form.removalUses', defaultMessage: '{branch} is still used by: {uses}', description: 'HI-3592: in the dialog before saving workflow options that take {branch} out of Other branches work can merge into: what still uses it ({uses}: card keys, lane and slot names, a list). The save is refused while any of them is left on it.' }),
+  removalAfterTarget: msg({ id: 'workflow.form.removalAfterTarget', defaultMessage: 'This save also changes Work merges into, so nothing can move from {branch} yet. Save the change to Work merges into first, with {branch} kept in Other branches work can merge into; then take it out, and Save… offers to move what uses it to the new branch.', description: 'HI-3592: in the dialog before saving workflow options that change Work merges into and also take {branch} out of Other branches work can merge into while something uses it: what is moved goes to the saved Work merges into, so this takes two saves. Work merges into and Other branches work can merge into are the options’ names: as translated there.' }),
+  removalPersist: msg({ id: 'workflow.form.removalPersist', defaultMessage: 'What moves stays moved, even if {branch} still can’t be taken out afterwards.', description: 'HI-3592: under the list of what can move from {branch} before it is taken out of Other branches work can merge into: the moves are made first, and kept even if the save is then refused (something else still uses it).' }),
+  movedUnsaved: msg({ id: 'workflow.form.movedUnsaved', defaultMessage: 'Moved what could move, but the options weren’t saved', description: 'HI-3592: a notification’s title: before taking a branch out of Other branches work can merge into, what could move from it was moved, but the save was then refused (something still uses the branch, or the options changed meanwhile). Its text says what moved; the dialog says why the save was refused.' }),
   retargetFailed: msg({ id: 'workflow.form.retargetFailed', defaultMessage: 'The options were saved, but nothing was retargeted', description: 'HI-2680: an error’s title: the workflow options were saved, but the retarget that should follow failed. Its text says why.' }),
   otherTargets: msg({ id: 'workflow.form.otherTargets', defaultMessage: 'Branches, separated by commas (such as 1.2.0)', description: 'HI-2556: the placeholder of the field “Other branches work can merge into” (branch names besides Work merges into). Keep 1.2.0 as it is.' }),
   appliesNowBranches: msg({ id: 'workflow.form.appliesNowBranches', defaultMessage: 'Only the other branches work can merge into change: they aren’t rules, so they apply now. A lane or card already merging into one keeps it.', description: 'HI-2556: the message of the dialog before saving workflow options when only “Other branches work can merge into” changes (or that and stage names).' }),
@@ -101,14 +99,10 @@ const T = {
   carried: msg({ id: 'workflow.form.carried', defaultMessage: 'Agents’ old worktrees finish their current work first: {agents}. Then they work in slots too.', description: 'Under “Where cards are built” (G11) while agents still hold their worktrees from before 1.0 (#1441), kept until their current card or lane ends. {agents} is a list of agent names (glossary 2.5: slot).' }),
   readOnly: msg({ id: 'workflow.form.readOnly', defaultMessage: '{agents} can’t be given review copies by their coding agent, so they review the builder’s folder read-only.', description: 'Under “Reviewers” (G17) when some reviewing agents use a coding agent that Combwork can’t give review copies (folders at the exact revision, glossary 2.5: review copy). {agents} is a list of agent names.' }),
   stageName: msg({ id: 'workflow.form.stageName', defaultMessage: 'Name of the stage {stage}', description: 'Accessible name of a stage’s name box under “Stage names” (glossary 2.2: stage). {stage} is its default name.' }),
-  stageNamesValue: msg({ id: 'workflow.form.stageNamesValue', defaultMessage: '{n, plural, =0 {The default names} one {# stage renamed} other {# stages renamed}}', description: 'A value of “Stage names” in the list of what changes before saving workflow options, and in a preset’s preview (glossary 2.2: stage).' }),
-  customWakesValue: msg({ id: 'workflow.form.customWakesValue', defaultMessage: 'Custom: {events}', description: 'An inherited value of the workflow option “Wake the Assistant for” (HI-3211) set to Custom: the events ticked, joined as a list (e.g. “A card fails review and A lane ends”).' }),
   fileLocksNote: msg({ id: 'workflow.form.fileLocksNote', defaultMessage: 'Applies to agents working in the same folder, outside a slot.', description: 'Under the workflow option “File locks”: a slot is a folder Combwork lends to a card or its lane (glossary 2.5: slot), so agents in different slots never share a file.' }),
   loopsReadNote: msg({ id: 'workflow.form.loopsReadNote', defaultMessage: 'Read when a loop starts: a loop already running keeps its own, and one started with its own (“rounds: 5, wait: 2h”) keeps those.', description: 'Under the workflow options “Rounds” and “Wait (hours)” (Card loops), when a change applies. “rounds: 5, wait: 2h” is what the user types to an agent: keep it in English.' }),
   overMax: msg({ id: 'workflow.form.overMax', defaultMessage: 'This project has {count, plural, one {# agent} other {# agents}}: none is removed, but no agent can be added until it has fewer than {max, number}.', description: 'Under the workflow option “Maximum agents” (HI-2001) when the project already has more agents ({count}) than it is set to ({max}): nobody can add one (HI-2058), neither the user nor the Assistant.' }),
   stepWaitNote: msg({ id: 'workflow.form.stepWaitNote', defaultMessage: 'A design left unchecked longer shows its card as stalled; one already posted keeps its wait.', description: 'Under the workflow option “Design check wait (minutes)” (Card loops), when a change applies.' }),
-  hoursValue: msg({ id: 'workflow.form.hoursValue', defaultMessage: '{n, plural, one {# hour} other {# hours}}', description: 'The value of the workflow option “Wait (hours)” (Card loops) in words, as in the Inherit box and a preset preview.' }),
-  minutesValue: msg({ id: 'workflow.form.minutesValue', defaultMessage: '{n, plural, one {# minute} other {# minutes}}', description: 'The value of the workflow option “Design check wait (minutes)” (Card loops) in words, as in the Inherit box.' }),
   notEnforced: msg({ id: 'workflow.form.notEnforced', defaultMessage: 'Workflow rules aren’t enforced (Settings → Advanced). These options are saved, and apply once the rules are enforced again.', description: 'A note atop Project Settings → Workflow while the switch "Workflow rules are enforced" is off.' }),
   invalid: msg({ id: 'workflow.form.invalid', defaultMessage: 'These options can’t be used, so every rule is off in this project:', description: 'A note atop Project Settings → Workflow: the saved options contradict each other or can’t be read; the reason follows.' }),
   save: msg({ id: 'workflow.form.save', defaultMessage: 'Save…', description: 'The button saving the workflow options (it shows what changes first).' }),
@@ -158,6 +152,7 @@ const T = {
   levelForGit: msg({ id: 'workflow.form.levelForGit', defaultMessage: 'The defaults of Git projects.', description: 'Beside the None · Git choice above workflow defaults, while Git is chosen.' }),
   offerUnsaved: msg({ id: 'workflow.form.offerUnsaved', defaultMessage: 'Workflow has changes you haven’t saved, so the release offer wasn’t filled in. Save or discard them, then choose Move… again.', description: 'HI-3155: a notification: Move… or Remove… on a release offer (For you) found unsaved edits in the Workflow section, which it doesn’t overwrite. Move… and Remove… are the offer’s buttons: as translated there.' }),
   offerStale: msg({ id: 'workflow.form.offerStale', defaultMessage: 'Work merges into or Other branches work can merge into changed since the release offer was made, so it wasn’t filled in. The offer is read again.', description: 'HI-3155: a notification: a release offer’s Move… or Remove… found the saved options no longer the ones it was made on. Work merges into and Other branches work can merge into are option names: as translated there.' }),
+  changedMeanwhileKept: msg({ id: 'workflow.form.changedMeanwhileKept', defaultMessage: 'The workflow options changed meanwhile, so they weren’t saved. Your changes are kept, over the options as they are now: Save… again to check them.', description: 'HI-3592: a notification: saving the Workflow section was refused because the options changed after it was read (in another window, or by the Combwork Assistant), after something had already been moved for it. The user’s own unsaved changes stay in the form, laid over the options as they are now. Save… is the button’s name.' }),
   changedMeanwhile: msg({ id: 'workflow.form.changedMeanwhile', defaultMessage: 'The workflow options changed meanwhile, so nothing was saved. They’re shown as they are now.', description: 'A notification: saving the Workflow section was refused because the options changed after it was read (in another window, or by the Combwork Assistant); the section reloads them.' }),
   tabsLabel: msg({ id: 'workflow.form.tabs', defaultMessage: 'Workflow options', description: 'Accessible name of the Workflow form’s tabs (HI-3549): Overview, Review & checks, Merging and the others, each a group of the workflow options.' }),
   loadFailed: msg({ id: 'workflow.form.loadFailed', defaultMessage: 'Couldn’t read the workflow options: {error}', description: 'An error showing Project Settings → Workflow. {error} says why.' })
@@ -541,17 +536,36 @@ function WorkflowEditor({ source, project, at, onDirty }: { source: FormSource; 
     // HI-2680: Also retarget what can move, ticked when anything can.
     const retargets = 'retarget' in check ? check.retarget : undefined
     const retarget = new Set<'on'>(retargets && retargets.cards.move.length + retargets.slots.move.length + (retargets.laneMoves?.length ?? 0) > 0 ? ['on'] : [])
+    // HI-3592: branches taken out that something still uses: each named, and what can move from it to the saved Work
+    // merges into, ticked when anything can, moved before the save (moving them is what lets it pass).
+    const removals = 'removals' in check ? (check.removals ?? []) : []
+    const removalChoice = new Map(removals.map((x) => [x.branch, new Set<'on'>(x.retarget && movableOf(x.retarget) > 0 ? ['on'] : [])]))
+    // Moved already (a retry after a refused save moves nothing again): each branch's result.
+    const movedFirst = new Map<string, RetargetResult>()
+    const movedLines = (): string => [...movedFirst.values()].map((r) => [tr(T.retargetDone, { cards: r.moved.cards.length, slots: r.moved.slots.length, skipped: r.skipped.length, to: r.to }), retargetSkippedText(r)].filter(Boolean).join('\n')).join('\n')
     let stale = false
+    // HI-3592: stale after moves made for it: the user's edits kept, over the options as they are now.
+    let keptStale = false
     const ok = await confirm({
       title: tr(T.confirmTitle),
       message: tr(source.level ? T.levelConfirm : check.appliesNow ? (check.changed.includes('otherTargets') ? T.appliesNowBranches : T.appliesNow) : T.confirmMessage),
       wide: true,
-      content: <SaveDetails changes={changes} check={check} picked={picked} retarget={retarget} title={(k) => tr(optionTitle(k, platform, effective.folder) ?? OPTION_TEXT[k]!.title)} />,
+      content: <SaveDetails changes={changes} check={check} picked={picked} retarget={retarget} removals={removalChoice} title={(k) => tr(optionTitle(k, platform, effective.folder) ?? OPTION_TEXT[k]!.title)} />,
       confirmLabel: tr(T.save).replace(/…$/, ''),
       run: async () => {
         const path = source.key
+        for (const x of removals) {
+          if (!x.retarget || !removalChoice.get(x.branch)?.has('on') || movedFirst.has(x.branch)) continue
+          const r = await call('workflow:retarget', path, x.retarget).catch((e: unknown) => {
+            // What moved before this branch is said, the draft kept: the dialog shows this failure.
+            if (movedFirst.size) notify('warning', tr(T.movedUnsaved), movedLines())
+            throw e
+          })
+          movedFirst.set(x.branch, r)
+        }
         try {
           show(path, await source.save(change, [...picked], offer), editedSince)
+          if (movedFirst.size) notify([...movedFirst.values()].some((r) => r.skipped.length) ? 'warning' : 'success', movedLines())
           // Saved: then what follows the new target, as previewed, each item rechecked; said whatever came of it.
           if (retargets && retarget.has('on')) {
             const r = await call('workflow:retarget', path, retargets).catch((e: unknown) => {
@@ -561,15 +575,24 @@ function WorkflowEditor({ source, project, at, onDirty }: { source: FormSource; 
             if (r) notify(r.skipped.length ? 'warning' : 'success', tr(T.retargetDone, { cards: r.moved.cards.length, slots: r.moved.slots.length, skipped: r.skipped.length, to: r.to }), retargetSkippedText(r))
           }
         } catch (e) {
+          // HI-3592: moved first, then refused: what moved is said, and the refusal stays in the dialog with the draft.
+          if (movedFirst.size) notify('warning', tr(T.movedUnsaved), movedLines())
           // Changed meanwhile (the Assistant's tool, another window): never written over; shown as it is now.
           const now = await source.read().catch(() => null)
           if (!now || sameOwn({ preset: now.preset, options: now.own }, { preset: form.preset, options: form.own })) throw e
           stale = true
-          show(path, now)
+          if (!movedFirst.size) show(path, now)
+          else {
+            keptStale = true
+            reads.current++
+            setLoaded((l) => (l && l.for === path ? afterStale(path, form, l.draft, now) : l))
+            setProblems([])
+            setFailed(null)
+          }
         }
       }
     })
-    if (stale) notify('warning', tr(T.changedMeanwhile))
+    if (stale) notify('warning', tr(keptStale ? T.changedMeanwhileKept : T.changedMeanwhile))
     else if (ok) notify('success', tr(T.saved))
   }
   saveRef.current = (offer) => save(offer).catch((e) => notify('error', errorMessage(e)))
@@ -749,7 +772,7 @@ function WorkflowEditor({ source, project, at, onDirty }: { source: FormSource; 
       case 'reviewerMode':
         return select('reviewerMode', [['lane', tr(V.reviewerMode.lane)], ['pool', tr(V.reviewerMode.pool)]])
       case 'target':
-        return <DraftText value={effective.target} placeholder={tr(T.defaultBranch)} onCommit={(v) => set('target', v.trim())} />
+        return <DraftText value={effective.target} placeholder={tr(VT.defaultBranch)} onCommit={(v) => set('target', v.trim())} />
       case 'okBefore':
         return (
           <div className="workflow-stack">
@@ -1029,41 +1052,8 @@ export function ChoicePreview({ choice, name, options, effective, valueText, onU
   )
 }
 
-/** An option's value in words (the rows' Inherit tips, a preview), as its platform names it. */
-export function optionValueText(key: OptionKey, v: unknown, platform: PlatformId): string {
-  if (typeof v === 'boolean') return tr(v ? T.on : T.off)
-  if (key === 'review') return tr(accepts(platform) && v === 'none' ? VALUE_TEXT.review.noneNone : VALUE_TEXT.review[v as keyof typeof VALUE_TEXT.review])
-  const values = (VALUE_TEXT as Record<string, Record<string, ReturnType<typeof msg>>>)[key]
-  if (values && typeof v === 'string' && values[v]) return tr(values[v])
-  // A structured value with what it holds (HR6's round 3: the labels, the identity), not only its kind.
-  if (key === 'okBefore') {
-    const ok = v as OkBefore
-    return ok.mode === 'labels' ? tr(T.labelsValue, { labels: ok.labels.length ? fmt.list(ok.labels) : tr(T.noneValue) }) : tr(VALUE_TEXT.okBefore[ok.mode])
-  }
-  if (key === 'identity') {
-    const id = v as WorkflowOptions['identity']
-    return id ? tr(T.identityValue, { name: id.name, email: id.email }) : tr(T.off)
-  }
-  if (key === 'stageNames') return tr(T.stageNamesValue, { n: Object.keys((v as StageNames | undefined) ?? {}).length })
-  // HI-3284: the guards by name (the user's own words), or none.
-  if (key === 'mergeGuards') return Array.isArray(v) && v.length ? fmt.list((v as MergeGuard[]).map((g) => g.name)) : tr(T.noneValue)
-  if (key === 'reviewers' || key === 'loopRounds' || key === 'maxAgents') return fmt.number(v as number)
-  if (key === 'simplifyAt' || key === 'churnStopAt') return v === 0 ? tr(T.off) : fmt.number(v as number)
-  if (key === 'loopWaitHours') return tr(T.hoursValue, { n: v as number })
-  if (key === 'loopStepWaitMinutes') return tr(T.minutesValue, { n: v as number })
-  if (key === 'assistantWakes') {
-    const w = v as AssistantWakes
-    return w.level === 'custom' ? tr(T.customWakesValue, { events: w.events.length ? fmt.list(w.events.map((e) => tr(WAKE_EVENT_TEXT[e]))) : tr(T.noneValue) }) : tr(VALUE_TEXT.assistantWakes[w.level])
-  }
-  if (key === 'fileLocks') {
-    const mode = FILE_LOCK_MODES.find((m) => m.value === v)
-    return mode ? tr(mode.text.label) : String(v)
-  }
-  if (key === 'commands') return Object.keys(v as Record<string, string>).length ? fmt.list(Object.entries(v as Record<string, string>).map(([name, command]) => `${name} (${command})`)) : tr(T.noneValue) // i18n-ignore: a check's name and command, shown as they are
-  if (Array.isArray(v)) return v.length ? fmt.list(v.map(String)) : tr(T.noneValue)
-  if (key === 'target') return (v as string) || tr(T.defaultBranch)
-  return String(v)
-}
+// The value text moved to workflowValueText.ts (HI-3620), kept importable from here.
+export { optionValueText }
 
 /** What never turns off, whatever the options (§16.6.4: data safety). */
 function NeverOff() {
@@ -1161,12 +1151,7 @@ function ChecksEditor({ names, commands, onChange }: { names: string[]; commands
  * level (#1422), each project inheriting the change, what changes for it, and its running lanes and cards in flight,
  * which keep their rules until their next card.
  */
-/** HI-2680: what a retarget left where it was, a line each (the toast's text). */
-export function retargetSkippedText(r: RetargetResult): string {
-  return r.skipped.map((s) => tr(T.retargetSkipped, { what: s.key ?? s.slot ?? s.lane ?? '', why: s.why })).join('\n')
-}
-
-function SaveDetails({ changes, check, picked, retarget, title }: { changes: string[]; check: WorkflowCheck | WorkflowLevelCheck; picked: Set<number>; retarget?: Set<'on'>; title: (k: OptionKey) => string }) {
+function SaveDetails({ changes, check, picked, retarget, removals, title }: { changes: string[]; check: WorkflowCheck | WorkflowLevelCheck; picked: Set<number>; retarget?: Set<'on'>; removals?: Map<string, Set<'on'>>; title: (k: OptionKey) => string }) {
   const [, redraw] = useState(0)
   const tasks = useStore((s) => s.tasks)
   const workspacePath = useStore((s) => s.workspace?.path ?? '')
@@ -1227,6 +1212,20 @@ function SaveDetails({ changes, check, picked, retarget, title }: { changes: str
         </div>
       )}
       {'retarget' in check && check.retarget && retarget && <RetargetDetails preview={check.retarget} choice={retarget} onChange={() => redraw((n) => n + 1)} />}
+      {/* HI-3592: each branch taken out that something still uses: what, and what can move from it first. */}
+      {'removals' in check &&
+        (check.removals ?? []).map((x) => (
+          <div key={x.branch} className="workflow-removal" data-removal={x.branch}>
+            <p>{tr(T.removalUses, { branch: x.branch, uses: fmt.list(x.uses) })}</p>
+            {x.afterTarget && <p data-removal-after-target="">{tr(T.removalAfterTarget, { branch: x.branch })}</p>}
+            {x.retarget && removals?.get(x.branch) && (
+              <>
+                <RetargetDetails preview={x.retarget} choice={removals.get(x.branch)!} onChange={() => redraw((n) => n + 1)} />
+                {movableOf(x.retarget) > 0 && <p className="s-desc" data-removal-persist="">{tr(T.removalPersist, { branch: x.branch })}</p>}
+              </>
+            )}
+          </div>
+        ))}
       {'projects' in check && (
         <div className="workflow-heirs" data-heirs="">
           <p>{check.projects.length ? tr(T.heirs, { n: check.projects.length }) : tr(T.noHeirs)}</p>
@@ -1271,10 +1270,13 @@ function SaveDetails({ changes, check, picked, retarget, title }: { changes: str
 /** HI-2680: a running lane's why in the Retarget's list (the select key of workflow.form.retargetKeep). */
 const LANE_KEEPS = 'lane' // i18n-ignore: a select key
 
+/** HI-2680: how many items a retarget's preview can move (cards, slots, running lanes). */
+const movableOf = (p: RetargetPreview): number => p.cards.move.length + p.slots.move.length + (p.laneMoves?.length ?? 0)
+
 /** HI-2680: the Save… dialog's Retarget: what can follow the new target, what stays and why, and its tick box. */
 export function RetargetDetails({ preview: p, choice, onChange }: { preview: RetargetPreview; choice: Set<'on'>; onChange: () => void }) {
   const lanes = p.laneMoves ?? []
-  const movable = p.cards.move.length + p.slots.move.length + lanes.length
+  const movable = movableOf(p)
   const laneName = (l: { name: string | null; builder: string }): string => (l.name ? tr(T.lane, { builder: l.builder, name: l.name }) : tr(T.laneUnnamed, { builder: l.builder }))
   return (
     <div className="workflow-retarget" data-retarget="">
@@ -1316,74 +1318,22 @@ export function RetargetDetails({ preview: p, choice, onChange }: { preview: Ret
           <ul>
             {p.cards.keep.map((c) => (
               <li key={`ck${c.number}`} data-retarget-keep={c.key}>
-                {tr(T.retargetKeep, { what: `${c.key} ${c.title}`, why: c.why, from: p.from, to: p.to })}
+                {tr(RT.retargetKeep, { what: `${c.key} ${c.title}`, why: c.why, from: p.from, to: p.to })}
               </li>
             ))}
             {p.slots.keep.map((s) => (
               <li key={`sk${s.name}`} data-retarget-keep={s.name}>
-                {tr(T.retargetKeep, { what: s.name, why: s.why, from: p.from, to: p.to })}
+                {tr(RT.retargetKeep, { what: s.name, why: s.why, from: p.from, to: p.to })}
               </li>
             ))}
             {p.lanes.map((l) => (
               <li key={`l${l.id}`} data-retarget-keep={l.id}>
-                {tr(T.retargetKeep, { what: laneName(l), why: l.why ?? LANE_KEEPS, from: p.from, to: p.to })}
+                {tr(RT.retargetKeep, { what: laneName(l), why: l.why ?? LANE_KEEPS, from: p.from, to: p.to })}
               </li>
             ))}
           </ul>
         </>
       )}
-    </div>
-  )
-}
-
-const N = {
-  text: msg({ id: 'workflow.presetsNotice.text', defaultMessage: '{n, plural, one {{projects} works} other {{projects} work}} as before this version. A preset sets up a workflow in one click: who reviews the work, which checks pass first and who merges.', description: 'The one-time notice after the upgrade to 1.0 (glossary 2.1: preset, workflow). {projects} is a list of project names; {n} how many.' }),
-  choose: msg({ id: 'workflow.presetsNotice.choose', defaultMessage: 'Choose…', description: 'A button of the one-time presets notice: opens the first project’s Version Control tab at Workflow.' }),
-  notNow: msg({ id: 'workflow.presetsNotice.notNow', defaultMessage: 'Not Now', description: 'A button of the one-time presets notice: dismisses it for good.' })
-}
-
-/**
- * The one-time notice after the upgrade (§16.17, OP-22): the projects kept today's way of working, and the presets on
- * offer. Choose… opens the first one's Workflow section; either answer is the last time it shows in the workspace.
- */
-export function PresetsNotice() {
-  const path = useStore((s) => s.workspace?.path ?? null)
-  const readOnly = useStore((s) => s.boardState?.readOnly ?? null)
-  // What main's answer depends on, as a string (HI-1807): the projects' names, and which have a workflow with no preset.
-  // Not the workspace object, replaced with each agent's change of state: a dozen agents working read it again more than
-  // once a second. The board's own part (answered, the upgrade's) changes only with readOnly or a reload.
-  const asked = useStore((s) => (s.workspace ? JSON.stringify([s.workspace.path, s.workspace.projects.map((p) => [p.path, p.name, !!p.config.workflow && p.config.workflow.preset === null])]) : null))
-  const [projects, setProjects] = useState<{ path: string; name: string }[] | null>(null)
-  // The workspaces answered in this window (#1464): a reload begun before the answer's board write commits (a new
-  // workspace object meanwhile, or one already in flight) reads the old board, and must not show it again.
-  const answered = useRef(new Set<string>())
-  useEffect(() => {
-    if (!asked || !path || readOnly !== null || answered.current.has(path)) return setProjects(null)
-    let live = true
-    call('workflow:presetsNotice')
-      .then((p) => live && setProjects(answered.current.has(path) ? null : p))
-      .catch(() => live && setProjects(null))
-    return () => {
-      live = false
-    }
-  }, [path, asked, readOnly])
-  if (!projects?.length) return null
-  const answer = (choose: boolean): void => {
-    if (path) answered.current.add(path)
-    if (choose) openWorkflowOption(projects[0].path, 'overview')
-    setProjects(null)
-    void call('workflow:presetsNoticeSaid').catch((e) => notify('error', errorMessage(e)))
-  }
-  return (
-    <div className="banner info presets-notice" role="status">
-      <Icon name="info" />
-      <span className="grow">{tr(N.text, { projects: fmt.list(projects.map((p) => p.name)), n: projects.length })}</span>
-      <button className="btn small primary" onClick={() => answer(true)}>
-        {tr(N.choose)}
-      </button>
-      <button className="btn small subtle" onClick={() => answer(false)}>
-        {tr(N.notNow)}
-      </button>
     </div>
   )
 }

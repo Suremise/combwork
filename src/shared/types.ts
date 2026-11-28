@@ -10,6 +10,7 @@ import type { ActivityKind, ActivityTarget, UndoFinalWhy } from './assistantActi
 import type { AttachmentKind } from './attachments'
 import type { IgnoreRule, IgnoreTarget } from './gitIgnoreRules'
 import type { GitlinkChange } from './gitlink'
+import type { PreviewConfig } from './preview'
 import type { AgentProcess } from './agentProcesses'
 import type { StartFailure } from './startFailure'
 import type { IdleResume } from './sessionFresh'
@@ -1368,12 +1369,9 @@ export interface TaskCard {
  * A bulk archive by the user (#351): Archive All in a column, or Archive All Cards. Kept so the batch can be brought back
  * later (Undo, "Unarchive this batch"), each card where it was.
  */
-/**
- * The board's state for the window (#1207): why it is read-only (saved by a newer Combwork, or waiting for its upgrade to 1.0,
- * which the user is asked for).
- */
+/** The board's state for the window (#1207): why it is read-only (saved by a newer Combwork). */
 export interface BoardState {
-  readOnly: 'newer' | 'upgrade' | null
+  readOnly: 'newer' | null
 }
 
 export interface ArchiveBatch {
@@ -1729,6 +1727,32 @@ export interface WorkflowCheck {
   retarget?: RetargetPreview
   /** HI-2807: branches newly named in Work merges into or Other branches that don't exist (a save refuses them). */
   missing?: string[]
+  /** HI-3592: branches the change takes out of Other branches work can merge into while something still uses them. */
+  removals?: TargetRemoval[]
+}
+
+/**
+ * HI-3592: a branch taken out of Other branches work can merge into while something uses it (`uses`: keys and names), and
+ * what can move from it to the saved Work merges into before the save (null: nothing offered). `afterTarget`: the same
+ * change moves Work merges into, so the moves wait for a second save, the branch kept until then.
+ */
+export interface TargetRemoval {
+  branch: string
+  uses: string[]
+  retarget: RetargetPreview | null
+  afterTarget?: true
+}
+
+/**
+ * HI-3592: a free slot's move to Work merges into from its row: `move` as it was seen (folder, recorded target, head),
+ * or `keep` with why it can't (`onTarget`: it follows Work merges into already).
+ */
+export interface SlotMovePreview {
+  slot: string
+  from: string
+  to: string
+  move?: RetargetPreview['slots']['move'][number]
+  keep?: RetargetPreview['slots']['keep'][number]['why'] | 'onTarget'
 }
 
 /**
@@ -1966,6 +1990,8 @@ export interface ProjectConfig {
   githubRemote?: string
   /** The project's review and check copies (#1435): how many it keeps (left out: the larger of 2 and its reviewers plus one). */
   copies?: { size?: number }
+  /** The project's preview (HI-3614, SPEC §16.21): its dev server's command, page path and hot reload port, set in Project Settings → Preview. */
+  preview?: PreviewConfig
   /** From before HI-1766 (Project Settings → Card loops): see `fileLocks`. */
   loopWakes?: boolean
   loopRounds?: number | null
@@ -1996,6 +2022,11 @@ export interface SlotView {
    * error line (English, never translated; '' when git said none: the target's branch isn't there).
    */
   operation?: { what: string; since: number; error?: string; target?: string }
+  /**
+   * HI-3592: free, recording another branch (`from`) than the project's Work merges into (`to`), left behind when that
+   * moved on: its row offers to move it there. Absent: lent, busy, or on it already.
+   */
+  moveOn?: { from: string; to: string }
 }
 
 /** A slot's writer as Release Slot… shows it (#1506, agentFolders.ts heldWriter). */
@@ -4308,15 +4339,13 @@ export interface ViewerToken {
 
 /**
  * Where a window's workspace is in opening it (HI-1694), for the steady view the window shows meanwhile: reading its
- * projects, and after the user said yes to its upgrade to 1.0, the upgrade (the 0.9 board kept as a backup), the cards'
- * and projects' adoption, and the agents' worktrees adopted as slots. Its bundled skills and modes are brought up to date
- * after the open, not in it (HI-1705).
+ * projects. Its bundled skills and modes are brought up to date after the open, not in it (HI-1705).
  */
 export interface OpenProgress {
   /** The workspace's folder, and its name as shown. */
   path: string
   name: string
-  step: 'projects' | 'upgrade' | 'adoption' | 'slots'
+  step: 'projects'
 }
 
 /** Events pushed from main to renderer. */
@@ -4412,6 +4441,10 @@ export type CombworkEvent =
   | { type: 'language-changed'; language: LanguageInfo }
   /** A workspace's progress runs changed (all of them, newest first): for in-process listeners (the Agent API's stream, the developer console). */
   | { type: 'progress-changed'; workspacePath: string; runs: ProgressRun[] }
+  /** A preview changed (HI-3614/HI-3615): started, running, stopped, its files changed. */
+  | { type: 'preview-changed'; preview: import('./preview').PreviewView }
+  /** A preview's page tried to leave its origin (HI-3615): Combwork's own bar offers the URL, opened only by the user's click. */
+  | { type: 'preview-tried'; projectPath: string; id: string; url: string }
   /** The window's telling of the same (#1108): ProgressTelling. */
   | ProgressTelling
   /** A workspace's merge slots changed (those held or waited for). */

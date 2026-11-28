@@ -55,6 +55,8 @@ interface CombworkMessageValues {
   'tips.assistantConnection.title': undefined
   'tips.assistantControl.text': undefined
   'tips.assistantControl.title': undefined
+  'tips.assistantGithubSource.text': undefined
+  'tips.assistantGithubSource.title': undefined
   'tips.assistantImages.text': undefined
   'tips.assistantImages.title': undefined
   'tips.assistantJournal.text': undefined
@@ -248,6 +250,12 @@ interface CombworkMessageValues {
   'tips.editTemplates.title': undefined
   'tips.externalTerminal.text': undefined
   'tips.externalTerminal.title': undefined
+  'tips.fileBlame.text': undefined
+  'tips.fileBlame.title': undefined
+  'tips.fileCompare.text': undefined
+  'tips.fileCompare.title': undefined
+  'tips.fileHistory.text': undefined
+  'tips.fileHistory.title': undefined
   'tips.fileLinks.text': undefined
   'tips.fileLinks.title': undefined
   'tips.fileRestore.text': undefined
@@ -416,6 +424,8 @@ interface CombworkMessageValues {
   'tips.moreAgents.title': { usual: number }
   'tips.moveAnyway.text': undefined
   'tips.moveAnyway.title': undefined
+  'tips.moveSlotOn.text': undefined
+  'tips.moveSlotOn.title': undefined
   'tips.muse.text': undefined
   'tips.muse.title': undefined
   'tips.myPrices.text': undefined
@@ -470,6 +480,10 @@ interface CombworkMessageValues {
   'tips.planLimitsProviders.title': undefined
   'tips.prComments.text': undefined
   'tips.prComments.title': undefined
+  'tips.previewAgents.text': undefined
+  'tips.previewAgents.title': undefined
+  'tips.previewTab.text': undefined
+  'tips.previewTab.title': undefined
   'tips.progressCard.text': undefined
   'tips.progressCard.title': undefined
   'tips.progressCheck.text': undefined
@@ -572,8 +586,6 @@ interface CombworkMessageValues {
   'tips.slotResume.title': undefined
   'tips.slots.text': undefined
   'tips.slots.title': undefined
-  'tips.slotsAdopted.text': undefined
-  'tips.slotsAdopted.title': undefined
   'tips.sortTables.text': undefined
   'tips.sortTables.title': undefined
   'tips.staleMessages.text': undefined

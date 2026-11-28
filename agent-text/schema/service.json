@@ -203,6 +203,47 @@
       "why": "plain"
     }
   },
+  "service.fileBlame.invalid": {
+    "placeholders": {}
+  },
+  "service.fileBlame.unsupported": {
+    "placeholders": {}
+  },
+  "service.fileCompare.invalid": {
+    "placeholders": {}
+  },
+  "service.fileCompare.noRef": {
+    "placeholders": {
+      "ref": "plain"
+    }
+  },
+  "service.fileCompare.unsupported": {
+    "placeholders": {}
+  },
+  "service.fileHistory.cancelled": {
+    "placeholders": {}
+  },
+  "service.fileHistory.failed": {
+    "placeholders": {
+      "why": "plain"
+    }
+  },
+  "service.fileHistory.invalid": {
+    "placeholders": {}
+  },
+  "service.fileHistory.noCommit": {
+    "placeholders": {
+      "commit": "plain"
+    }
+  },
+  "service.fileHistory.timedOut": {
+    "placeholders": {
+      "seconds": "number"
+    }
+  },
+  "service.fileHistory.unsupported": {
+    "placeholders": {}
+  },
   "service.files.badName": {
     "placeholders": {
       "name": "plain"
@@ -2026,6 +2067,14 @@
     "placeholders": {
       "name": "plain"
     }
+  },
+  "service.workspace.formatUnknown": {
+    "placeholders": {
+      "error": "plain"
+    }
+  },
+  "service.workspace.from09": {
+    "placeholders": {}
   },
   "service.workspace.holdsOpen": {
     "placeholders": {

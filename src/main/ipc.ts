@@ -56,8 +56,8 @@ import { editLanes, endedSinceOf, laneEditOf } from './laneEdits'
 import { laneStartInfo, oweFreshForTest, retryFreshStart, startLaneFromWindow } from './laneStart'
 import { loopChecksOf } from './loopCheck'
 import { sweepWorkspaceLeftovers } from './leftovers'
-import { AfterOpen, assertNotOpening, claimWindow, openProgress, openStep, releaseWindow, windowClaim } from './openProgress'
-import { boardState, boardWaits, cardHeads, exportBoard, movedNames, onBoardUpgraded, projectKeys, upgradeBoard } from './boardStore'
+import { AfterOpen, assertNotOpening, claimWindow, releaseWindow } from './openProgress'
+import { boardState, cardHeads, exportBoard, movedNames, projectKeys } from './boardStore'
 import { cardCosts, cardRoundCosts, laneCosts } from './cardCosts'
 import { badgeDescription } from '../shared/taskbar'
 import * as files from './files'
@@ -129,26 +129,24 @@ import { capturedText, englishError, CombworkError, combworkError, windowError }
 import { deleteJournalEntry, deleteWorkspaceJournal, editJournalEntry, forgetJournalEntries, forgetJournalPreview, journalEntry, journalStatus, setJournalSettings } from './journalService'
 import { browseJournal, journalProjects } from './journal'
 import { runActions } from './workflow/actionWorker'
-import { adoptWorkspace } from './workflow/adoption'
 import { repairStages } from './workflow/stageRepair'
 import { attachableSource, attachToCard, cardAttachmentGroups, cardAttachments, previewCardAttachment, recoverCardAttachments, removeCardAttachment, stageDrafts } from './cardAttachments'
-import { settleSlotsUpToDate } from './workflow/slotsUpToDateStep'
-import { settleCommitMessageDefault } from './workflow/commitMessageStep'
 import { migrateSlots, releaseCarried } from './slotMigration'
 import { boardSlots, heldWriter, releaseHeldWriter } from './agentFolders'
-import { copyV09Templates, sayV09TemplatesOnce } from './templateUpgrade'
-import { checkWorkflowChange, chooseMerge, guardPreview, presetsNotice, settleMergeChoices, presetsNoticeSaid, projectStages, setWorkflowOptions, workflowForm } from './workflow/optionsForm'
+import { checkWorkflowChange, chooseMerge, guardPreview, settleMergeChoices, projectStages, setWorkflowOptions, workflowForm } from './workflow/optionsForm'
 import { checkPlatformSwitch, setPlatform } from './workflow/platformSwitch'
 import { presetNotNow } from './workflow/presetStep'
 import { checkLevelChange, levelForm, setLevelOptions } from './workflow/levels'
 import { rulesNow } from './workflow/rulesets'
 import { poolFor, removeGoneSlot, slotTest, slotViews } from './slotsApp'
+import { hidePreview, openTried, placePreview, previewDevTools, previewSuggestion, previewTest, previewViews, reloadPreview, setPreviewConfig, showPreview, startPreview, stopPreview } from './previewApp'
 import { projectSlotCopy, setSlotDefault, setSlotSetting, slotLevelForm } from './slotSettings'
 import { githubHostsForm, setGithubHosts } from './githubHosts'
 import { githubLinkOf, githubRepoFor, openPrsOf, setGithubRemote } from './githubLink'
 import { closeShippedIssues, issueSourceFor, openIssuesOf, releasedLines, shippedIssuesOf } from './issueSources'
 import { copyViews, stopIsolated } from './copiesApp'
-import { retargetApply, retargetArg } from './workflow/retarget'
+import { retargetApply, retargetArg, slotMoveApply, slotMoveArg, slotMovePreview } from './workflow/retarget'
+import { projectTargets } from './workflow/targets'
 import { lineRepoReads } from './platform/repoReadsPorts'
 import { checkRepoTools } from './platform/repoPorts'
 import { slotWorkspaces } from './platform/workspacePorts'
@@ -239,6 +237,23 @@ const advancedState = (): AdvancedState => advanced.state(workspace.path ? (work
 
 /** The window an IPC call came from, for calls that keep something per window (the developer console's subscription). */
 const senderStore = new AsyncLocalStorage<WebContents>()
+
+/** HI-3476: the windows whose blames are stopped when they go (registered once each). */
+const blameWindows = new WeakSet<WebContents>()
+/**
+ * HI-3476: whose blame request ids an IPC call's are: its window's (its webContents' id), so two windows' ids never
+ * meet; `onGone` stops that window's blames when it is destroyed (registered once a window).
+ */
+function blameOwner(onGone?: (owner: string) => void): string {
+  const wc = senderStore.getStore()
+  if (!wc) return 'none'
+  const owner = `wc:${wc.id}`
+  if (onGone && !blameWindows.has(wc)) {
+    blameWindows.add(wc)
+    wc.once('destroyed', () => onGone(owner))
+  }
+  return owner
+}
 
 /** HI-3372: who may cancel a run started now: this window, this open of its workspace, the project (gitCancel.ts). */
 const cancelOwner = (projectPath: string): CancelOwner => cancelOwnerOf(senderStore.getStore(), currentWorkspace(), projectPath)
@@ -409,23 +424,10 @@ async function authorizedMerge(path: string, branch: string | null | undefined, 
   if (r.ok && queued && out) await mergedOutsideQueue(workspace, path, queued.card, typeof out.reason === 'string' ? out.reason.slice(0, 2000) : '').catch((e) => log.warn('recording a merge outside the queue', e))
   return r
 }
-/**
- * What a workspace's opening does with its board, each step in the background. A 0.9 board waiting for its upgrade takes
- * no writes, and its tables aren't 1.0's yet: none of the steps runs on it (HI-1694: the stage repair failed against it),
- * and all of them run once it is upgraded (#1621), with no restart; each changes nothing the second time.
- */
-function boardSteps(ws: WorkspaceService, upgraded = false, after?: AfterOpen): void {
-  if (boardWaits(ws)) return
+/** What a workspace's opening does with its board, each step in the background; each changes nothing the second time. */
+function boardSteps(ws: WorkspaceService, after?: AfterOpen): void {
   // Each chain timed in the open's "after opening" line (HI-1705), when an open started it.
   const timed = <T>(what: string, p: Promise<T>): Promise<T> => (after ? after.track(what, p) : p)
-  // Just upgraded at the user's word: the adoption and the slots that follow are shown as the open's last steps (HI-1694).
-  const path = ws.path
-  // The upgrade's claim of the window (board:upgrade), which the adoption and slots carry on and let go; none for an
-  // upgrade made another way, so never another operation's.
-  const claim = upgraded && openProgress(ws)?.step === 'upgrade' ? windowClaim(ws) : null
-  const step = (s: 'adoption' | 'slots'): void => {
-    if (claim && path && ws.path === path) openStep(ws, s, { token: claim })
-  }
   // Each card, lane and card watch names its project by its stable id (#508), then old Done cards are archived.
   void timed(
     "projects' ids and keys, old Done cards", // i18n-ignore: a part of a log line's timing
@@ -444,44 +446,24 @@ function boardSteps(ws: WorkspaceService, upgraded = false, after?: AfterOpen): 
   )
   // The cards' actions a crash or a close left pending (#1215, SPEC §16.4.5): run once, in the order written.
   void timed('pending card actions', runActions(ws)) // i18n-ignore: a part of a log line's timing
-  // The 1.0 upgrade's adoption (#1218, SPEC §16.17): each project's options and its old cards, until it has run once;
-  // then what changed in its projects while it was closed, recorded as observed facts (#1217): the cards adopted too.
-  // Then its agents' worktrees become slots (#1441), each project once, before what changed is observed.
-  // And G15 saved before P7 settled once (#1445), so a Pair or Team project gets its preset's On.
+  // Its agents' worktrees become slots (#1441), each project once, before what changed while it was closed is observed
+  // (recorded as observed facts, #1217). The 1.0 upgrade's adoption and its one-time steps are gone (HI-3619).
   // And a card the board has in Done while its stage isn't (HI-1674) brought into line, before what changed is observed.
-  step('adoption')
   void timed(
-    'adoption, slots, repairs and what changed while closed', // i18n-ignore: a part of a log line's timing
-    adoptWorkspace(ws)
-      .then(() => settleSlotsUpToDate(ws))
-      // HI-1997: a commit message a preset stored as Combwork's, switched once to the branch's own (a proven choice kept).
-      .then(() => settleCommitMessageDefault(ws))
-      .then(() => step('slots'))
-      .then(() => migrateSlots(ws))
+    'slots, repairs and what changed while closed', // i18n-ignore: a part of a log line's timing
+    migrateSlots(ws)
       .then(() => repairStages(ws))
       // HI-1697: a merge choice the board recorded and a save stopped before writing to project.json, written there now.
       .then(() => settleMergeChoices(ws))
       // What an interrupted card attachment operation left (HI-1700), settled from its records against the board.
       .then(() => recoverCardAttachments(ws))
-      .finally(() => {
-        releaseWindow(ws, claim)
-        return reconcileWorkspace(ws)
-      })
-  )
-  // 0.9's agent templates copied into the 0.9 backup once after the upgrade (#1436), and a quiet notice saying so.
-  void timed(
-    "0.9's agent templates", // i18n-ignore: a part of a log line's timing
-    copyV09Templates(ws)
-      .then(() => sayV09TemplatesOnce(ws))
-      .catch((e) => log.warn("copying 0.9's agent templates (tried again at the next open)", e))
+      .finally(() => reconcileWorkspace(ws))
   )
   // HI-2059: choices dropped converting MCP servers to added servers, said once.
   void mcp.sayMcpAddedOnce(ws).catch((e) => log.warn('the MCP added-servers notice', e))
 }
 
 export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:info']>, quitControl: QuitControl): void {
-  // A board upgraded to 1.0 while its workspace is open: what its opening skipped, now (#1621).
-  onBoardUpgraded((ws) => boardSteps(ws, true))
   // Each time a workspace opens: Combwork's bundled skills and modes it hasn't got, or has untouched older copies of.
   // After the open, not before it (HI-1705): a launch waits for it.
   WorkspaceService.bringItemsUpToDate = (fresh) => syncBundled({ fresh })
@@ -491,8 +473,8 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
     const ws = workspace
     // Its usage history imports the sessions it had, the first time (#1106), in the background.
     void after.track('usage history', usageHistory.opened(contextWorkspace()!)) // i18n-ignore: a part of a log line's timing
-    // Its board's steps: skipped while the board waits for its upgrade to 1.0, and run again once it is upgraded.
-    boardSteps(contextWorkspace()!, false, after)
+    // Its board's steps.
+    boardSteps(contextWorkspace()!, after)
     // Builds of Combwork left for it while it was closed (#1534), into the journal once.
     void after.track('builds left for it', pickUpBuilds(ws).catch((e) => log.warn('recording the builds left for Combwork', e))) // i18n-ignore: a part of a log line's timing
     // What failed or interrupted saves and the project-id migration left in the .combwork folders (#1016).
@@ -934,21 +916,6 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
     'project:forget': (name) => removal.forgetHidden(name),
     'project:takeRemovedData': (p, keep) => removal.takeRemovedData(p, keep),
     'board:state': () => boardState(currentWorkspace()),
-    'board:upgrade': async () => {
-      const ws = currentWorkspace()
-      // Shown as the open's steps (HI-1694): the upgrade, then the adoption and slots, until they are done.
-      // The window claimed, shown as the open's steps (HI-1694): the upgrade, then the adoption and slots, which carry the
-      // claim on and let it go (boardSteps).
-      const claim = claimWindow(ws, ws.path ?? '', 'upgrade')
-      // Then what the workspace's opening skipped (boardSteps, through onBoardUpgraded): the adoption (#1218), its
-      // agents' worktrees adopted as slots (#1441), 0.9's templates copied aside (#1436), the cards' ids and keys.
-      try {
-        return await upgradeBoard(ws)
-      } finally {
-        // Refused, or upgraded already (nothing pending): no steps after it carry the claim on.
-        if (openProgress(ws)?.step === 'upgrade') releaseWindow(ws, claim)
-      }
-    },
     'tasks:list': (fullArchive) => tasks.windowTasks(workspace, fullArchive === true),
     'tasks:changes': (since) => tasks.windowChanges(workspace, since && typeof since === 'object' && typeof since.board === 'string' && Number.isSafeInteger(since.mark) ? { board: since.board, mark: since.mark } : null),
     'tasks:export': async () => {
@@ -1090,6 +1057,8 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
       if (patch.workflow !== undefined) throw new CombworkError({ lines: ["A project's workflow options change through workflow:setOptions"] }, { kind: 'invalid' }) // i18n-ignore: a mistake in Combwork's code, never shown
       // Its version control switches only with its checks and its options kept per platform (#1419): workflow:setPlatform.
       if (patch.platform !== undefined) throw new CombworkError({ lines: ["A project's version control changes through workflow:setPlatform"] }, { kind: 'invalid' }) // i18n-ignore: a mistake in Combwork's code, never shown
+      // HI-3614: its preview is checked whole, and only while the Preview is on: preview:setConfig.
+      if (patch.preview !== undefined) throw new CombworkError({ lines: ["A project's preview changes through preview:setConfig"] }, { kind: 'invalid' }) // i18n-ignore: a mistake in Combwork's code, never shown
       const projectPath = workspace.assertProject(p)
       // A project has no provider pages or default provider since HI-2106/HI-2107: its agents' connections hold what they
       // set (HI-2122: nothing is made from them), and project.json keeps none.
@@ -1114,15 +1083,27 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
     'workflow:checkPlatform': (p, to) => checkPlatformSwitch(workspace, workspace.assertProject(p), to),
     'workflow:setPlatform': (p, to, opts) => setPlatform(workspace, workspace.assertProject(p), to, { expected: opts?.expected }),
     'workflow:presetNotNow': (p, platform) => presetNotNow(workspace, workspace.assertProject(p), platform),
-    'workflow:presetsNotice': () => presetsNotice(workspace),
-    'workflow:presetsNoticeSaid': () => presetsNoticeSaid(workspace),
     'workflow:levelForm': (level, platform) => levelForm(workspace, level, platform),
     'workflow:levelCheck': (level, platform, change) => checkLevelChange(workspace, level, platform, change),
     'workflow:setLevel': (level, platform, change) => setLevelOptions(workspace, level, platform, change),
     'queue:list': (p, target) => queueViews(workspace, workspace.assertProject(p), typeof target === 'string' && target ? target : undefined, true),
-    'slots:list': async (p) => slotViews(await poolFor(workspace, workspace.assertProject(p))),
+    'slots:list': async (p) => slotViews(await poolFor(workspace, workspace.assertProject(p)), (await projectTargets(workspace, workspace.assertProject(p)).catch(() => null))?.default ?? null),
+    'slots:movePreview': (p, slot) => slotMovePreview(currentWorkspace(), workspace.assertProject(p), String(slot)),
+    'slots:move': (p, preview) => slotMoveApply(currentWorkspace(), workspace.assertProject(p), slotMoveArg(preview)),
     'slots:setSetting': (p, key, value) => setSlotSetting(workspace, workspace.assertProject(p), key, value),
     'slots:copyOf': (p) => projectSlotCopy(workspace, workspace.assertProject(p)),
+    'preview:list': (p) => previewViews(workspace.assertProject(p)),
+    'preview:start': (p, folder) => startPreview(workspace, workspace.assertProject(p), typeof folder === 'string' ? folder : null),
+    'preview:stop': (p, folder) => stopPreview(workspace, workspace.assertProject(p), typeof folder === 'string' ? folder : null),
+    'preview:suggest': (p) => previewSuggestion(workspace.assertProject(p)),
+    'preview:setConfig': (p, cfg) => setPreviewConfig(workspace, workspace.assertProject(p), cfg),
+    'preview:show': (p, id, bounds) => showPreview(win(), workspace.assertProject(p), String(id), bounds),
+    'preview:place': (id, bounds) => placePreview(win(), String(id), bounds),
+    'preview:hide': (id) => hidePreview(win(), String(id)),
+    'preview:reload': (p, id, hard) => reloadPreview(workspace.assertProject(p), String(id), hard === true),
+    'preview:devtools': (p, id) => previewDevTools(workspace.assertProject(p), String(id)),
+    'preview:openTried': (id, url) => openTried(String(id), url),
+    'preview:test': (op) => previewTest(op),
     'slots:gitFiles': async (p) => (await slotWorkspaces().files?.status(workspace.assertProject(p))) ?? null,
     // A workspace's (null) or project's GitHub hosts (HI-2779): parsed again in setGithubHosts, whoever asks.
     'github:form': (p) => githubHostsForm(workspace, p ? workspace.assertProject(p) : null, process.env),
@@ -1924,6 +1905,20 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
       }) }
     },
     'git:branchDrops': (p, name) => lineRepoReads().lineDrops(p, String(name ?? '')),
+    // HI-3475: the Files tab's History, in the folder it shows (the project folder, a slot, a worktree): reads only.
+    'files:history': async (root, rel, isDir, pinned, page) => (await import('./fileHistoryPanel')).fileHistoryAt(workspace, root, rel, isDir, pinned, page, lineRepoReads()),
+    'files:historyDiff': async (root, left, right) => (await import('./fileHistoryPanel')).fileHistoryDiffAt(workspace, root, left, right, lineRepoReads()),
+    'files:historyIntro': async (root, head, commit) => (await import('./fileHistoryPanel')).fileHistoryIntroAt(workspace, root, head, commit, lineRepoReads()),
+    // HI-3476: blame by card, in the same folders as History; a later request with the same id, or blameCancel, stops it.
+    'files:blame': async (root, rel, text, large, id) => {
+      const blame = await import('./fileBlamePanel')
+      return blame.fileBlameAt(workspace, root, rel, text, large, id, lineRepoReads(), blameOwner(blame.fileBlameOwnerGone))
+    },
+    'files:blameCancel': async (id) => (await import('./fileBlamePanel')).fileBlameCancel(blameOwner(), id),
+    // HI-3478: Compare with…, in the same folders as History.
+    'files:compareChoices': async (root) => (await import('./fileComparePanel')).compareChoicesAt(workspace, root, lineRepoReads()),
+    'files:compareWith': async (root, rel, ref, path) => (await import('./fileComparePanel')).compareWithAt(workspace, root, rel, ref, path, lineRepoReads()),
+    'files:compareProject': async (root, rel) => (await import('./fileComparePanel')).compareProjectAt(workspace, root, rel),
     'git:history': async (p, ref, page) => {
       p = workspace.assertProject(p)
       const reads = lineRepoReads()

@@ -257,7 +257,7 @@ export const CW_TOOLS: readonly string[] = [
   'cw_read_latest_handover', 'cw_create_handover', 'cw_notify', 'cw_list_providers', 'cw_agent_activity', 'cw_wait_for_agents',
   'cw_create_project', 'cw_activate_project', 'cw_add_agent', 'cw_update_agent', 'cw_start_agent', 'cw_stop_agent', 'cw_prompt_agent',
   'cw_message_agent', 'cw_hand_over', 'cw_list_tasks', 'cw_read_task', 'cw_read_attachment', 'cw_create_task', 'cw_update_task', 'cw_update_tasks', 'cw_reorder_tasks', 'cw_start_task', 'cw_list_skills', 'cw_wait_for_tasks',
-  'cw_list_settings', 'cw_read_setting', 'cw_update_setting', 'cw_merge_slot', 'cw_lane', 'cw_queue', 'cw_release_slot', 'cw_team', 'cw_branch', 'cw_template', 'cw_connection', 'cw_inbox', 'cw_console',
+  'cw_list_settings', 'cw_read_setting', 'cw_update_setting', 'cw_merge_slot', 'cw_lane', 'cw_queue', 'cw_release_slot', 'cw_team', 'cw_branch', 'cw_template', 'cw_connection', 'cw_inbox', 'cw_console', 'cw_preview',
   'cw_journal_write', 'cw_journal_recall', 'cw_journal_entry', 'cw_journal_update',
   'cw_start_card', ...INTENT_TOOLS, 'cw_focused_skip', 'cw_ask_assistant', 'cw_undo', 'cw_answer_simplify'
 ]

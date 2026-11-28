@@ -320,6 +320,7 @@ export const EDGES = [
   { file: 'src/main/platform/releaseReadsPorts', module: 'src/main/platform/git/gitReleaseReads', class: 'registry', names: ['gitReleaseReads'], why: "the release reads port's map (HI-3148)" },
   { file: 'src/main/platform/revisionReadsPorts', module: 'src/main/platform/git/gitRevisionReads', class: 'registry', names: ['gitRevisionReads'], why: "the revision reads port's map (HI-3218)" },
   { file: 'src/main/platform/workspacePorts', module: 'src/main/platform/git/gitWorkspacePort', class: 'registry', names: ['gitWorkspacePort'], why: "the workspace port's map (R4)" },
+  { file: 'src/main/previewSource', module: 'src/main/git', class: 'impl', names: ['GitResult', 'git'], why: "HI-3614: a preview's stamp, Git's half: the place's commit and its files' tree (a temporary index's add and write-tree, on git's worker); outside a repository it reads nothing" },
   { file: 'src/main/projectAgents', module: 'src/main/branchWatch', class: 'gitUi', why: "an agent's branch card checked again" },
   { file: 'src/main/projectAgents', module: 'src/main/gitTool', class: 'gitUi', why: "Add Agent's 0.9 worktree choice says why git can't run" },
   { file: 'src/main/projectAgents', module: 'src/main/repoLock', class: 'impl', names: ['withRepoLock'], why: "a 0.9 worktree's guarded removal under the repository lock (R5 left it to the audit)" },
@@ -380,7 +381,7 @@ export const EDGES = [
 export const SEAMS = {
   'src/main/agentFolders': { calls: { slotWorkspaces: 2 }, why: "a Resume's claim of a slot: the pool's platform (R5)" },
   'src/main/assistantUndo': { calls: { lineRepoOps: 1 }, why: "the Assistant's branch undo: the window's repository operations, whatever the project's workflow platform (R3)" },
-  'src/main/ipc': { calls: { lineRepoReads: 20, slotWorkspaces: 1 }, why: "the window's repository reads: they read the folder whatever it is, as before (R2), the Changes tab's too (HI-2792), and Branches & remotes' Signing section (HI-1185), and the Files tab's Git menu's target (HI-3477); Slots and copies' submodules and LFS status, the slots' platform's (HI-1182)" },
+  'src/main/ipc': { calls: { lineRepoReads: 26, slotWorkspaces: 1 }, why: "the window's repository reads: they read the folder whatever it is, as before (R2), the Changes tab's too (HI-2792), and Branches & remotes' Signing section (HI-1185), and the Files tab's Git menu's target (HI-3477), and its History (HI-3475) Blame by card (HI-3476) and Compare with… (HI-3478); Slots and copies' submodules and LFS status, the slots' platform's (HI-1182)" },
   'src/main/lanes': { calls: { slotWorkspaces: 1 }, why: "a lane's start reads its slot through the pool's platform (R5)" },
   'src/main/githubLink': { calls: { lineRepoReads: 1 }, why: "HI-3550: a project's GitHub link reads its remotes' URLs, the window's repository read (R2), as Branches & remotes does" },
   'src/main/fileRestorePanel': { calls: { lineRepoReads: 1 }, why: "the Files tab's Restore From → Target Branch: the project's target, the window's repository read (R2, HI-3477); its plan and change go through repoOpsIpc's opsAt" },
@@ -566,11 +567,10 @@ export const SWITCHES = {
   'src/main/nameUpgradeProjects': { n: 2, class: 'historic', why: "1.1's name upgrade moves a Git repository's refs and exclude line (HI-2594): its boundary read as Git's" },
   'src/main/ipc': { n: 1, class: 'gitUi', why: "the Files tab's Git menu reads only a Git repository's boundary (git:…)" },
   'src/main/workflow/platformSwitch': { n: 1, class: 'gitUi', why: "the switch to None warns that the folder is still a Git repository (gitFolder, git.vc.switch.gitFolder): Git-facing text" },
-  'src/main/workflow/commitMessageStep': { n: 2, class: 'historic', why: "HI-1997's one-time step over G19's stored Git options (in force, or kept as `kept.git`): Git's data alone" },
   'src/renderer/src/components/AgentTiles': { n: 1, class: 'data', why: "a CSS grid column token (`none`): not a platform" },
-  'src/renderer/src/components/WorkflowOptions': { n: 1, class: 'data', why: "the review option's value `none` (G3), said in None's words where the platform accepts work: not a platform" },
   'src/renderer/src/views/VersionControl': { n: 1, class: 'gitUi', why: "the Version Control tab compares git's own read of the folder (its status summary) with detection finding Git: Git's page" },
-  'src/renderer/src/views/VersionControlHeader': { n: 1, class: 'gitUi', why: "Initialise repository… switches the project to Git by name once Git's page made it one (switchAfterInit): Git's page" }
+  'src/renderer/src/views/VersionControlHeader': { n: 1, class: 'gitUi', why: "Initialise repository… switches the project to Git by name once Git's page made it one (switchAfterInit): Git's page" },
+  'src/renderer/src/workflowValueText': { n: 1, class: 'data', why: "the review option's value `none` (G3), said in None's words where the platform accepts work: not a platform" }
 }
 
 

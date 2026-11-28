@@ -6,7 +6,7 @@ import { join } from 'path'
 import { afterAll, describe, expect, it } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
-import { as09, writeCard } from './boardDb'
+import { writeCard } from './boardDb'
 import { holdsOfCard } from '../src/shared/usageLedger'
 
 const base = tempDir('cw-card-writes-')
@@ -170,27 +170,5 @@ describe('costs read what they need of the cards (#1210)', () => {
     expect(holdsOfCard(cost)).toEqual(holds)
     expect([cost.agent, cost.agentName, cost.review]).toEqual([full.agent, full.agentName, full.review])
     expect(cost.comments).toEqual([])
-  })
-
-  it('the same on a 0.9 board waiting for its upgrade (its documents read for those fields)', async () => {
-    const { ws, w } = await workspace()
-    await inWorkspace(w, () => writeCard(w, 1, unheld(1)))
-    const [full] = await inWorkspace(w, () => tasks.allTasks(w, { numbers: [1] }))
-    await disposeWorkspaceService(w)
-    opened.splice(opened.indexOf(w), 1)
-    store.closeBoard(ws)
-    as09(store.boardFile(ws))
-    store.boardTestHooks.upgradeAnswer = 'no'
-    try {
-      const w2 = createWorkspaceService()
-      await w2.open(ws)
-      opened.push(w2)
-      expect(inWorkspace(w2, () => store.boardState(w2)).readOnly).toBe('upgrade')
-      const [cost] = await inWorkspace(w2, () => tasks.costCards(w2, [1]))
-      expect(holdsOfCard(cost)).toEqual(holdsOfCard(full))
-      expect(cost.comments).toEqual([])
-    } finally {
-      store.boardTestHooks.upgradeAnswer = null
-    }
   })
 })

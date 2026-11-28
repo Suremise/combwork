@@ -369,6 +369,13 @@
       "state": "plain"
     }
   },
+  "api.card.linkedSource": {
+    "placeholders": {
+      "set": "select",
+      "kind": "select",
+      "number": "plain"
+    }
+  },
   "api.card.madeKind": {
     "placeholders": {
       "kind": "plain"
@@ -444,6 +451,13 @@
   "api.card.saidSkipsReview": {
     "placeholders": {}
   },
+  "api.card.saidSource": {
+    "placeholders": {
+      "set": "select",
+      "kind": "select",
+      "number": "plain"
+    }
+  },
   "api.card.saidTarget": {
     "placeholders": {
       "own": "select",
@@ -454,6 +468,9 @@
     "placeholders": {}
   },
   "api.card.setSkipReview": {
+    "placeholders": {}
+  },
+  "api.card.sourceArg": {
     "placeholders": {}
   },
   "api.card.splitHint": {
@@ -923,6 +940,11 @@
       "asked": "plain",
       "doc": "plain",
       "list": "plain"
+    }
+  },
+  "api.doc.notBundled": {
+    "placeholders": {
+      "path": "plain"
     }
   },
   "api.doc.notFound": {
@@ -1645,6 +1667,38 @@
     "placeholders": {}
   },
   "api.own.typing": {
+    "placeholders": {}
+  },
+  "api.preview.agentsOnly": {
+    "placeholders": {}
+  },
+  "api.preview.badAction": {
+    "placeholders": {
+      "actions": "plain"
+    }
+  },
+  "api.preview.badPath": {
+    "placeholders": {}
+  },
+  "api.preview.notOwnPlace": {
+    "placeholders": {}
+  },
+  "api.preview.notOwned": {
+    "placeholders": {}
+  },
+  "api.preview.notRunning": {
+    "placeholders": {}
+  },
+  "api.preview.off": {
+    "placeholders": {}
+  },
+  "api.preview.placeChanged": {
+    "placeholders": {}
+  },
+  "api.preview.timedOut": {
+    "placeholders": {}
+  },
+  "api.preview.tooLarge": {
     "placeholders": {}
   },
   "api.project.nameRequired": {

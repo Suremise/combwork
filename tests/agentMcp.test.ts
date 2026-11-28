@@ -141,6 +141,44 @@ describe('a launch', () => {
     }
   })
 
+  it("gives a project agent's combwork server CW_PREVIEW only with the Preview on and the project's command set, never the Assistant (HI-3616)", async () => {
+    const home = join(base, 'ws-preview')
+    const project = join(home, 'proj')
+    mkdirSync(join(project, '.combwork'), { recursive: true })
+    mkdirSync(join(home, '.combwork'), { recursive: true })
+    writeFileSync(join(home, '.combwork', 'workspace.json'), JSON.stringify({ version: 1 }))
+    const agent = { id: 'a-p', name: 'Builder', provider: 'claude-code', workflowRole: 'builder' }
+    const write = (preview?: object) => writeFileSync(join(project, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [agent], ...(preview ? { preview } : {}) }))
+    write({ command: 'npm run dev' })
+    const { createWorkspaceService, disposeWorkspaceService } = await import('../src/main/workspace')
+    const { sessions } = await import('../src/main/sessions')
+    const { advanced } = await import('../src/main/advanced')
+    const { PREVIEW_ENABLED } = await import('../src/shared/advanced')
+    const w = createWorkspaceService()
+    await w.open(home)
+    const was = sessions.combworkMcp
+    sessions.combworkMcp = () => ({ command: 'node', args: ['cw-mcp.js'], env: {} })
+    try {
+      const env = async (id = agent.id, at = project) => (await sessions.effective(at, (id === 'assistant' ? { id, name: 'Assistant' } : agent) as never)).mcpServers.combwork?.env ?? {}
+      expect((await env()).CW_PREVIEW).toBeUndefined()
+      await advanced.set(PREVIEW_ENABLED, true)
+      const on = await sessions.effective(project, agent as never)
+      expect(on.mcpServers.combwork?.env?.CW_PREVIEW).toBe('1')
+      // Claude Code sees an image it opens (its descriptor's attachments): no CW_PREVIEW_IMAGES.
+      expect(on.mcpServers.combwork?.env?.CW_PREVIEW_IMAGES).toBeUndefined()
+      expect((await env('assistant', w.assistantHome)).CW_PREVIEW).toBeUndefined()
+      write()
+      const unset = await sessions.effective(project, agent as never)
+      expect(unset.mcpServers.combwork?.env?.CW_PREVIEW).toBeUndefined()
+      // Part of the launch's signature: turning it on or off asks a running agent for a restart.
+      expect(sessions.signature(on)).not.toBe(sessions.signature(unset))
+    } finally {
+      await advanced.set(PREVIEW_ENABLED, null)
+      sessions.combworkMcp = was
+      await disposeWorkspaceService(w)
+    }
+  })
+
   it('launches an Independent agent as from a terminal, whatever its connection says; every other role with its side (HI-2731)', async () => {
     // A workspace of its own: two servers on, a skill of its own, one agent per role.
     const home = join(base, 'ws-roles')

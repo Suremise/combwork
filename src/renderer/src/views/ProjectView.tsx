@@ -8,7 +8,11 @@ import { batchCounts } from '@shared/startAll'
 import { ONE_AGENT_TEXT, oneAgentEntries, oneAgentMore } from '../oneAgentMenu'
 import { HOOKS_DOUBLED_NOTE, hooksMissingNote } from '@shared/runtime'
 import { providerDescriptor } from '@shared/providers'
-import { MAIN_TABS, MORE_TABS, tabCommand } from '@shared/projectTabs'
+import { stripTabs, tabCommand, type PreviewTabPlace } from '@shared/projectTabs'
+import { PREVIEW_ENABLED } from '@shared/advanced'
+import { previewConfigOf } from '@shared/preview'
+import { useAdvancedValue } from '../advanced'
+import { PreviewTab } from '../components/PreviewTab'
 import { allStopped, mostUrgent, projectAgentStates, projectStateShort, projectStateSummary } from '@shared/agentState'
 import { fmt, msg, tr, tRich } from '@shared/i18n'
 import hexUrl from '../assets/icon.svg'
@@ -35,12 +39,16 @@ import { ActivityTab } from './ActivityTab'
 import { SessionsTab } from './SessionsTab'
 import { ErrorBoundary } from '../components/ErrorBoundary'
 import { ProjectTasksTab } from '../components/Board'
-import { useStartBlocked } from '../components/BoardUpgrade'
 import { RemovedDataBanner } from '../components/ProjectRemoval'
 
 // The tabs the strip shows, in order, then More ▾ with the others (#1043): the title bar's Project menu has them all,
-// and Settings (#974).
-const TABS = MAIN_TABS
+// and Settings (#974). The Preview tab (HI-3615) is placed by its project (stripTabs).
+
+/** Where a project's Preview tab is: nowhere with the switch off, in the strip with a preview command, else in More ▾. */
+function usePreviewTab(project: ProjectInfo | null): PreviewTabPlace {
+  const on = useAdvancedValue<boolean>(PREVIEW_ENABLED) === true
+  return !on || !project ? 'hidden' : previewConfigOf(project.config.preview) ? 'strip' : 'more'
+}
 
 const M = {
   moreTabs: msg({ id: 'project.tabs.more', defaultMessage: 'More', description: "The last of a project's tabs: opens a menu of its other tabs (Memory, Skills, Templates, MCP). When one of them is open, the button shows its name instead. Keep it short." }),
@@ -121,8 +129,6 @@ function tabTip(id: ProjectTab, label: string): string {
   return kb ? tr(M.tabTip, { tab: label, key: formatKeybinding(kb) }) : label
 }
 
-/** The More ▾ button's place among the strip's measured items: after the tabs (#1043). */
-const MORE_AT = TABS.length
 
 /** How the tab strip fits: every tab labelled; icons, with the active tab's label; or icons only, scrolling if even they don't. */
 type TabFit = 'labels' | 'icons' | 'all-icons'
@@ -169,6 +175,9 @@ function headerNeed(el: HTMLElement): number | null {
  * active item, with its name and icon.
  */
 function ProjectTabStrip({ project, tab, live }: { project: ProjectInfo; tab: ProjectTab; live: boolean }) {
+  const { main: TABS, more: MORE_TABS } = stripTabs(usePreviewTab(project))
+  // The More ▾ button's place among the strip's measured items: after the tabs (#1043).
+  const MORE_AT = TABS.length
   const [widthRef, width] = useWidth<HTMLDivElement>()
   const strip = useRef<HTMLDivElement | null>(null)
   const stripRef = useCallback(
@@ -324,8 +333,6 @@ function SessionEmpty({ project, framed }: { project: ProjectInfo; framed: boole
       : null
   const epoch = useStore((s) => (focused ? s.sessionEpoch[projectKey(project.path, focused.id)] : undefined))
   const ended = epoch !== undefined
-  // Its workspace's 1.0 upgrade waits (#1230): no session can start.
-  const startBlocked = useStartBlocked()
   // From the click until the session runs (#1177): the focused agent's, or with no agent, the one being added.
   const agentStarting = useStarting(project.path, focused?.id ?? null)
   const addingStarting = useProjectStarting(project.path)
@@ -341,10 +348,10 @@ function SessionEmpty({ project, framed }: { project: ProjectInfo; framed: boole
         <>
           <Icon name="debug-disconnect" />
           <span className="grow">{tr(M.sessionEnded)}</span>
-          <button className="btn act-resume solid" disabled={!!startBlocked || !!starting} aria-busy={resuming || undefined} title={startBlocked ?? (focused?.resume?.fresh ? freshTip(focused.resume.fresh, sessionLabel(focused.resume, project.name)) : undefined)} onClick={() => void actions.resumeLast(project.path)}>
+          <button className="btn act-resume solid" disabled={!!starting} aria-busy={resuming || undefined} title={focused?.resume?.fresh ? freshTip(focused.resume.fresh, sessionLabel(focused.resume, project.name)) : undefined} onClick={() => void actions.resumeLast(project.path)}>
             <Icon name={resuming ? 'loading' : 'debug-continue'} spin={resuming} /> {resuming ? startingLabel(starting) : tr(M.resume)}
           </button>
-          <button className="btn act-start" disabled={!!startBlocked || !!starting} aria-busy={startingNew || undefined} title={startBlocked ?? undefined} onClick={() => void actions.newSession(project.path)}>
+          <button className="btn act-start" disabled={!!starting} aria-busy={startingNew || undefined} onClick={() => void actions.newSession(project.path)}>
             <Icon name={startingNew ? 'loading' : 'add'} spin={startingNew} /> {startingNew ? startingLabel(starting) : tr(M.newSession)}
           </button>
         </>
@@ -368,7 +375,7 @@ function SessionEmpty({ project, framed }: { project: ProjectInfo; framed: boole
           )}
           {noAccount && <NoConnectionBanner where="empty" />}
           <div className="btns">
-            <button className="btn act-start solid" disabled={!!startBlocked || !!starting} aria-busy={startingNew || undefined} title={startBlocked ?? undefined} onClick={() => void actions.newSession(project.path)}>
+            <button className="btn act-start solid" disabled={!!starting} aria-busy={startingNew || undefined} onClick={() => void actions.newSession(project.path)}>
               <Icon name={startingNew ? 'loading' : 'add'} spin={startingNew} /> {startingNew ? startingLabel(starting) : tr(M.newSession)} {newKey && <kbd style={{ marginLeft: 6 }}>{formatKeybinding(newKey)}</kbd>}
             </button>
             {focused ? <ResumeButton project={project} a={focused} className={RESUME_TINT} label={tr(M.resumeLast)} /> : <AddAgentButton project={project} className="tint-amber" />}
@@ -401,7 +408,10 @@ export function ProjectView({ visible }: { visible: boolean }) {
   const oneMenu = useContextMenu()
   const oneMenuFor = useRef<'resume' | 'stop' | null>(null)
   const project = workspace?.projects.find((p) => p.path === selected) ?? null
-  const tab = (project && tabs[project.path]) || 'session'
+  const shownTab = (project && tabs[project.path]) || 'session'
+  // The Preview tab while the Preview is off (turned off while it was shown): the Session tab instead (HI-3615).
+  const previewTab = usePreviewTab(project)
+  const tab = shownTab === 'preview' && previewTab === 'hidden' ? 'session' : shownTab
   // The Session tab's view (#975): Panes shows the terminals; Tiles hides them (they keep running) for a tile each (#976).
   const view = project ? projectSessionView(project.config, settings) : 'panes'
   // A tile's focus view (#976): that agent's pane, beside the strip of the others.
@@ -733,6 +743,7 @@ export function ProjectView({ visible }: { visible: boolean }) {
           {tab === 'skills' && <ProjectSkillsTab project={project} />}
           {tab === 'templates' && <ProjectTemplatesTab project={project} />}
           {tab === 'mcp' && <ProjectMcpTab project={project} />}
+          {tab === 'preview' && previewTab !== 'hidden' && <PreviewTab project={project} />}
           {tab === 'settings' && <ProjectSettingsTab project={project} />}
         </ErrorBoundary>
       </div>

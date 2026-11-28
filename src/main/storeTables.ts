@@ -1,6 +1,6 @@
 import { existsSync } from 'original-fs'
 import { resolve } from 'path'
-import { boardLock, boardOpen, boardWriteOp, dbGenerationAt, inBoardWrite, leaseDb, noteLanesSaved, onDbReplaced, upgradeWaiting, workspaceDb, type DbLease } from './boardStore'
+import { boardLock, boardOpen, boardWriteOp, inBoardWrite, leaseDb, noteLanesSaved, workspaceDb, type DbLease } from './boardStore'
 import type { WorkspaceService } from './workspace'
 import { countedWrite } from './dbWrites'
 import { transaction } from './db'
@@ -17,9 +17,6 @@ const log = createLogger('stores')
  * the board's own transactions on their shared connection), that rewrites only the entries that changed and removes
  * those gone. A store's values (`imported`, metrics' `observed`, watches' `invalid`) are in `board_meta` as
  * `<store>.<key>`.
- *
- * While a workspace's upgrade to 1.0 waits (#1207), its file still has 0.9's `store_rows`: the stores read them from
- * there, and nothing is written (the file is read-only).
  */
 
 export interface TableData {
@@ -40,21 +37,16 @@ export const tableTestHooks: { failSave: ((store: TableStore) => boolean) | null
  * database opened for it and closed again) keeps nothing, those of workspaces closed since go at each save, and at most
  * MAX_COMMITTED stores are kept, the least recently saved going first.
  */
-const committed = new Map<string, { path: string; place: string; gen: number; docs: Map<string, string> }>()
+const committed = new Map<string, { path: string; place: string; docs: Map<string, string> }>()
 export const MAX_COMMITTED = 3 * 8
 const cacheKey = (path: string, store: TableStore): string => `${path.toLowerCase()}|${store}`
-// Under every spelling of the workspace, by the place each save recorded as it entered (#1456).
-onDbReplaced((workspacePath, place) => {
-  for (const store of Object.keys(TABLE_DEFS) as TableStore[]) committed.delete(cacheKey(resolve(workspacePath), store))
-  for (const [k, v] of [...committed]) if (v.place === place) committed.delete(k)
-})
 
 /** Keeps a store's committed entries, as the most recently saved; drops those of closed workspaces and past the bound. */
-function remember(path: string, place: string, store: TableStore, gen: number, docs: Map<string, string>): void {
+function remember(path: string, place: string, store: TableStore, docs: Map<string, string>): void {
   const key = cacheKey(path, store)
   committed.delete(key)
   for (const [k, v] of committed) if (!boardOpen(v.path)) committed.delete(k)
-  committed.set(key, { path, place, gen, docs })
+  committed.set(key, { path, place, docs })
   while (committed.size > MAX_COMMITTED) committed.delete(committed.keys().next().value!)
 }
 
@@ -63,7 +55,7 @@ export const committedFor = (): string[] => [...new Set([...committed.values()].
 
 const hasTable = (db: ReturnType<typeof workspaceDb>['reader'], name: string): boolean => !!db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?").get(name) // i18n-ignore: SQL
 
-/** A store's entries and values as last committed: its tables, or 0.9's `store_rows` while its upgrade waits. */
+/** A store's entries and values as last committed, from its tables. */
 export function readTable(workspacePath: string, store: TableStore): TableData {
   if (tableTestHooks.failRead?.(store)) throw new Error(`SQLITE_IOERR: disk I/O error (test, ${store})`) // i18n-ignore: a test's stand-in for SQLite's error
   return readTableIn(workspaceDb(resolve(workspacePath)).reader, store)
@@ -72,24 +64,9 @@ export function readTable(workspacePath: string, store: TableStore): TableData {
 /** readTable on the connection given (a lease's: a look at a workspace no window holds, #1395). */
 export function readTableIn(db: ReturnType<typeof workspaceDb>['reader'], store: TableStore): TableData {
   const def = TABLE_DEFS[store]
-  if (!hasTable(db, def.main)) return readOld(db, store)
+  // A board saved by a newer Combwork may have moved a store's table: nothing read of it then.
+  if (!hasTable(db, def.main)) return { docs: [], meta: new Map() }
   return { docs: readEntries(db, store).map((e) => e.doc), meta: readMeta(db, store) }
-}
-
-/** 0.9's rows for a store (a file waiting for its upgrade to 1.0), read only. */
-function readOld(db: ReturnType<typeof workspaceDb>['reader'], store: TableStore): TableData {
-  if (!hasTable(db, 'store_rows')) return { docs: [], meta: new Map() }
-  const rows = db.prepare("SELECT doc FROM store_rows WHERE store = ? AND scope = '' ORDER BY ord, key").all(store) as { doc: string }[] // i18n-ignore: SQL
-  const meta = db.prepare("SELECT key, value FROM store_meta WHERE store = ? AND scope = ''").all(store) as { key: string; value: string }[] // i18n-ignore: SQL
-  const docs: unknown[] = []
-  for (const r of rows) {
-    try {
-      docs.push(JSON.parse(r.doc))
-    } catch {
-      // not JSON: the upgrade keeps it aside
-    }
-  }
-  return { docs, meta: new Map(meta.map((m) => [m.key, m.value])) }
 }
 
 /**
@@ -144,7 +121,7 @@ export function saveTableInBoard(ws: WorkspaceService, store: TableStore, docs: 
 function saveEntries(path: string, store: TableStore, docs: readonly unknown[], meta: Record<string, string | null>, lease: DbLease, also?: (db: ReturnType<typeof workspaceDb>['writer']) => void): void {
   const next = saveEntriesOn(path, store, docs, meta, lease.db.writer, false, also)
   // A closed workspace's last save keeps nothing (its database is closed again at once).
-  if (lease.kept && next) remember(path, next.place, store, next.gen, next.docs)
+  if (lease.kept && next) remember(path, next.place, store, next.docs)
   else committed.delete(cacheKey(path, store))
 }
 
@@ -152,11 +129,10 @@ function saveEntries(path: string, store: TableStore, docs: readonly unknown[], 
  * saveTable's writes on a connection, in a transaction of their own, or (`inner`) in a savepoint of the caller's; what
  * it wrote, for the cache.
  */
-function saveEntriesOn(path: string, store: TableStore, docs: readonly unknown[], meta: Record<string, string | null>, db: ReturnType<typeof workspaceDb>['writer'], inner: boolean, also?: (db: ReturnType<typeof workspaceDb>['writer']) => void): { place: string; gen: number; docs: Map<string, string> } | null {
+function saveEntriesOn(path: string, store: TableStore, docs: readonly unknown[], meta: Record<string, string | null>, db: ReturnType<typeof workspaceDb>['writer'], inner: boolean, also?: (db: ReturnType<typeof workspaceDb>['writer']) => void): { place: string; docs: Map<string, string> } | null {
   const def = TABLE_DEFS[store]
-  // Its workspace's place resolved once, as the save enters: its generation, and what the cache records.
+  // Its workspace's place resolved once, as the save enters: what the cache records.
   const place = placeKey(path)
-  const gen = dbGenerationAt(place)
   const keys = entryKeys(store, docs)
   const texts = docs.map((d) => JSON.stringify(d))
   let had = committed.get(cacheKey(path, store))
@@ -164,7 +140,7 @@ function saveEntriesOn(path: string, store: TableStore, docs: readonly unknown[]
   const inTransaction = inner ? savepoint : transaction
   inTransaction(db, () => {
     // A store others write too (the runtime's lanes, #1291) is compared with what the table has now.
-    if (!had || had.gen !== gen || def.shared) had = { path, place, gen, docs: new Map(readEntries(db, store).map((e) => [e.key, JSON.stringify(e.doc)])) }
+    if (!had || def.shared) had = { path, place, docs: new Map(readEntries(db, store).map((e) => [e.key, JSON.stringify(e.doc)])) }
     const before = had.docs
     // Those no longer in the list go first: a new entry may take what one of them held (an agent's one watch).
     const kept = new Set(keys)
@@ -205,7 +181,7 @@ function saveEntriesOn(path: string, store: TableStore, docs: readonly unknown[]
     also?.(db)
     if (tableTestHooks.failSave?.(store)) throw new Error(`SQLITE_FULL: database or disk is full (test, ${store})`) // i18n-ignore: a test's stand-in for SQLite's error
   })
-  return { place, gen, docs: next }
+  return { place, docs: next }
 }
 
 /** fn in a savepoint of the transaction under way: undone alone if it throws, else part of that transaction. */
@@ -244,12 +220,10 @@ function deleteByKey(db: ReturnType<typeof workspaceDb>['writer'], store: TableS
  * the file as the store always has and gives its entries, null only when there is no file; one that can't be read now
  * throws, and nothing is marked, so the next open tries again. They go into the tables in one transaction with the mark
  * that they did (`<store>.imported`), and the file is renamed `<file>.imported-<time>`, kept as a backup. A file found
- * after that (a rename refused before, or one an older version wrote since) is renamed the same way, unread. While the
- * upgrade to 1.0 waits, nothing is moved: the store reads what the file has (`store_rows`).
+ * after that (a rename refused before, or one an older version wrote since) is renamed the same way, unread.
  */
 export async function openTable(workspacePath: string, store: TableStore, file: string, readFile: () => Promise<{ docs: unknown[]; meta?: Record<string, string> } | null>): Promise<TableData> {
   const path = resolve(workspacePath)
-  if (upgradeWaiting(path)) return readTable(path, store)
   const moved = (): boolean => hasTable(workspaceDb(path).reader, TABLE_DEFS[store].main) && readMeta(workspaceDb(path).reader, store).has('imported')
   const first = !moved()
   if (first) {

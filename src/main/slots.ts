@@ -1145,6 +1145,11 @@ export class SlotStore {
     await this.conn.write((db) => db.prepare("UPDATE slots SET state = 'gone' WHERE project = ? AND name = ? AND state = 'lent' AND op IS NULL").run(this.project, name))
   }
 
+  /** HI-3614 round 2: a job kept on a slot that holds none (a preview's server not proved ended): whether it was. */
+  async holdJob(name: string, job: string): Promise<boolean> {
+    return this.conn.write((db) => Number(db.prepare('UPDATE slots SET job = ? WHERE project = ? AND name = ? AND job IS NULL').run(job, this.project, name).changes) === 1)
+  }
+
   /** A job left by an ended operation, settled since: cleared, only while no operation holds the slot. */
   async jobSettled(name: string, job: string): Promise<void> {
     await this.conn.write((db) => db.prepare('UPDATE slots SET job = NULL WHERE project = ? AND name = ? AND job = ? AND op IS NULL').run(this.project, name, job))
@@ -1258,7 +1263,8 @@ interface PoolDeps {
   /** The owed pass's wake (HI-2906): a timer by default; tests give a scheduler they fire themselves. */
   later?: (fn: () => void, ms: number) => { cancel(): void }
   /** A lease ended (#1434): its builder's session in the slot (the slot's writer) is stopped once its turn ends. */
-  ended?: (lease: SlotLease, slot: Slot) => void
+  /** HI-3614 round 2: `holdJob`, a job whose processes may still run in the slot (a preview's server): kept on the slot, out of the pool, until settled. */
+  ended?: (lease: SlotLease, slot: Slot) => void | Promise<void | { holdJob?: string }>
   /**
    * Whether a writer's run is over and its processes are known to have ended (#1434): only then does a refresh clear it
    * (a release that couldn't be written). A writer of a Combwork that is gone is cleared only as `writerGone` says.
@@ -1730,7 +1736,7 @@ export class SlotPool {
     const r = await this.store.laneOver(lease, why, decide)
     if (!r || !('ended' in r)) return r
     const slot = this.store.slot(r.ended.slot)
-    if (slot) this.deps.ended?.(r.ended, slot)
+    if (slot) await this.holdFor(slot.name, await this.deps.ended?.(r.ended, slot))
     await this.drained(r.ended.slot)
     return r
   }
@@ -1740,9 +1746,20 @@ export class SlotPool {
     if (!ended) return false
     const slot = this.store.slot(ended.slot)
     // Its writer (the builder's session there) drains, and is stopped once its turn is over (#1434).
-    if (slot) this.deps.ended?.(ended, slot)
+    if (slot) await this.holdFor(slot.name, await this.deps.ended?.(ended, slot))
     await this.drained(ended.slot)
     return true
+  }
+
+  /**
+   * HI-3614 round 2: a job a lease's end couldn't prove ended (a preview's server in the slot) kept on the slot, so it
+   * isn't lent, removed or reused until a settle proves it (the refresh's, as an operation's leftover job is).
+   */
+  private async holdFor(name: string, answer: void | { holdJob?: string }): Promise<void> {
+    const job = answer && answer.holdJob
+    if (!job) return
+    if (await this.store.holdJob(name, job)) log.warn(`Slot ${userText(name)} is held for job ${job}, whose processes couldn't be proved ended: it stays out of the pool until they are`)
+    else log.warn(`Slot ${userText(name)} already holds a job: job ${job}, whose processes couldn't be proved ended, isn't recorded on it`)
   }
 
   /**

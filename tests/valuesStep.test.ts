@@ -28,10 +28,10 @@ let n = 0
 /** A board at version 25 (before the step), given rows, then opened with every step. */
 function board(fill: (db: DatabaseSync) => void): { file: string; db: Db } {
   const file = join(base, `board${++n}.db`)
-  const before = openDb(file, { migrations: BOARD_MIGRATIONS.filter((m) => m.version < 26), appVersion: '1.0.0', approve: () => true })
+  const before = openDb(file, { migrations: BOARD_MIGRATIONS.filter((m) => m.version < 26), appVersion: '1.0.0' })
   fill(before.writer)
   before.close()
-  return { file, db: openDb(file, { migrations: BOARD_MIGRATIONS, appVersion: '1.1.0', approve: () => true }) }
+  return { file, db: openDb(file, { migrations: BOARD_MIGRATIONS, appVersion: '1.1.0' }) }
 }
 
 const NOW = '2026-10-01T00:00:00.000Z'
@@ -121,7 +121,7 @@ describe("the board's values step", () => {
 
   it('on a fresh board, changes nothing', () => {
     const file = join(base, `fresh${++n}.db`)
-    const db = openDb(file, { migrations: BOARD_MIGRATIONS, appVersion: '1.1.0', approve: () => true })
+    const db = openDb(file, { migrations: BOARD_MIGRATIONS, appVersion: '1.1.0' })
     expect(upgradeValues(db.writer)).toEqual({})
     db.close()
   })

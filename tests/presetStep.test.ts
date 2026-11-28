@@ -8,7 +8,6 @@ import { join } from 'path'
 import { afterAll, describe, expect, it } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
-import { as09 } from './boardDb'
 
 const base = tempDir('cw-presetstep-')
 mkdirSync(join(base, 'profile'), { recursive: true })
@@ -19,7 +18,6 @@ const store = await import('../src/main/boardStore')
 const form = await import('../src/main/workflow/optionsForm')
 const sw = await import('../src/main/workflow/platformSwitch')
 const step = await import('../src/main/workflow/presetStep')
-const { adoptNow } = await import('../src/main/workflow/adoption')
 const { preset } = await import('../src/shared/workflow/options')
 const { asksPreset, suggestPreset } = await import('../src/shared/workflow/presetStep')
 const { settingEntry } = await import('../src/shared/settingsCatalog')
@@ -67,13 +65,13 @@ describe('the suggestion, from the agents (#1423)', () => {
 })
 
 describe('which projects ask (#1423)', () => {
-  it('new: yes; from before 1.0 (no platform recorded, or options the upgrade wrote): no; answered: no; options of its own or a preset: no', () => {
+  it('new: yes; with options the upgrade wrote: no; no platform recorded: yes (HI-3619); answered: no; options of its own or a preset: no', () => {
     expect(asksPreset({ platform: 'git' }, 'git')).toBe(true)
     expect(asksPreset({ platform: 'git', workflow: { platform: 'git', preset: null, options: { review: 'none' } } }, 'git')).toBe(false)
     expect(asksPreset({ platform: 'git', workflow: { platform: 'git', preset: null, options: {}, presetAsked: 'notNow' } }, 'git')).toBe(false)
     expect(asksPreset({ platform: 'git', workflow: { platform: 'git', preset: 'solo', options: {} } }, 'git')).toBe(false)
-    // No platform recorded: from before 1.0, whose upgrade gives it options (also before that has run).
-    expect(asksPreset({}, 'git')).toBe(false)
+    // No platform recorded: from before 1.0, its upgrade's options never written (HI-3619: the adoption that wrote them is gone).
+    expect(asksPreset({}, 'git')).toBe(true)
   })
 
   it('switched to a platform with nothing kept: yes, even with the other platform answered; back: its answer restored', async () => {
@@ -123,29 +121,19 @@ describe('the answer (#1423)', () => {
     expect(asksPreset(await w.projectConfig(repo), 'none')).toBe(true)
   })
 
-  it("a project from before 1.0 never asks, also before its upgrade has run; an empty 0.9 board's projects get their options (HR3's round 1, finding 1)", async () => {
+  it("a project from before 1.0 that never got its upgrade's options asks, and nothing is written for it unasked (HI-3619)", async () => {
     const ws = join(base, `ws-${++n}`)
     const repo = join(ws, 'p')
     mkdirSync(join(repo, '.combwork'), { recursive: true })
     mkdirSync(join(ws, '.combwork'), { recursive: true })
     git(repo, 'init', '-q', '-b', 'main')
-    // As 0.9 left it: no platform recorded, no workflow, no card on the board.
+    // As a Combwork before 1.0 left it: no platform recorded, no workflow, no card on the board (HI-3602: none made yet).
     writeFileSync(join(repo, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'b1', name: 'Builder' }, { id: 'r1', name: 'Reviewer' }] }))
-    const w0 = createWorkspaceService()
-    await w0.open(ws)
-    // Its board made (an empty one), then as 0.9 left it.
-    await store.boardWrite(w0, async () => undefined)
-    await disposeWorkspaceService(w0)
-    store.closeBoard(ws)
-    as09(store.boardFile(ws))
     const w = createWorkspaceService()
     await w.open(ws)
     opened.push(w)
-    expect(asksPreset(await w.projectConfig(repo), 'git')).toBe(false)
-    await inWorkspace(w, () => store.upgradeBoard(w))
-    expect(await adoptNow(w)).toMatchObject({ configured: 1, failed: 0 })
-    expect(onDisk(repo)).toMatchObject({ platform: 'git', preset: null, options: { review: 'agent' } })
-    expect(asksPreset(await w.projectConfig(repo), 'git')).toBe(false)
+    expect(asksPreset(await w.projectConfig(repo), 'git')).toBe(true)
+    expect(onDisk(repo)).toBeUndefined()
   })
 
   it("a folder found by a refresh is made a project as opening makes one: its platform recorded, it asks", async () => {
@@ -158,9 +146,8 @@ describe('the answer (#1423)', () => {
     expect(asksPreset(cfg, 'none')).toBe(true)
   })
 
-  it("a board made by 1.0 gives its projects no upgrade options: they ask", async () => {
+  it("a project made by 1.0 gets no options written: it asks", async () => {
     const { w, repo } = await workspace(undefined, [{ id: 'b1', name: 'Builder' }, { id: 'r1', name: 'Reviewer' }])
-    await adoptNow(w)
     expect(onDisk(repo)).toBeUndefined()
     expect(asksPreset(await w.projectConfig(repo), 'git')).toBe(true)
   })

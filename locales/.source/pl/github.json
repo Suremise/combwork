@@ -101,6 +101,7 @@
   "github.shipped.cancel": "Close",
   "github.shipped.close": "{count, plural, one {Close # Issue} other {Close # Issues}}",
   "github.shipped.desc": "The cards with a GitHub issue that merged into a released branch. Once its release is published on GitHub, each open issue is closed with the comment “Fixed in {version}”, under your GitHub account.",
+  "github.shipped.doubt": "{reason, select, earlier {Issue #{issue} · {card}: left out, as it couldn’t be told whether the earlier release {tag} shipped it} other {Issue #{issue} · {card}: left out, as it couldn’t be read whether its merge is in {tag}}}",
   "github.shipped.failed": "Couldn’t close the shipped issues",
   "github.shipped.line": "Released branch",
   "github.shipped.loading": "Asking GitHub…",

@@ -274,6 +274,10 @@
   "api.card.lineCommentsState": {
     "text": "Unknown state \"{state}\": open or all."
   },
+  "api.card.linkedSource": {
+    "text": "{set, select, yes {linked it to {kind, select, pr {pull request} other {issue}} #{number}} other {cleared its GitHub source}}",
+    "note": "HI-3584: what the Assistant's card change did, one of a list joined with commas (stored)."
+  },
   "api.card.madeKind": {
     "text": "made it {kind}"
   },
@@ -329,6 +333,10 @@
   "api.card.saidSkipsReview": {
     "text": "Skips review"
   },
+  "api.card.saidSource": {
+    "text": "{set, select, yes {Linked to {kind, select, pr {pull request} other {issue}} #{number}} other {GitHub source cleared}}",
+    "note": "HI-3584: a line of the Assistant's card change's reply: it set the card's GitHub source (set yes, kind pr or issue, its number) or cleared it."
+  },
   "api.card.saidTarget": {
     "text": "{own, select, yes {Merges into {target}} other {Merges into the project's branch}}",
     "note": "HI-2556: a card update set its Merges into: own yes, {target} (a branch); else the project's Work merges into."
@@ -338,6 +346,10 @@
   },
   "api.card.setSkipReview": {
     "text": "set it to skip review"
+  },
+  "api.card.sourceArg": {
+    "text": "source is a GitHub pull request or issue of the project: #12 or its address; null clears it.",
+    "note": "HI-3584: cw_create_task or cw_update_task was given a source that is not text or null."
   },
   "api.card.splitHint": {
     "text": "{n} comments: a card this long is hard to follow. Consider splitting its remaining work into new cards.",
@@ -664,6 +676,10 @@
   },
   "api.doc.noSection": {
     "text": "No section \"{asked}\" in {doc}. Closest: {list}."
+  },
+  "api.doc.notBundled": {
+    "text": "Combwork ships no {path}: its own guide is combwork:USER_GUIDE.md",
+    "note": "HI-3622: a combwork: path that names no document Combwork ships (only its user guide)."
   },
   "api.doc.notFound": {
     "text": "Not found: {path}"
@@ -1145,6 +1161,36 @@
   },
   "api.own.typing": {
     "text": "Typing into an agent"
+  },
+  "api.preview.agentsOnly": {
+    "text": "cw_preview is a project agent's own tool: it reaches the preview of the place its session works in."
+  },
+  "api.preview.badAction": {
+    "text": "action is one of {actions}."
+  },
+  "api.preview.badPath": {
+    "text": "path is a page of the preview's own server, starting with / (no //, no spaces or backslashes)."
+  },
+  "api.preview.notOwnPlace": {
+    "text": "cw_preview reaches only your own place (the slot you build in, or the review copy you review in): it takes no project, place, folder or agent."
+  },
+  "api.preview.notOwned": {
+    "text": "Another program listens on its port now, so Combwork stopped the preview and loaded nothing: start it again (action start)."
+  },
+  "api.preview.notRunning": {
+    "text": "Your place's preview isn't running: start it first (action start)."
+  },
+  "api.preview.off": {
+    "text": "The Preview is off: the user can turn it on in Settings → Advanced (Preview: run projects' dev servers)."
+  },
+  "api.preview.placeChanged": {
+    "text": "Your place changed meanwhile (its lease ended or passed on): nothing was done. Call again to reach your place as it is now."
+  },
+  "api.preview.timedOut": {
+    "text": "The capture took longer than Settings → Advanced → Preview: longest an agent's capture takes allows. Nothing was saved: try again."
+  },
+  "api.preview.tooLarge": {
+    "text": "The screenshot is too large to save, even as a JPEG at half size: take the viewport (no full), or a smaller page. Nothing was saved."
   },
   "api.project.nameRequired": {
     "text": "name is required"

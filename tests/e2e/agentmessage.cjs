@@ -135,9 +135,15 @@ const check = (name, ok, extra = '') => {
   check('…not typed while it works', !wakes('Builder').length)
   check('once idle, its doorbell is typed, and the builder reads it', !!(await until(async () => wakes('Builder').some((t) => t === `Add #${c1}'s follow-up to your lane after it.`), lib.timing('hang.step'))) && bells('Builder').includes(`[CW] New in your inbox: 1 message (${mid}). Call cw_inbox to read it, act on it, then ack it.`), JSON.stringify(wakeLog('Builder')))
   // Read (#650: the only receipt): received through the inbox, and no longer unread in the pane; still the builder's to ack.
-  check('…received as it reads it, and no longer unread in its pane', !!(await until(async () => lastDelivery('Builder')?.state === 'received' && lastDelivery('Builder')?.receivedVia === 'inbox' && !(await unread()), lib.timing('hang.ui'))), JSON.stringify(lastDelivery('Builder')))
-  const done = activity('Builder')
-  check('…and its activity says when it was offered and received', done.inbox?.unread === 0 && !!done.inbox.deliveries.at(-1)?.offered && !!done.inbox.deliveries.at(-1)?.received, JSON.stringify(done))
+  check('…received as it reads it, and no longer unread in its pane', !!(await until(async () => lastDelivery('Builder')?.state === 'received' && lastDelivery('Builder')?.readVia === 'inbox' && !(await unread()), lib.timing('hang.ui'))), JSON.stringify(lastDelivery('Builder')))
+  // HI-3611: its woke is saved apart from its read (the take is confirmed in the background), so the whole row is waited
+  // for, one snapshot an attempt: offered, then woke, then read.
+  let done = null
+  const wokeThenRead = (r) => !!r?.offered && Date.parse(r.woke) >= Date.parse(r.offered) && Date.parse(r.read) >= Date.parse(r.woke)
+  check('…and its activity says when it was offered, woke it and was read (HI-3611)', !!(await until(async () => {
+    done = activity('Builder')
+    return done.inbox?.unread === 0 && wokeThenRead(done.inbox.deliveries?.find((d) => d.id === mid))
+  }, lib.timing('hang.ui'))), JSON.stringify(done))
   await until(() => idle(builder.id), lib.timing('hang.ui'))
   // While it acts on that one, a second comes (#1531): one call acks the first and reads the second (ack with read),
   // which is received, not acked.
@@ -147,7 +153,7 @@ const check = (name, ok, extra = '') => {
   const mid2 = /\((m\d+), working\)/.exec(second.text)?.[1] ?? '?'
   fs.writeFileSync(path.join(claudeHome, 'agentmessage-ack-go'), '')
   const state = (id) => (activity('Builder').inbox?.deliveries ?? []).find((d) => d.id === id)
-  check('the builder acks the first and reads the second in one call (ack with read): the first acked, the second received only', !!(await until(async () => state(mid)?.state === 'acked' && state(mid2)?.state === 'received' && state(mid2)?.receivedVia === 'inbox', lib.timing('hang.ui'))), JSON.stringify([state(mid), state(mid2)]))
+  check('the builder acks the first and reads the second in one call (ack with read): the first acked, the second received only', !!(await until(async () => state(mid)?.state === 'acked' && state(mid2)?.state === 'received' && state(mid2)?.readVia === 'inbox', lib.timing('hang.ui'))), JSON.stringify([state(mid), state(mid2)]))
   await until(() => idle(builder.id), lib.timing('hang.ui'))
   // The reply it got, from its transcript: the ack line, then the read with the second, to ack once acted on.
   const s = await live(alpha, builder.id)

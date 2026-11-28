@@ -24,7 +24,7 @@
 // so a closed board is never opened again for it nor another workspace's written.
 
 import { randomUUID } from 'crypto'
-import { boardFile, boardRead, boardReadOnly, boardWrite, boardWriteOp, dbGeneration, onBoardCommitted } from '../boardStore'
+import { boardFile, boardRead, boardReadOnly, boardWrite, boardWriteOp, onBoardCommitted } from '../boardStore'
 import { createLogger } from '../logger'
 import type { WorkspaceService } from '../workspace'
 import type { DatabaseSync } from 'node:sqlite'
@@ -57,8 +57,8 @@ const PROCESS = randomUUID()
  * with one id are two actions (HR1's #1266 round 4).
  */
 const handling = new Map<string, string>()
-/** An action of a workspace's database, as this process's maps key it: the board's file, its generation, the id. */
-const actionKey = (ws: WorkspaceService, id: number): string => `${ws.path ? boardFile(ws.path).toLowerCase() : ''}#${ws.path ? dbGeneration(ws.path) : 0}#${id}`
+/** An action of a workspace's database, as this process's maps key it: the board's file and the id. */
+const actionKey = (ws: WorkspaceService, id: number): string => `${ws.path ? boardFile(ws.path).toLowerCase() : ''}#${id}`
 /** For tests: the lease's length (null: two minutes), to test its renewal and expiry without waiting minutes. */
 export function setLeaseMsForTests(ms: number | null): void {
   LEASE_MS = ms ?? 2 * 60_000

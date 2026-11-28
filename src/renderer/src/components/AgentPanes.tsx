@@ -49,7 +49,6 @@ import { hooksMissingNote, hooksMissingText, retryWaitText, unknownStateText } f
 import { retryWaitsView } from '@shared/toolReplies'
 import { Icon, IconButton, ReviewMark, SafeguardMark, signInNote, statusText, Tooltip, useContextMenu, useFolds, type MenuEntry } from './ui'
 import { useConnections } from './ConnectionChoice'
-import { startBlockedReason, useStartBlocked } from './BoardUpgrade'
 import { awayFromProject, legacyOf, placeText, placeTip } from '../agentPlace'
 import { legacySetupPending } from '@shared/agentFolders'
 
@@ -220,22 +219,20 @@ const STOP = msg({ id: 'panes.agent.stop', defaultMessage: 'Stop', description: 
 export function ResumeButton({ project, a, className, label }: { project: ProjectInfo; a: AgentInfo; className?: string; label?: string }) {
   useLanguage()
   const picker = useSessionPicker()
-  // Its workspace's 1.0 upgrade waits (#1230): no session can start.
-  const blocked = useStartBlocked()
   // From the click until the session runs (#1177).
   const starting = useStarting(project.path, a.id)
   const resuming = starting?.kind === 'resume'
   const choose = tr(msg({ id: 'panes.resume.choose', defaultMessage: 'Choose a session to resume', description: "Tooltip and accessible name of the ▾ beside an agent's Resume button: opens the session picker." }))
   return (
     <span className="split-btn">
-      <Tooltip content={blocked ?? resumeTip(project, a)}>
+      <Tooltip content={resumeTip(project, a)}>
         {/* Its label can fold away in a very narrow bar (#890): the name stays for screen readers. */}
-        <button className={cx('btn', className)} disabled={!a.resume || !!blocked || !!starting} aria-busy={resuming || undefined} onClick={() => void actions.resumeLast(project.path, a.id)} aria-label={resuming ? startingLabel(starting) : (label ?? tr(RESUME))}>
+        <button className={cx('btn', className)} disabled={!a.resume || !!starting} aria-busy={resuming || undefined} onClick={() => void actions.resumeLast(project.path, a.id)} aria-label={resuming ? startingLabel(starting) : (label ?? tr(RESUME))}>
           <Icon name={resuming ? 'loading' : 'debug-continue'} spin={resuming} /> <span className="btn-label">{resuming ? startingLabel(starting) : (label ?? tr(RESUME))}</span>
         </button>
       </Tooltip>
-      <Tooltip content={blocked ?? choose}>
-        <button className={cx('btn', 'split-caret', className)} disabled={!!blocked || !!starting} onClick={(e) => picker.openBelow(e.currentTarget, project, a)} aria-label={choose}>
+      <Tooltip content={choose}>
+        <button className={cx('btn', 'split-caret', className)} disabled={!!starting} onClick={(e) => picker.openBelow(e.currentTarget, project, a)} aria-label={choose}>
           <Icon name="chevron-down" />
         </button>
       </Tooltip>
@@ -465,11 +462,9 @@ function agentMenu(project: ProjectInfo, a: AgentInfo, pick: () => void, usage?:
   // What is left to merge, under Merge… (its count was the header's Merge button's before #977).
   const unmerged = worktree ? unmergedWork(useStore.getState().branchStatus[projectKey(project.path, a.id)], tr) : null
   const blocked = mergeBlocked(a.name, a.live?.status, tr)
-  // Its workspace's 1.0 upgrade waits (#1230): no session can start, said under each way to start one.
-  const startBlocked = startBlockedReason(get().boardState?.readOnly)
   // Starting or resuming already (#1177): said under each way to start it.
   const starting = get().starting[startingKey(project.path, a.id)]
-  const noStart = startBlocked ? { disabled: true, detail: startBlocked } : starting ? { disabled: true, detail: startingLabel(starting) } : {}
+  const noStart = starting ? { disabled: true, detail: startingLabel(starting) } : {}
   return [
     ...(a.live
       ? [
@@ -1285,7 +1280,6 @@ function PaneHeader({ project, a, focused }: { project: ProjectInfo; a: AgentInf
   const live = a.live
   const failure = useStartFailure(project, a)
   const removing = useStore((s) => !!s.running[`removeAgent:${project.path}#${a.id}`])
-  const startBlocked = useStartBlocked()
   const starting = useStarting(project.path, a.id)
   // Its stopped run, as its pane's bar and its tile say it (HI-1881).
   const end = useStoppedEnd(project.path, a)
@@ -1434,8 +1428,8 @@ function PaneHeader({ project, a, focused }: { project: ProjectInfo; a: AgentInf
       {live
         ? btn('stop-circle', tr(STOP), () => void actions.stopSession(project.path, a.id), 'act-stop', tr(msg({ id: 'panes.header.stopTip', defaultMessage: 'Stop this agent (the conversation is kept; resume it any time)', description: "Tooltip of a pane's Stop button." })))
         : a.resume
-          ? btn('debug-continue', starting ? startingLabel(starting) : tr(RESUME), () => void actions.resumeLast(project.path, a.id), 'act-resume', startBlocked ?? (starting ? startingLabel(starting) : resumeTip(project, a)), !!startBlocked, !!starting)
-          : btn('add', starting ? startingLabel(starting) : tr(NEW_SESSION), () => void actions.newSession(project.path, a.id), 'act-start', startBlocked ?? (starting ? startingLabel(starting) : tr(NEW_SESSION)), !!startBlocked, !!starting)}
+          ? btn('debug-continue', starting ? startingLabel(starting) : tr(RESUME), () => void actions.resumeLast(project.path, a.id), 'act-resume', starting ? startingLabel(starting) : resumeTip(project, a), false, !!starting)
+          : btn('add', starting ? startingLabel(starting) : tr(NEW_SESSION), () => void actions.newSession(project.path, a.id), 'act-start', starting ? startingLabel(starting) : tr(NEW_SESSION), false, !!starting)}
       <Tooltip content={alert.length ? <span style={{ whiteSpace: 'pre-line' }}>{[tr(MORE), ...alert].join('\n')}</span> : tr(MORE)}>
         <button
           ref={more}
@@ -1965,7 +1959,6 @@ function PaneBody({ project, a, hasTerminal, single, cell }: { project: ProjectI
   useLanguage()
   const failure = useStartFailure(project, a)
   const limit = useAgentLimit(project)
-  const startBlocked = useStartBlocked()
   // From the click until the session runs (#1177).
   const starting = useStarting(project.path, a?.id ?? null)
   const startingNew = starting?.kind === 'start'
@@ -2013,8 +2006,8 @@ function PaneBody({ project, a, hasTerminal, single, cell }: { project: ProjectI
           // Together, so in a narrow pane they wrap under the text as one row (#890).
           <span className="session-ended-actions">
             <ResumeButton project={project} a={a} className={cx('act-resume', 'solid', !single && 'small')} />
-            <Tooltip content={startBlocked ?? tr(NEW_SESSION)}>
-              <button className={cx('btn', 'act-start', !single && 'small')} disabled={!!startBlocked || !!starting} aria-busy={startingNew || undefined} onClick={() => void actions.newSession(project.path, a.id)} aria-label={startingNew ? startingLabel(starting) : tr(NEW_SESSION)}>
+            <Tooltip content={tr(NEW_SESSION)}>
+              <button className={cx('btn', 'act-start', !single && 'small')} disabled={!!starting} aria-busy={startingNew || undefined} onClick={() => void actions.newSession(project.path, a.id)} aria-label={startingNew ? startingLabel(starting) : tr(NEW_SESSION)}>
                 <Icon name={startingNew ? 'loading' : 'add'} spin={startingNew} /> <span className="btn-label">{startingNew ? startingLabel(starting) : tr(NEW_SESSION)}</span>
               </button>
             </Tooltip>
@@ -2031,11 +2024,9 @@ function PaneBody({ project, a, hasTerminal, single, cell }: { project: ProjectI
       {where && <p className="faint">{where}</p>}
       {setupPending && <p className="faint">{tr(msg({ id: 'panes.body.setupFirst', defaultMessage: 'Its setup command runs first.', description: "A stopped worktree agent's pane: its worktree setup command runs before its next session." }))}</p>}
       <div className="btns">
-        <Tooltip content={startBlocked}>
-          <button className="btn act-start solid small" disabled={!!startBlocked || !!starting} aria-busy={startingNew || undefined} onClick={() => void actions.newSession(project.path, a.id)}>
-            <Icon name={startingNew ? 'loading' : 'add'} spin={startingNew} /> {startingNew ? startingLabel(starting) : tr(NEW_SESSION)}
-          </button>
-        </Tooltip>
+        <button className="btn act-start solid small" disabled={!!starting} aria-busy={startingNew || undefined} onClick={() => void actions.newSession(project.path, a.id)}>
+          <Icon name={startingNew ? 'loading' : 'add'} spin={startingNew} /> {startingNew ? startingLabel(starting) : tr(NEW_SESSION)}
+        </button>
         <ResumeButton project={project} a={a} className={cx(RESUME_TINT, 'small')} />
       </div>
     </div>

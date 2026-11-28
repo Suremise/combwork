@@ -2,9 +2,6 @@
 // docs/USER_GUIDE.md, kept when the heading is renamed. tests/userGuide.test.ts checks every link the app makes.
 import { docOutline, findHeading } from './docSections'
 
-/** The id of the user guide's heading about the 1.0 board upgrade (its notice's Learn more). */
-export const BOARD_UPGRADE_GUIDE = 'upgrading-to-10' // i18n-ignore: a user guide heading's id (#1535)
-
 /**
  * The slug of the heading a link's id names in a document (the Docs view's Learn more), or null when none does for
  * sure: missing, or an id several headings carry. Decided by findHeading, as card references and cw_read_section are.

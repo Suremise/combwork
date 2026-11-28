@@ -242,7 +242,7 @@ The waits found along the way cost more than any duplicate: `lib.until` now says
 **Kept, unchanged** (each audited; one line for why):
 - **Workflow, board and lanes**: suites share their setup (start, submit, review, merge), but each one's assertions are its own. The splits are recorded in their headers. The card-loop and wake suites differ in trigger, recipient and stall. `slotrecovery` and `lanebrief` (restart and ownership) stay.
 - **Git, locks and the merge queue**: these stay as the safety and boundary cases:
-  - `mergequeuecrash` and `queueupgrade` (crash seams);
+  - `mergequeuecrash` (crash seams);
   - `queuelease` (takeover);
   - `repolock` and `lockask`;
   - `slotrelease`, `slotwriterhold` and the slot repair suites;

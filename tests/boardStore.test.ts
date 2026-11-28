@@ -1,6 +1,6 @@
-// The board in SQLite (#1017): the database layer (settings, migrations, a file from a newer Combwork), the move of the cards'
-// files into it (once, checked, the folder kept as a backup and a stub left for older versions), cards an older version saved
-// meanwhile, Export Board to JSON (an export read back is the same board), and the window's board with archived cards in short.
+// The board in SQLite (#1017): the database layer (settings, migrations, a file from a newer Combwork), the cards' files
+// from before 0.9 left as they are (HI-3619: no longer imported), cards an older version saved meanwhile, Export Board to
+// JSON (an export read back is the same board), and the window's board with archived cards in short.
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, unlinkSync, writeFileSync } from 'fs'
 import { join, resolve, sep } from 'path'
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
@@ -34,24 +34,34 @@ afterAll(async () => {
   for (const w of opened) await disposeWorkspaceService(w)
   store.closeAllBoards()
 })
-afterEach(() => {
-  store.boardTestHooks.refuseRename = null
-})
+/** The cards each workspace's board is given as it is first opened here (`<n>.json`, `board.json`'s next, `archive-batches.json`). */
+const seeds = new Map<string, Record<string, string>>()
 
-/** A workspace with a project `p`, and the cards' files from before 0.9 given (`files`: name → text). */
+/**
+ * A workspace with a project `p`, and a board holding the cards given as an export has them (`files`: name → text),
+ * put on the board as it is first opened (HI-3619: card files are no longer imported).
+ */
 function workspaceWith(files: Record<string, string> = {}): string {
   const ws = join(base, `ws-${++n}`)
   mkdirSync(join(ws, 'p', '.combwork'), { recursive: true })
   writeFileSync(join(ws, 'p', '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Agent 1' }] }))
-  const tasksDir = join(ws, '.combwork', 'tasks')
-  mkdirSync(tasksDir, { recursive: true })
-  for (const [name, text] of Object.entries(files)) writeFileSync(join(tasksDir, name), text)
+  if (Object.keys(files).length) seeds.set(ws, files)
   return ws
 }
 async function open(ws: string): Promise<WS> {
   const w = createWorkspaceService()
   await w.open(ws)
   opened.push(w)
+  const files = seeds.get(ws)
+  if (files) {
+    seeds.delete(ws)
+    await store.boardWrite(w, async () => {
+      for (const [name, text] of Object.entries(files)) if (/^\d+\.json$/.test(name)) store.putCard(w, Number(name.slice(0, -5)), JSON.parse(text))
+      if (files['board.json']) store.setBoardValue(w, 'next', String(JSON.parse(files['board.json']).next))
+      if (files['archive-batches.json']) store.setArchiveBatches(w, JSON.parse(files['archive-batches.json']).batches)
+      store.boardChanged(w)
+    })
+  }
   return w
 }
 const card = (num: number, fields: Record<string, unknown> = {}): Record<string, unknown> => ({ number: num, title: `Card ${num}`, description: `About ${num}`, project: 'p', agent: null, column: 'todo', order: num, labels: [], blocked: null, blockedBy: [], links: [], comments: [{ at: '2026-10-01T00:00:00.000Z', by: 'You', text: `Note ${num}`, id: `c${num}` }], history: [], archived: false, createdAt: '2026-10-01T00:00:00.000Z', createdBy: 'You', updatedAt: '2026-10-01T00:00:00.000Z', ...fields })
@@ -328,74 +338,21 @@ describe.runIf(process.platform === 'win32' && MAPPED_SHM_REFUSED)('a board whos
   })
 })
 
-describe("moving the cards' files in (#1017)", () => {
-  it('imports every card file once, as its text was, skipping backups, temp files and damaged files; keeps the folder as a backup and leaves no stub (HI-2594)', async () => {
-    const files = {
-      '1.json': fileOf(card(1, { custom: { kept: true } })),
-      '2.json': fileOf(card(2, { column: 'done', archived: true, archivedFor: 'user' })),
-      '3.json': '{ not json',
-      '1.json.before-ids.bak': fileOf(card(1, { title: 'old copy' })),
-      '1.json.123-4.tmp': '{ "half": ',
-      'board.json': JSON.stringify({ version: 1, next: 40 }),
-      'archive-batches.json': JSON.stringify({ version: 1, batches: [{ id: 'b1', at: '2026-10-02T00:00:00.000Z', by: 'You', label: 'All in Done', cards: [2], columns: { done: [2] } }] })
-    }
-    const ws = workspaceWith(files)
-    const notices: BoardNotice[] = []
-    store.onBoardNotice((_p, x) => notices.push(x))
-    const w = await open(ws)
-    const all = await inWorkspace(w, () => tasks.allTasks(w))
-    expect(all.map((c) => c.number)).toEqual([1, 2])
-    // Every field kept, the ones this Combwork doesn't know too.
-    expect(store.cardDoc(w, 1)).toEqual(card(1, { custom: { kept: true } }))
-    expect(await inWorkspace(w, () => tasks.archiveBatches(w))).toEqual([expect.objectContaining({ id: 'b1', cards: [2] })])
-    // The next number is board.json's: a new card never takes one used before.
-    expect((await inWorkspace(w, () => tasks.createTask({ title: 'New', project: 'p' }, user))).number).toBe(40)
-    // The folder kept as it was, under its backup name; no stub in its place.
-    const kept = combworkFolders(ws).find((f) => f.startsWith('tasks.imported-'))!
-    expect(readdirSync(join(ws, '.combwork', kept)).sort()).toEqual(Object.keys(files).sort())
-    expect(readFileSync(join(ws, '.combwork', kept, '1.json'), 'utf8')).toBe(files['1.json'])
-    expect(existsSync(join(ws, '.combwork', 'tasks'))).toBe(false)
-    expect(notices).toEqual([{ kind: 'imported', cards: 2, damaged: ['3.json'], folder: kept }])
-    // The import is recorded; opening again imports nothing, and closed, nothing is written for older versions.
-    await disposeWorkspaceService(w)
-    const again = await open(ws)
-    expect((await inWorkspace(again, () => tasks.allTasks(again))).map((c) => c.number).sort((a, b) => a - b)).toEqual([1, 2, 40])
-    expect(combworkFolders(ws).filter((f) => f.startsWith('tasks'))).toEqual([kept])
-    await disposeWorkspaceService(again)
-    expect(existsSync(join(ws, '.combwork', 'tasks'))).toBe(false)
-  })
-
-  it('a folder Windows refuses to rename is renamed at the next open; the cards are in the database meanwhile, imported once', async () => {
-    const ws = workspaceWith({ '5.json': fileOf(card(5)) })
-    store.boardTestHooks.refuseRename = () => true
-    const w = await open(ws)
-    expect((await inWorkspace(w, () => tasks.allTasks(w))).map((c) => c.number)).toEqual([5])
-    expect(existsSync(join(ws, '.combwork', 'tasks', '5.json'))).toBe(true)
-    await inWorkspace(w, () => tasks.updateTask(5, { title: 'Changed since' }, user))
-    await disposeWorkspaceService(w)
-    store.boardTestHooks.refuseRename = null
-    const again = await open(ws)
-    // Not imported again (the change made meanwhile is kept), and the folder has its backup name now.
-    expect((await inWorkspace(again, () => tasks.getTask(5, again))).title).toBe('Changed since')
-    expect(combworkFolders(ws).some((f) => f.startsWith('tasks.imported-'))).toBe(true)
-    expect(existsSync(join(ws, '.combwork', 'tasks'))).toBe(false)
-  })
-
-  it("a new workspace's board starts empty, with no stub and no backup folder", async () => {
+describe("card files from before 0.9 (HI-3619: no longer imported)", () => {
+  it('a card file in `.combwork/tasks` is neither imported nor moved, and the open records no import', async () => {
     const ws = workspaceWith()
+    const tasksDir = join(ws, '.combwork', 'tasks')
+    mkdirSync(tasksDir, { recursive: true })
+    const files = { '1.json': fileOf(card(1)), 'board.json': JSON.stringify({ version: 1, next: 40 }) }
+    for (const [f, text] of Object.entries(files)) writeFileSync(join(tasksDir, f), text)
     const w = await open(ws)
     expect(await inWorkspace(w, () => tasks.allTasks(w))).toEqual([])
-    // The empty folder it was given (0.8's, with no cards) is left as it was, nothing written in it, at this open and the
-    // next: no version reads it now, and nothing makes one (HI-2594).
-    expect(combworkFolders(ws).filter((f) => f.startsWith('tasks'))).toEqual(['tasks'])
-    expect(readdirSync(join(ws, '.combwork', 'tasks'))).toEqual([])
+    expect((await inWorkspace(w, () => tasks.createTask({ title: 'New', project: 'p' }, user))).number).toBe(1)
+    expect(store.boardValue(w, 'imported')).toBeNull()
     await disposeWorkspaceService(w)
-    const fresh = join(base, `ws-${++n}`)
-    mkdirSync(join(fresh, 'p', '.combwork'), { recursive: true })
-    writeFileSync(join(fresh, 'p', '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [] }))
-    const again = await open(fresh)
-    expect(await inWorkspace(again, () => tasks.allTasks(again))).toEqual([])
-    expect(combworkFolders(fresh).filter((f) => f.startsWith('tasks'))).toEqual([])
+    expect(combworkFolders(ws).filter((f) => f.startsWith('tasks'))).toEqual(['tasks'])
+    expect(readdirSync(tasksDir).sort()).toEqual(Object.keys(files).sort())
+    expect(readFileSync(join(tasksDir, '1.json'), 'utf8')).toBe(files['1.json'])
   })
 })
 
@@ -658,14 +615,13 @@ describe('numbers an older version could take (#1017 round 1)', () => {
     expect(existsSync(join(ws, '.combwork', 'tasks'))).toBe(false)
   })
 
-  it("a damaged card file's number is never given to another card, moving in or back (as before 0.9)", async () => {
-    // No board.json: the next number comes from the files, the damaged one's too.
-    const ws = workspaceWith({ '1.json': fileOf(card(1)), '2.json': '{ damaged' })
+  it("a damaged card file an older version left in the stub: its number is never given to another card", async () => {
+    const ws = workspaceWith({ '1.json': fileOf(card(1)) })
     let w = await open(ws)
-    expect((await inWorkspace(w, () => tasks.createTask({ title: 'Next', project: 'p' }, user))).number).toBe(3)
+    expect((await inWorkspace(w, () => tasks.createTask({ title: 'Next', project: 'p' }, user))).number).toBe(2)
     await disposeWorkspaceService(w)
     // A damaged file an older version left in 1.0's stub: its number is past the board's, and kept from new cards.
-    writeFileSync(join(leaveStub(ws, 4), '9.json'), '{ damaged too')
+    writeFileSync(join(leaveStub(ws, 3), '9.json'), '{ damaged too')
     w = await open(ws)
     expect((await inWorkspace(w, () => tasks.createTask({ title: 'After', project: 'p' }, user))).number).toBe(10)
   })

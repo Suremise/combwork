@@ -23,7 +23,7 @@ import { queueIntegration } from '../platform/integrationPorts'
 import { basename, join } from 'path'
 import { app } from 'electron'
 import { detect } from '../platform/registry'
-import { boardRead, boardReadOnly, boardWrite, onBoardUpgraded } from '../boardStore'
+import { boardRead, boardReadOnly, boardWrite } from '../boardStore'
 import { onCombworkEvent } from '../events'
 import { exitBy } from '../exitLog'
 import { git, withGitRoute } from '../git'
@@ -464,9 +464,8 @@ function openTargets(wf: Workflow): string[] {
 }
 
 /**
- * Starts the hosts of a workspace's projects that have open entries (as it opens, its board upgraded, or the rules back
- * on). A board that takes no writes (waiting for its upgrade to 1.0, or a newer Combwork's) has nothing to run: the upgrade
- * starts them (#1621).
+ * Starts the hosts of a workspace's projects that have open entries (as it opens, or the rules back on). A board that
+ * takes no writes (a newer Combwork's) has nothing to run.
  */
 async function startOpen(ws: WorkspaceService, resumeRulesOff = false): Promise<void> {
   if (!ws.path || boardReadOnly(ws)) return
@@ -533,8 +532,6 @@ export function startQueueHosts(): void {
       void startOpen(ws).catch((x) => log.warn('starting the merge queues of a workspace', x))
     }
   })
-  // Opened while its board waited for the upgrade to 1.0, its queues start once it is upgraded, with no restart (#1621).
-  const offUpgraded = onBoardUpgraded((ws) => void startOpen(ws).catch((x) => log.warn('starting the merge queues of an upgraded workspace', x)))
   let enforced = workflowEnforced()
   const checkedOutMode = (): unknown => advanced.get(QUEUE_CHECKED_OUT_TARGET)
   let mode = checkedOutMode()
@@ -561,7 +558,6 @@ export function startQueueHosts(): void {
   WorkspaceService.closingTasks.add(closing)
   stopHosts = () => {
     off()
-    offUpgraded()
     offAdvanced()
     endWatches()
     WorkspaceService.closingTasks.delete(closing)

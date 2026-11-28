@@ -1579,6 +1579,10 @@
     "defaultMessage": "Performance",
     "description": "A project's tab: how its agents' turns perform."
   },
+  "project.tab.preview": {
+    "defaultMessage": "Preview",
+    "description": "A project's tab: its dev server's page, shown in a guarded view."
+  },
   "project.tab.session": {
     "defaultMessage": "Session",
     "description": "A project's tab: its agents' terminals."

@@ -60,6 +60,17 @@ interface CombworkMessageValues {
   'service.combworkVcs.exitCode': { code: string | number }
   'service.combworkVcs.noRepo': undefined
   'service.combworkVcs.rmFailed': { why: string | number }
+  'service.fileBlame.invalid': undefined
+  'service.fileBlame.unsupported': undefined
+  'service.fileCompare.invalid': undefined
+  'service.fileCompare.noRef': { ref: string | number }
+  'service.fileCompare.unsupported': undefined
+  'service.fileHistory.cancelled': undefined
+  'service.fileHistory.failed': { why: string | number }
+  'service.fileHistory.invalid': undefined
+  'service.fileHistory.noCommit': { commit: string | number }
+  'service.fileHistory.timedOut': { seconds: number }
+  'service.fileHistory.unsupported': undefined
   'service.files.badName': { name: string | number }
   'service.files.exists': { name: string | number }
   'service.files.existsIn': { root: string; name: string | number; folder: string | number }
@@ -477,8 +488,6 @@ interface CombworkMessageValues {
   'service.targetChanges.setAside': undefined
   'service.targetChanges.show': undefined
   'service.targetChanges.title': { target: string | number }
-  'service.templates.v09': { n: number }
-  'service.templates.v09Title': undefined
   'service.transcripts.busy': undefined
   'service.transcripts.exported': { session: string | number; date: string | number }
   'service.transcripts.imageNotKept': undefined
@@ -508,6 +517,8 @@ interface CombworkMessageValues {
   'service.workspace.closed': undefined
   'service.workspace.connectionGone': { agent: string | number }
   'service.workspace.folderExists': { name: string | number }
+  'service.workspace.formatUnknown': { error: string | number }
+  'service.workspace.from09': undefined
   'service.workspace.holdsOpen': { workspace: string | number; folder: string | number; name: string | number }
   'service.workspace.insideOpen': { folder: string | number; workspace: string | number }
   'service.workspace.nameIn': { name: string | number; projects: string | number }

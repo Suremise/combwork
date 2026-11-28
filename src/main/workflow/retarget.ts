@@ -23,7 +23,7 @@ import { workflowFor } from './service'
 import { hasOwnWork, projectTargets } from './targets'
 import { keptLineTarget } from './keptLine'
 import { checkCardMove, IN_FLIGHT_STAGES, laneOf, laneStill, type MoveRefusal, type MoveWhy } from './retargetCard'
-import type { RetargetPreview, RetargetResult } from '../../shared/types'
+import type { RetargetPreview, RetargetResult, SlotMovePreview, TargetRemoval } from '../../shared/types'
 import { combworkError } from '../combworkError'
 import { fmt, msg } from '../../shared/i18n'
 import { createLogger, userText } from '../logger'
@@ -46,10 +46,13 @@ function keptLog(c: { key: string }, from: string, r: MoveRefusal): void {
  * What a change of Work merges into from `from` to `to` would move, and what stays with why (HI-2680), read-only. Slots
  * recording none count as `from`'s when it is the project's target they fell back to (the preview is made while it is).
  */
-export async function retargetPreview(ws: WorkspaceService, projectPath: string, from: string, to: string, o: { ongoing?: boolean } = {}): Promise<RetargetPreview> {
+export async function retargetPreview(ws: WorkspaceService, projectPath: string, from: string, to: string, o: { ongoing?: boolean; slotsOnly?: string } = {}): Promise<RetargetPreview> {
   const out: RetargetPreview = { from, to, cards: { move: [], keep: [] }, slots: { move: [], keep: [] }, lanes: [], ...(o.ongoing ? { ongoing: true } : {}) }
   const wf = await workflowFor(ws, projectPath)
   if (!wf || from === to) return out
+  // HI-3592: one slot's move (its row's Move to…): only its slot read, no card or lane.
+  const H = lineHistory()
+  if (o.slotsOnly !== undefined) return { ...out, slots: await slotsPreview(ws, projectPath, from, H, o.slotsOnly) }
   const store = wf.store
   const cards = store.cards()
   const keys = cardKeys(ws, cards.map((c) => c.id))
@@ -65,7 +68,6 @@ export async function retargetPreview(ws: WorkspaceService, projectPath: string,
   // A change between branches that both go on leaves started cards and running lanes on their own (HI-2674).
   // HI-2807: `ongoing` (Start the next version): both go on by the user's word, whatever their heads say (a new branch is
   // at the release's head), so started cards and running lanes stay, and `to` need not exist yet: nothing reads it.
-  const H = lineHistory()
   const fromNow = o.ongoing ? null : await H.lineHead(projectPath, from)
   const toNow = o.ongoing ? null : await H.lineHead(projectPath, to)
   const ended = !o.ongoing && !isUnknown(fromNow) && !isUnknown(toNow) && !!toNow && (!fromNow || fromNow === toNow || (await H.isAncestor(projectPath, fromNow, toNow)) === true)
@@ -135,10 +137,21 @@ export async function retargetPreview(ws: WorkspaceService, projectPath: string,
     if (w === false) out.cards.move.push(row(c))
     else out.cards.keep.push({ ...row(c), why: (w === 'unknown' ? 'cantCheck' : 'work') as KeepWhy }) // i18n-ignore: a reason's code, said in words where it is shown
   }
+  out.slots = await slotsPreview(ws, projectPath, from, H)
+  return out
+}
+
+/**
+ * The slots part of a retarget's preview from `from` (HI-2680), each checked as `retargetPreview` says: free, clean, its
+ * head in `from`. `only`: that slot alone (HI-3592: its row's Move to…).
+ */
+async function slotsPreview(ws: WorkspaceService, projectPath: string, from: string, H: ReturnType<typeof lineHistory>, only?: string): Promise<RetargetPreview['slots']> {
+  const out: Pick<RetargetPreview, 'slots'> = { slots: { move: [], keep: [] } }
   const { poolFor } = await import('../slotsApp')
   const pool = await poolFor(ws, projectPath).catch(() => null)
   const fromHead = await H.lineHead(projectPath, from)
   for (const s of pool ? pool.deps.store.slots() : []) {
+    if (only !== undefined && s.name !== only) continue
     if ((s.target ?? from) !== from) continue
     const keep = (why: RetargetPreview['slots']['keep'][number]['why']) => out.slots.keep.push({ name: s.name, why })
     if (s.state !== 'ready') {
@@ -169,6 +182,62 @@ export async function retargetPreview(ws: WorkspaceService, projectPath: string,
       continue
     }
     out.slots.move.push({ name: s.name, folder: s.folder, target: s.target ?? null, head: h })
+  }
+  return out.slots
+}
+
+/**
+ * HI-3592: a free slot left on another branch than Work merges into (lent, changed or holding commits when that moved on,
+ * or never moved), moved on from its row: what its move would be, read-only, with the same checks as Also retarget what
+ * can move. `move` when it can, else `keep` with why (`onTarget`: it follows Work merges into already, or records none).
+ */
+export async function slotMovePreview(ws: WorkspaceService, projectPath: string, name: string): Promise<SlotMovePreview> {
+  const to = (await projectTargets(ws, projectPath).catch(() => null))?.default ?? null
+  const { poolFor } = await import('../slotsApp')
+  const s = (await poolFor(ws, projectPath)).deps.store.slots().find((x) => x.name === name)
+  if (!s) throw new Error(`No slot ${name}`) // i18n-ignore: a mistake in a caller, never the window's
+  const from = s.target ?? null
+  if (!to || !from || from === to) return { slot: name, from: from ?? to ?? '', to: to ?? '', keep: 'onTarget' } // i18n-ignore: a reason's code, said in words where it is shown
+  // Its reads as the retarget's preview makes them (one history, read once per preview).
+  const p = (await retargetPreview(ws, projectPath, from, to, { slotsOnly: name })).slots
+  const move = p.move[0]
+  return move ? { slot: name, from, to, move } : { slot: name, from, to, keep: p.keep[0]?.why ?? 'cantCheck' } // i18n-ignore: a reason's code, said in words where it is shown
+}
+
+/** HI-3592: a slot's move as its preview showed it, applied as a retarget's is (rechecked under the pool's own operation). */
+export async function slotMoveApply(ws: WorkspaceService, projectPath: string, preview: SlotMovePreview): Promise<RetargetResult> {
+  if (!preview.move) throw new Error('Nothing to move') // i18n-ignore: a mistake in a caller, never the window's
+  return retargetApply(ws, projectPath, { from: preview.from, to: preview.to, cards: { move: [], keep: [] }, slots: { move: [preview.move], keep: [] }, laneMoves: [] }, { kind: 'user' })
+}
+
+/** A slot's move as the window sends it back (HI-3592): its shape checked; anything else refused. */
+export function slotMoveArg(raw: unknown): SlotMovePreview {
+  const r = raw as Partial<SlotMovePreview> | null
+  const str = (v: unknown): v is string => typeof v === 'string' && v.length > 0 && v.length <= 250
+  const m = r?.move
+  if (!r || !str(r.slot) || !str(r.from) || !str(r.to) || !m || !str(m.name) || m.name !== r.slot || !str(m.folder) || !(m.target === null || str(m.target)) || !str(m.head)) throw new Error("A slot's move is its preview: slot, from, to and move") // i18n-ignore: a mistake in a caller, never the window's
+  return { slot: r.slot, from: r.from, to: r.to, move: { name: m.name, folder: m.folder, target: m.target, head: m.head } }
+}
+
+/**
+ * HI-3592: the branches a change of Other branches work can merge into takes out while something still uses them, each
+ * with what uses it and, when Work merges into stays as saved, what can move from it there (`retargetPreview`). When the
+ * same change moves Work merges into (`targetMoves`: its draft's `draftTarget`, null for the default branch), nothing is
+ * offered: a move goes to the saved one, so the removal waits for a second save.
+ */
+export async function removalsOf(ws: WorkspaceService, projectPath: string, before: readonly string[], after: readonly string[], draftTarget: string | null, targetMoves: boolean): Promise<TargetRemoval[]> {
+  const saved = (await projectTargets(ws, projectPath).catch(() => null))?.default ?? null
+  // Only the default the draft keeps is never a removal (as `refuseRemovedTargets` counts, the draft's `target || null`):
+  // an old default taken out with the same save's change of Work merges into is one, its moves waiting for the second save.
+  const kept = targetMoves ? draftTarget : saved
+  const gone = before.filter((b) => !after.includes(b) && b !== kept)
+  if (!gone.length) return []
+  const slots = await slotUses(ws, projectPath)
+  const out: TargetRemoval[] = []
+  for (const branch of gone) {
+    const uses = await referencesTo(ws, projectPath, branch, () => slots.inUse(), kept)
+    if (!uses.length) continue
+    out.push({ branch, uses, retarget: !targetMoves && saved ? await retargetPreview(ws, projectPath, branch, saved) : null, ...(targetMoves ? { afterTarget: true as const } : {}) })
   }
   return out
 }

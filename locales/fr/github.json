@@ -101,6 +101,7 @@
   "github.shipped.cancel": "Fermer",
   "github.shipped.close": "{count, plural, one {Fermer # issue} many {Fermer # issues} other {Fermer # issues}}",
   "github.shipped.desc": "Les cartes liées à une issue GitHub qui ont été fusionnées dans une branche publiée. Une fois sa version publiée sur GitHub, chaque issue ouverte est fermée avec le commentaire « Fixed in {version} », sous ton compte GitHub.",
+  "github.shipped.doubt": "{reason, select, earlier {Issue #{issue} · {card} : laissée de côté, car on n’a pas pu savoir si la version précédente {tag} l’a livrée} other {Issue #{issue} · {card} : laissée de côté, car on n’a pas pu lire si son merge est dans {tag}}}",
   "github.shipped.failed": "Impossible de fermer les issues livrées",
   "github.shipped.line": "Branche publiée",
   "github.shipped.loading": "Interrogation de GitHub…",

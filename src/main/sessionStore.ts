@@ -2,10 +2,10 @@ import { existsSync } from 'original-fs'
 import { readFile } from 'original-fs/promises'
 import { resolve } from 'path'
 import type { SessionsFile } from './workspace'
-import { onDbReplaced, upgradeWaiting, withLeasedDb, workspaceDb } from './boardStore'
+import { withLeasedDb, workspaceDb } from './boardStore'
 import { placeKey, readKeptJson, writeKeptJson } from './fsutil'
 import { createLogger, userText } from './logger'
-import { keepAsBackup, openTable, readStore, rowKeys, storeValue, withStoreLock, writeStore, type StoreData, type StoreRow } from './storeRows'
+import { keepAsBackup, openTable, storeValue, withStoreLock, writeStore } from './storeRows'
 import { beginTransaction, transaction, type Db } from './db'
 import { addSessionRecords, countSessions, readAgentSessionRecords, readCardSessionRecords, readDeleted, readDeletedUsage, readSessionRecord, readSessionRecords, removeSessionRecords, sessionTexts, writeSessionRecord, writeSessionRecords } from './schema/sessionDeliveryTables'
 import { withMode } from '../shared/defaults'
@@ -23,8 +23,7 @@ const log = createLogger('sessions')
  * found later while the host has no records (its folder removed from another workspace, exportSessions), else it is kept
  * so unread. Remove from Combwork writes them back into the folder, which takes them wherever it goes, and marks them
  * `exported` here: while the project is removed (or being removed) nothing reads that file; once it is back (Restore, or
- * the folder shown again), it is moved in again, with what was recorded here meanwhile. While the workspace's upgrade to
- * 1.0 waits (#1207) its file is 0.9's: the records are read from its `store_rows`, and nothing is written.
+ * the folder shown again), it is moved in again, with what was recorded here meanwhile.
  */
 
 const EMPTY = (): SessionsFile => ({ version: 1, sessions: [] })
@@ -43,8 +42,6 @@ export interface SessionsPlace {
   removed?: () => boolean
 }
 
-type Row = { key: string; doc: string; ord?: number }
-type Kind = 's:' | 'd:' | 'u:'
 type Kept = NonNullable<SessionsFile['deletedUsage']>[number]
 
 /**
@@ -94,41 +91,6 @@ const fromTables = (db: ReturnType<typeof workspaceDb>['reader'], scope: string,
   filed(saved, () => readDeleted(db, scope), () => readDeletedUsage(db, scope) as unknown as Kept[])
 
 // ---------------------------------------------------------------------------
-// 0.9's rows (store_rows), read while the workspace's upgrade to 1.0 waits.
-// ---------------------------------------------------------------------------
-
-/** A kind's rows: its entries in order, each keyed by its id (made unique, rowKeys) after the kind's prefix. */
-function kindRows(kind: Kind, entries: readonly unknown[]): StoreRow[] {
-  const keys = rowKeys(kind === 'd:' ? entries.map((id) => ({ id })) : entries)
-  return entries.map((e, i) => ({ key: kind + keys[i], doc: JSON.stringify(e), ord: i }))
-}
-
-/** The rows a 0.9 store kept of a host's records (each kind in its order, its keys kept apart by their prefix). */
-export function sessionRows(f: SessionsFile): StoreRow[] {
-  return [...kindRows('s:', f.sessions), ...kindRows('d:', f.deleted ?? []), ...kindRows('u:', f.deletedUsage ?? [])]
-}
-
-/** Parses a row, or says it can't be read (it is left out). */
-function parsed(r: Row): { ok: true; doc: unknown } | { ok: false } {
-  try {
-    return { ok: true, doc: JSON.parse(r.doc) }
-  } catch (e) {
-    log.warn(`a session row (${r.key}) couldn't be read: left out`, e)
-    return { ok: false }
-  }
-}
-
-/** A host's records from a 0.9 store's rows (all of them, as read). */
-export function sessionsOf(data: StoreData): SessionsFile {
-  const docs = (kind: Kind): unknown[] => data.rows.filter((r) => r.key.startsWith(kind)).map(parsed).flatMap((p) => (p.ok ? [p.doc] : []))
-  return filed(
-    docs('s:'),
-    () => docs('d:').filter((d): d is string => typeof d === 'string'),
-    () => docs('u:').filter((u): u is Kept => !!u && typeof u === 'object')
-  )
-}
-
-// ---------------------------------------------------------------------------
 // The move in, reads and changes.
 // ---------------------------------------------------------------------------
 
@@ -160,13 +122,6 @@ async function readOldFile(file: string): Promise<SessionsFile | null> {
  */
 const opened = new Map<string, string>()
 const openedKey = (p: SessionsPlace): string => `${p.workspace.toLowerCase()}\0${p.scope}`
-// The workspace's database replaced (#1207 round 2: the upgrade to 1.0, a restore): its hosts are looked at again (a
-// sessions.json whose move waited, or one a restore brought back the need for), under every spelling of the workspace,
-// by the place each recorded. The records keep no copy in memory.
-onDbReplaced((workspacePath, place) => {
-  const prefix = `${workspacePath.toLowerCase()}\0`
-  for (const [k, at] of [...opened]) if (k.startsWith(prefix) || at === place) opened.delete(k)
-})
 /** For tests: the workspaces (as spelt, lower-cased) whose hosts were moved in this run. */
 export const sessionsOpenedFor = (): string[] => [...new Set([...opened.keys()].map((k) => k.slice(0, k.indexOf('\0'))))]
 
@@ -181,12 +136,11 @@ const TABLE = {
 
 /**
  * Moves a host's old file in if it hasn't been this run (openTable says when it is due), or the file Remove from Combwork
- * left in its folder once the project is back. A removed host's file stays where it is. Nothing while the workspace's
- * upgrade to 1.0 waits (asked again once it is upgraded).
+ * left in its folder once the project is back. A removed host's file stays where it is.
  */
 async function opening(place: SessionsPlace, db?: Db): Promise<void> {
   const k = openedKey(place)
-  if (opened.has(k) || (db ? !!db.pending : upgradeWaiting(place.workspace))) return
+  if (opened.has(k)) return
   // A removed host's folder keeps its file, whatever scope it is read under (#1161: its id unreadable for a moment gives
   // its folder's, which has no `exported` mark). Not marked opened: asked again at each read until the project is back.
   if (refused(place)) return
@@ -209,40 +163,30 @@ export async function readSessions(place: SessionsPlace, signal?: AbortSignal): 
   await opening(place)
   // Closed meanwhile: its board, closed with it, isn't opened again by this read (#1379).
   signal?.throwIfAborted()
-  if (upgradeWaiting(place.workspace)) return sessionsOf(readStore(place.workspace, 'sessions', place.scope))
   return fromTables(workspaceDb(resolve(place.workspace)).reader, place.scope)
 }
 
 /** One of a host's records by its id, or undefined: read by its key, not with every record (a running agent's, at each board change). */
 export async function readSession(place: SessionsPlace, id: string): Promise<SessionsFile['sessions'][number] | undefined> {
   await opening(place)
-  if (upgradeWaiting(place.workspace)) return sessionsOf(readStore(place.workspace, 'sessions', place.scope)).sessions.find((s) => s.id === id)
   const rec = readSessionRecord(workspaceDb(resolve(place.workspace)).reader, place.scope, id)
   return rec ? recordOf(rec) : undefined
 }
 
-/**
- * An agent's records of a host, most recently active first (HI-1236): read by the agent's index, no other record read
- * (while the workspace's upgrade to 1.0 waits, picked from all of them).
- */
+/** An agent's records of a host, most recently active first (HI-1236): read by the agent's index, no other record read. */
 export async function readAgentSessions(place: SessionsPlace, agentId: string): Promise<SessionsFile['sessions']> {
   await opening(place)
-  if (upgradeWaiting(place.workspace)) return byActivity(sessionsOf(readStore(place.workspace, 'sessions', place.scope)).sessions.filter((s) => s.agentId === agentId))
   return readAgentSessionRecords(workspaceDb(resolve(place.workspace)).reader, place.scope, agentId).map(recordOf)
 }
 
 /**
  * The records of a host that worked on a card (their `cards` have it), in the host's order (HI-1236): read by the
- * cards' index, no other record read (while the workspace's upgrade to 1.0 waits, picked from all of them).
+ * cards' index, no other record read.
  */
 export async function readCardSessions(place: SessionsPlace, card: number): Promise<SessionsFile['sessions']> {
   await opening(place)
-  if (upgradeWaiting(place.workspace)) return sessionsOf(readStore(place.workspace, 'sessions', place.scope)).sessions.filter((s) => s.cards?.some((c) => c.number === card))
   return readCardSessionRecords(workspaceDb(resolve(place.workspace)).reader, place.scope, card).map(recordOf)
 }
-
-/** Most recently active first, as the agent's index gives them. */
-const byActivity = (recs: SessionsFile['sessions']): SessionsFile['sessions'] => [...recs].sort((a, b) => (b.lastActiveAt ?? '').localeCompare(a.lastActiveAt ?? ''))
 
 /**
  * Changes a host's records from what is committed now, one change at a time across Combwork's windows and processes: `fn`

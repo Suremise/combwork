@@ -970,11 +970,22 @@
       "shown": "plain"
     }
   },
+  "tasks.source.linkAgents": {
+    "placeholders": {}
+  },
   "tasks.source.linkChanged": {
     "placeholders": {
       "repo": "plain",
       "shown": "plain"
     }
+  },
+  "tasks.source.moved": {
+    "placeholders": {
+      "card": "plain"
+    }
+  },
+  "tasks.source.newColumn": {
+    "placeholders": {}
   },
   "tasks.source.noLink": {
     "placeholders": {}

@@ -484,3 +484,190 @@ describe('a slot counts against a branch in Other branches only while it uses it
     expect(await retarget.referencesTo(w, repo, '1.2.0', () => uses.inUse())).toEqual([])
   })
 })
+
+describe('a free slot left on an older branch, moved on from its row (HI-3592)', () => {
+  let wt = 0
+  /** A slot of the project at a real worktree detached at `target`, recording it, ready and free. */
+  async function slotAt(w: WS, repo: string, target: string): Promise<{ name: string; folder: string }> {
+    const id = (await slotsApp.poolFor(w, repo)).deps.store.project
+    const name = `slot-m${++wt}`
+    const folder = join(base, 'moves', `${n}-${name}`)
+    sh(repo, 'worktree', 'add', '-q', '--detach', folder, target)
+    const at = new Date().toISOString()
+    await store.boardWrite(w, async () => store.boardWriteOp(w, (db) => db.prepare("INSERT INTO slots (project, name, folder, state, port_base, target, created_at, used_at) VALUES (?, ?, ?, 'ready', ?, ?, ?, ?)").run(id, name, folder, 43000 + 10 * wt, target, at, at)))
+    return { name, folder }
+  }
+  /** An open card lease of `name`: lent. */
+  async function lend(w: WS, repo: string, name: string): Promise<void> {
+    const id = (await slotsApp.poolFor(w, repo)).deps.store.project
+    const at = new Date().toISOString()
+    await store.boardWrite(w, async () =>
+      store.boardWriteOp(w, (db) => {
+        db.prepare("UPDATE slots SET state = 'lent' WHERE project = ? AND name = ?").run(id, name)
+        db.prepare('INSERT INTO slot_leases (id, project, slot, kind, card, agent, from_at) VALUES (?, ?, ?, ?, ?, ?, ?)').run(`l-${name}`, id, name, 'card', 9500 + wt, `a-${name}`, at)
+      })
+    )
+  }
+  /** 1.2.0 a commit ahead of 1.1.0 (its release's own commit); its head. */
+  const ahead = (repo: string): string => {
+    sh(repo, 'checkout', '-q', '1.2.0')
+    commit(repo, { 'release.txt': '1.2.0\n' }, '1.2.0 only')
+    sh(repo, 'checkout', '-q', 'main')
+    return sh(repo, 'rev-parse', '1.2.0')
+  }
+  const views = async (w: WS, repo: string) => slotsApp.slotViews(await slotsApp.poolFor(w, repo), '1.2.0')
+  const targetOf = async (w: WS, repo: string, name: string) => (await slotsApp.poolFor(w, repo)).deps.store.slot(name)?.target ?? null
+
+  it('its row offers the move; previewed and applied, it follows Work merges into, its folder at its head; then nothing more is offered', async () => {
+    const { w, repo } = await project()
+    const { name, folder } = await slotAt(w, repo, '1.1.0')
+    await moveTarget(w, repo, '1.2.0')
+    const head = ahead(repo)
+    expect((await views(w, repo)).find((v) => v.name === name)?.moveOn).toEqual({ from: '1.1.0', to: '1.2.0' })
+    const p = await inWorkspace(w, () => retarget.slotMovePreview(w, repo, name))
+    expect(p).toMatchObject({ slot: name, from: '1.1.0', to: '1.2.0', move: { name, folder, target: '1.1.0' } })
+    // As the window sends it back: its shape checked, another slot's name refused.
+    expect(retarget.slotMoveArg(JSON.parse(JSON.stringify(p)))).toEqual(p)
+    expect(() => retarget.slotMoveArg({ ...p, slot: 'slot-z' })).toThrow(/slot's move is its preview/)
+    const r = await inWorkspace(w, () => retarget.slotMoveApply(w, repo, p))
+    expect(r).toMatchObject({ from: '1.1.0', to: '1.2.0', moved: { cards: [], slots: [name] }, skipped: [] })
+    expect(await targetOf(w, repo, name)).toBe('1.2.0')
+    expect(sh(folder, 'rev-parse', 'HEAD')).toBe(head)
+    expect(sh(folder, 'status', '--porcelain')).toBe('')
+    expect((await views(w, repo)).find((v) => v.name === name)?.moveOn).toBeUndefined()
+    expect(await inWorkspace(w, () => retarget.slotMovePreview(w, repo, name))).toMatchObject({ keep: 'onTarget' })
+  })
+
+  it('one that can’t move says why, and a lent one is offered nothing: lent, with changes, holding commits its branch lacks', async () => {
+    const { w, repo } = await project()
+    const lent = await slotAt(w, repo, '1.1.0')
+    await lend(w, repo, lent.name)
+    const dirty = await slotAt(w, repo, '1.1.0')
+    writeFileSync(join(dirty.folder, 'left.txt'), 'left\n')
+    const unmerged = await slotAt(w, repo, '1.1.0')
+    commit(unmerged.folder, { 'own.txt': 'own\n' }, 'only here')
+    await moveTarget(w, repo, '1.2.0')
+    const why = async (name: string) => (await inWorkspace(w, () => retarget.slotMovePreview(w, repo, name))).keep
+    expect([await why(lent.name), await why(dirty.name), await why(unmerged.name)]).toEqual(['lent', 'dirty', 'unmerged'])
+    expect((await views(w, repo)).find((v) => v.name === lent.name)?.moveOn).toBeUndefined()
+    // Free, so its row still offers it: the move says why it can't, and offers it again once it can (read as it is then).
+    expect((await views(w, repo)).find((v) => v.name === dirty.name)?.moveOn).toEqual({ from: '1.1.0', to: '1.2.0' })
+    rmSync(join(dirty.folder, 'left.txt'))
+    expect(await why(dirty.name)).toBeUndefined()
+  })
+
+  it('lent or changed between its preview and its move, it stays where it was', async () => {
+    const { w, repo } = await project()
+    const a = await slotAt(w, repo, '1.1.0')
+    const b = await slotAt(w, repo, '1.1.0')
+    await moveTarget(w, repo, '1.2.0')
+    ahead(repo)
+    const pa = await inWorkspace(w, () => retarget.slotMovePreview(w, repo, a.name))
+    const pb = await inWorkspace(w, () => retarget.slotMovePreview(w, repo, b.name))
+    expect(pa.move && pb.move).toBeTruthy()
+    await lend(w, repo, a.name)
+    writeFileSync(join(b.folder, 'meanwhile.txt'), 'meanwhile\n')
+    const ra = await inWorkspace(w, () => retarget.slotMoveApply(w, repo, pa))
+    const rb = await inWorkspace(w, () => retarget.slotMoveApply(w, repo, pb))
+    expect(ra.moved.slots).toEqual([])
+    expect(ra.skipped).toEqual([expect.objectContaining({ slot: a.name })])
+    expect(rb.moved.slots).toEqual([])
+    expect(rb.skipped).toEqual([expect.objectContaining({ slot: b.name })])
+    expect([await targetOf(w, repo, a.name), await targetOf(w, repo, b.name)]).toEqual(['1.1.0', '1.1.0'])
+    expect(sh(b.folder, 'status', '--porcelain')).toMatch(/meanwhile\.txt/)
+  })
+})
+
+describe('taking a used branch out of Other branches work can merge into names it and offers what can move (HI-3592)', () => {
+  /** The tab's check of Work merges into `target` with `others` listed. */
+  const checkOf = (w: WS, repo: string, target: string, others: string[]) => inWorkspace(w, () => form.checkWorkflowChange(w, repo, { preset: 'pair', options: { ...pair, target, otherTargets: others } }))
+  const lentSlot = async (w: WS, repo: string, target: string): Promise<string> => {
+    const id = (await slotsApp.poolFor(w, repo)).deps.store.project
+    const name = `slot-r${++n}`
+    const at = new Date().toISOString()
+    await store.boardWrite(w, async () =>
+      store.boardWriteOp(w, (db) => {
+        db.prepare("INSERT INTO slots (project, name, folder, state, port_base, target, created_at, used_at) VALUES (?, ?, ?, 'lent', ?, ?, ?, ?)").run(id, name, join(base, 'removals', name), 45000 + 10 * n, target, at, at)
+        db.prepare('INSERT INTO slot_leases (id, project, slot, kind, card, agent, from_at) VALUES (?, ?, ?, ?, ?, ?, ?)').run(`l-${name}`, id, name, 'card', 9700 + n, `a-${name}`, at)
+      })
+    )
+    return name
+  }
+
+  it('Work merges into unchanged: each removed branch in use, with what uses it and what can move to the saved one; none in use, none listed', async () => {
+    const { w, repo } = await project()
+    await moveTarget(w, repo, '1.2.0')
+    const a = await card(w, 'On 1.1.0')
+    await own(w, repo, a.number, '1.1.0')
+    const b = await card(w, 'On main')
+    await own(w, repo, b.number, 'main')
+    const one = await checkOf(w, repo, '1.2.0', ['main'])
+    expect(one.removals).toEqual([expect.objectContaining({ branch: '1.1.0', uses: [expect.any(String)], retarget: expect.objectContaining({ from: '1.1.0', to: '1.2.0' }) })])
+    expect(one.removals![0].retarget!.cards.move.map((c) => c.number)).toEqual([a.number])
+    expect(one.removals![0].afterTarget).toBeUndefined()
+    // Two at once: each its own, in the order listed.
+    const two = await checkOf(w, repo, '1.2.0', [])
+    expect(two.removals?.map((x) => [x.branch, x.retarget?.to, x.retarget?.cards.move.map((c) => c.number)])).toEqual([
+      ['main', '1.2.0', [b.number]],
+      ['1.1.0', '1.2.0', [a.number]]
+    ])
+    // Nothing on it: no removal listed.
+    await own(w, repo, b.number, '1.1.0')
+    expect((await checkOf(w, repo, '1.2.0', ['1.1.0'])).removals).toBeUndefined()
+  })
+
+  it('with Work merges into changing in the same save: nothing offered (a second save); once saved, the removal moves to the new one', async () => {
+    const { w, repo } = await project()
+    await moveTarget(w, repo, '1.2.0')
+    const a = await card(w, 'On 1.1.0')
+    await own(w, repo, a.number, '1.1.0')
+    const both = await checkOf(w, repo, 'main', ['1.2.0'])
+    expect(both.removals).toEqual([expect.objectContaining({ branch: '1.1.0', retarget: null, afterTarget: true })])
+    // The first save: Work merges into moved, 1.1.0 kept listed. The second: taking it out offers the move to main.
+    await moveTarget(w, repo, 'main', ['1.1.0', '1.2.0'])
+    const second = await checkOf(w, repo, 'main', ['1.2.0'])
+    expect(second.removals).toEqual([expect.objectContaining({ branch: '1.1.0', retarget: expect.objectContaining({ from: '1.1.0', to: 'main' }) })])
+    expect(second.removals![0].afterTarget).toBeUndefined()
+    await inWorkspace(w, () => retarget.retargetApply(w, repo, second.removals![0].retarget!, user))
+    await moveTarget(w, repo, 'main', ['1.2.0'])
+    expect((await w.projectConfig(repo)).workflow?.options.otherTargets).toEqual(['1.2.0'])
+  })
+
+  it('the old default taken out with the change of Work merges into is a removal too: named, nothing moved until the second save (HR2, round 1)', async () => {
+    const { w, repo } = await project()
+    // Saved: Work merges into 1.1.0, listed among the other branches too.
+    await moveTarget(w, repo, '1.1.0', ['main', '1.2.0', '1.1.0'])
+    const a = await card(w, 'On 1.1.0')
+    await own(w, repo, a.number, '1.1.0')
+    const both = await checkOf(w, repo, '1.2.0', ['main'])
+    expect(both.removals).toEqual([expect.objectContaining({ branch: '1.1.0', uses: [expect.any(String)], retarget: null, afterTarget: true })])
+    // The save itself refuses it, as the dialog said it would.
+    await expect(moveTarget(w, repo, '1.2.0', ['main'])).rejects.toThrow(/1\.1\.0 can’t be taken out/)
+    // The first save, 1.1.0 kept listed; the second offers its move to the new default.
+    await moveTarget(w, repo, '1.2.0', ['main', '1.1.0'])
+    const second = await checkOf(w, repo, '1.2.0', ['main'])
+    expect(second.removals).toEqual([expect.objectContaining({ branch: '1.1.0', retarget: expect.objectContaining({ from: '1.1.0', to: '1.2.0' }) })])
+    expect(second.removals![0].retarget!.cards.move.map((c) => c.number)).toEqual([a.number])
+  })
+
+  it('a movable blocker moves and stays moved while another keeps the branch; one changed between preview and move stays', async () => {
+    const { w, repo } = await project()
+    await moveTarget(w, repo, '1.2.0')
+    const a = await card(w, 'Moves')
+    await own(w, repo, a.number, '1.1.0')
+    const c = await card(w, 'Changed meanwhile')
+    await own(w, repo, c.number, '1.1.0')
+    const lent = await lentSlot(w, repo, '1.1.0')
+    const x = (await checkOf(w, repo, '1.2.0', ['main'])).removals![0]
+    expect(x.uses).toEqual(expect.arrayContaining([lent]))
+    expect(x.retarget!.cards.move.map((m) => m.number).sort()).toEqual([a.number, c.number].sort())
+    expect(x.retarget!.slots.keep).toEqual([{ name: lent, why: 'lent' }])
+    await own(w, repo, c.number, 'main')
+    const r = await inWorkspace(w, () => retarget.retargetApply(w, repo, x.retarget!, user))
+    expect(r.moved.cards.map((m) => m.number)).toEqual([a.number])
+    expect(r.skipped).toEqual([expect.objectContaining({ card: c.number, why: 'changed' })])
+    await expect(moveTarget(w, repo, '1.2.0', ['main'])).rejects.toThrow(new RegExp(`1\\.1\\.0 can’t be taken out .*${lent}`))
+    expect(await ownOf(w, repo, a.number)).toBeNull()
+    expect(await ownOf(w, repo, c.number)).toBe('main')
+  })
+})

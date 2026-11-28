@@ -55,6 +55,9 @@ interface CombworkMessageValues {
   'shell.command.assistant.toggle': undefined
   'shell.command.console.showCapture': undefined
   'shell.command.files.commitIgnore': undefined
+  'shell.command.files.compareWith': undefined
+  'shell.command.files.toggleBlame': undefined
+  'shell.command.files.toggleHistory': undefined
   'shell.command.folderChanges.settle': undefined
   'shell.command.folderChanges.show': undefined
   'shell.command.git.cancelRun': undefined
@@ -99,6 +102,7 @@ interface CombworkMessageValues {
   'shell.command.project.tab.next': undefined
   'shell.command.project.tab.overview': undefined
   'shell.command.project.tab.performance': undefined
+  'shell.command.project.tab.preview': undefined
   'shell.command.project.tab.previous': undefined
   'shell.command.project.tab.session': undefined
   'shell.command.project.tab.sessions': undefined

@@ -1,5 +1,4 @@
 import { join } from 'path'
-import { onBoardUpgraded } from './boardStore'
 import { createLogger } from './logger'
 import { sessions } from './sessions'
 import { endReviewsWithoutSession } from './tasks'
@@ -31,8 +30,6 @@ export function initReviewsOnOpen(): void {
     running.add(run)
   }
   WorkspaceService.openedListeners.add(repair)
-  // Opened while its board waited for the upgrade to 1.0 (it takes no writes until then): repaired once it is upgraded (#1621).
-  onBoardUpgraded(repair)
 }
 
 const running = new Set<Promise<unknown>>()

@@ -37,9 +37,9 @@ import * as assistant from './assistantControl'
 import { config } from './config'
 import { onCombworkEvent } from './events'
 import { placeKey, readCapped, readJson, realPath, renameRetrying, withFileLock } from './fsutil'
-import { openTable, readStore, saveTable, storeValue } from './storeRows'
+import { openTable, saveTable, storeValue } from './storeRows'
 import { measured } from './stallWork'
-import { boardLock, dbGenerationAt, onDbReplaced, upgradeWaiting, withLeasedDb, workspaceDb } from './boardStore'
+import { boardLock, withLeasedDb, workspaceDb } from './boardStore'
 import { transaction } from './db'
 import { addDeliveriesFile, countDeliveries, readDeliveries as readDeliveryRows, readDeliveriesWithBases, StaleDeliveries } from './schema/sessionDeliveryTables'
 import { saveDeliveryChanges } from './deliveryChanges'
@@ -189,9 +189,8 @@ const T = {
   badKey: agentMsg({ id: 'inbox.create.badKey', text: 'Not a delivery Combwork can keep: its source or key is too long.', note: "Why a delivery isn't made: what names its producer is too long to keep." }),
   projectFull: agentMsg({ id: 'inbox.create.projectFull', text: 'This project already has {max} deliveries waiting or not acked, the most Combwork keeps.', note: "Why a delivery isn't made: its project has as many live deliveries as Combwork keeps. max: that many." }),
   full: agentMsg({ id: 'inbox.create.full', text: "This project's deliveries are full (what waits for its agents and isn't acked): wait until they are received and acked, or cancel some.", note: "Why a delivery isn't made: its project's deliveries are full (the file's budget)." }),
-  notSaved: agentMsg({ id: 'inbox.save.failed', text: "Combwork couldn't save the deliveries ({error}): nothing changed.", note: 'Why a change to deliveries (a message, a read, an ack, a cancel) failed. error: why the save failed (inbox.save.tooMany, .dbReplaced, or a system error).' }),
+  notSaved: agentMsg({ id: 'inbox.save.failed', text: "Combwork couldn't save the deliveries ({error}): nothing changed.", note: 'Why a change to deliveries (a message, a read, an ack, a cancel) failed. error: why the save failed (inbox.save.tooMany, or a system error).' }),
   tooMany: agentMsg({ id: 'inbox.save.tooMany', text: 'too many deliveries to keep in this project', note: "Why the deliveries couldn't be saved, in inbox.save.failed." }),
-  dbReplaced: agentMsg({ id: 'inbox.save.dbReplaced', text: "the workspace's database was replaced since these deliveries were read", note: "Why the deliveries couldn't be saved, in inbox.save.failed: an upgrade or a restore replaced the database." }),
   readFailed: agentMsg({ id: 'inbox.load.failed', text: 'Could not read the deliveries ({error})', note: "Why a project's deliveries couldn't be read, from its file from before #1018. error: the system's error." }),
   changed: agentMsg({ id: 'inbox.given.changed', text: 'what it was for changed meanwhile', note: "Why a delivery wanted now (a task, a handover's step) wasn't given: its caller no longer wants it." }),
   notTyped: agentMsg({ id: 'inbox.given.notTyped', text: 'Combwork could not type it', note: "Why a delivery wanted now (a task, a handover's step) wasn't given, when nothing more is known." })
@@ -232,8 +231,6 @@ interface Store {
    * go-ahead): its own check, asked with offerHolds, and what to do once it is received or ends without that.
    */
   hooks: Map<string, DeliveryHooks>
-  /** The workspace database's generation it was read from (#1207 round 2): from an older one, it is stale and never saved. */
-  gen: number
   /**
    * Each delivery's row as this store last read or wrote it (#1266): a save changes only what its transaction changed,
    * and only from these, so another Combwork's receipt, ack or cancel since is never overwritten (saveDeliveryChanges).
@@ -532,31 +529,22 @@ export function load(host: string): Promise<Store> {
   const p = (async () => {
     await beforeRead?.()
     const place: HostPlace = { ...(await hostPlace(real)), host: real, key }
-    for (let tries = 1; ; tries++) {
-      const gen = dbGenerationAt(key)
-      const read = await readSaved(place)
-      if (stores.has(k)) return stores.get(k)!
-      const store: Store = { host, place, records: read.records, next: read.next, invalid: read.invalid, lock: Promise.resolve(), offering: new Set(), confirming: new Map(), rungAgain: new Set(), launches: new Map(), hooks: new Map(), gen, base: read.base }
-      // Restored before anything else sees it (a second load waits for this one).
-      await transact(store, (d) => {
-        for (const r of [...d.records]) if (r.state === 'offered') set(store, d, r, 'uncertain', say(T.uncertainRestart), undefined, { again: inDialectOf({ projectPath: store.host, agentId: r.agentId }, () => say(T.againRestart)) })
-        recheck(store, d)
-      }).catch((e) => log.warn('restoring deliveries', e))
-      if (stores.has(k)) return stores.get(k)!
-      if (gen !== dbGenerationAt(key)) {
-        // The database replaced meanwhile (the upgrade to 1.0, a restore): read again, from the file as it is now, while
-        // its workspace is still open; closed meanwhile, the stale read is kept by nobody (its saves are refused anyway).
-        if (!workspaceFor(host)) return store
-        if (tries < 3) continue
-      }
-      // Its workspace closed while it was read (#1391): kept by nobody, so no tick works on it.
-      if (!isAdmitted(key)) return store
-      stores.set(k, store)
-      showAll(store)
-      // A card that moved on while Combwork was closed: what was tied to its round is stale now (#652).
-      if (store.records.some((r) => r.round && isUnread(r))) sweepStale()
-      return store
-    }
+    const read = await readSaved(place)
+    if (stores.has(k)) return stores.get(k)!
+    const store: Store = { host, place, records: read.records, next: read.next, invalid: read.invalid, lock: Promise.resolve(), offering: new Set(), confirming: new Map(), rungAgain: new Set(), launches: new Map(), hooks: new Map(), base: read.base }
+    // Restored before anything else sees it (a second load waits for this one).
+    await transact(store, (d) => {
+      for (const r of [...d.records]) if (r.state === 'offered') set(store, d, r, 'uncertain', say(T.uncertainRestart), undefined, { again: inDialectOf({ projectPath: store.host, agentId: r.agentId }, () => say(T.againRestart)) })
+      recheck(store, d)
+    }).catch((e) => log.warn('restoring deliveries', e))
+    if (stores.has(k)) return stores.get(k)!
+    // Its workspace closed while it was read (#1391): kept by nobody, so no tick works on it.
+    if (!isAdmitted(key)) return store
+    stores.set(k, store)
+    showAll(store)
+    // A card that moved on while Combwork was closed: what was tied to its round is stale now (#652).
+    if (store.records.some((r) => r.round && isUnread(r))) sweepStale()
+    return store
   })().finally(() => {
     if (loading.get(k) !== p) return
     loading.delete(k)
@@ -573,29 +561,17 @@ export function load(host: string): Promise<Store> {
  */
 async function readSaved(place: HostPlace): Promise<{ records: DeliveryRecord[]; next: number; invalid: unknown[]; base: Map<string, string> }> {
   const file = fileOf(place.host)
-  let raw: unknown[]
-  let value: (key: string) => string | null
-  // The rows' texts as read (none while the upgrade waits: nothing is saved then).
-  let base = new Map<string, string>()
-  if (upgradeWaiting(place.workspace)) {
-    // The workspace's upgrade to 1.0 waits (#1207): its file is 0.9's, its deliveries rows of store_rows; nothing is moved in.
-    const data = readStore(place.workspace, 'deliveries', place.scope)
-    raw = data.rows.map((r) => JSON.parse(r.doc) as unknown)
-    value = (key) => data.meta.get(key) ?? null
-  } else {
-    // In their own table since 1.0 (#1211), deliveries.json moved in the first time (its next id and entries kept aside with it).
-    await openTable(place.workspace, 'deliveries', place.scope, file, () => readFileOf(place.host), DELIVERIES_TABLE)
-    // The rows, their bases and the values beside them, read in one read transaction (one snapshot, #1266 round 3): a
-    // record and its base are the same row's, never two reads another Combwork committed between.
-    const db = workspaceDb(place.workspace).reader
-    db.exec('BEGIN')
-    try {
-      ;({ raw, base, value } = readRows(db, place.scope))
-    } finally {
-      db.exec('COMMIT')
-    }
+  // In their own table since 1.0 (#1211), deliveries.json moved in the first time (its next id and entries kept aside with it).
+  await openTable(place.workspace, 'deliveries', place.scope, file, () => readFileOf(place.host), DELIVERIES_TABLE)
+  // The rows, their bases and the values beside them, read in one read transaction (one snapshot, #1266 round 3): a
+  // record and its base are the same row's, never two reads another Combwork committed between.
+  const db = workspaceDb(place.workspace).reader
+  db.exec('BEGIN')
+  try {
+    return parsedRows(readRows(db, place.scope))
+  } finally {
+    db.exec('COMMIT')
   }
-  return parsedRows({ raw, base, value })
 }
 
 /** A host's delivery rows, their bases and the values beside them, on the connection given (in the caller's transaction). */
@@ -742,9 +718,7 @@ async function save(store: Store, d: Draft): Promise<void> {
     for (const r of changed) if (!readDelivery(JSON.parse(JSON.stringify(r)))) throw new Error(`delivery ${r.id} isn't one Combwork could read back`)
     if (fileBytes(d) > MAX_FILE_BYTES) throw saidError(T.tooMany)
   })
-  // Read from a database since replaced (the upgrade to 1.0, a restore): never saved over what the file has now.
   const guard = (): void => {
-    if (store.gen !== dbGenerationAt(store.place.key)) throw saidError(T.dbReplaced)
     try {
       d.commit?.()
     } catch (e) {
@@ -1271,7 +1245,6 @@ async function reconcileLeft(place: HostPlace): Promise<void> {
 function leftOnLease(host: string, place: HostPlace, nd: NewDelivery, meta: DeliveryRecord['meta'], agentName: string | undefined): Promise<DeliveryRecord | null> {
   return withLeasedDb(place.workspace, async (db) => {
     await inLeave?.()
-    if (db.pending) return null
     await openTable(place.workspace, 'deliveries', place.scope, fileOf(place.host), () => readFileOf(place.host), DELIVERIES_TABLE, { db })
     return withFileLock(boardLock(place.workspace), async () =>
       transaction(db.writer, () => {
@@ -1841,6 +1814,25 @@ function confirming(store: Store, o: Offer, before: { runId: string; count: numb
   for (const id of o.ids) store.confirming.set(id, before)
 }
 
+/**
+ * HI-3611: when a delivery woke its agent, `at` (taken as the wake was seen, before any save waits), for this offer in
+ * `runId` only, once. Never after its read: one read before its line's take was seen (Codex's queued input, #1514)
+ * woke the agent by the time it was read.
+ */
+export function wokeAt(r: DeliveryRecord, runId: string, at: string): DeliveryRecord | null {
+  if (r.woke || r.offerRun !== runId || !(r.state === 'offered' || r.state === 'received' || r.state === 'acked' || r.state === 'uncertain')) return null
+  return { ...r, woke: r.received && Date.parse(r.received) < Date.parse(at) ? r.received : at }
+}
+
+/** Records, in a draft, that these deliveries woke their agent at `at` (wokeAt). */
+function recordWoke(d: Draft, ids: readonly string[], runId: string, at: string): void {
+  for (const id of ids) {
+    const r = byId(d.records, id)
+    const next = r && wokeAt(r, runId, at)
+    if (r && next) put(d, r, next)
+  }
+}
+
 /** Each source's line made again for what is about to be offered (from things as they are now): its body, or why it is cancelled. */
 async function refreshAll(store: Store, items: readonly DeliveryRecord[]): Promise<Map<string, Fresh>> {
   const out = new Map<string, Fresh>()
@@ -1972,6 +1964,11 @@ async function offerOnce(host: string, agentId: string, only?: string, tries = 1
       // A line the user typed into before its CLI took it is theirs (#652 round 1 finding 2): what it named waits again.
       follow: {
         confirming: (before) => confirming(store, o, before),
+        // HI-3611: its CLI took the line: the moment these woke the agent, taken now, before the save queues.
+        taken: () => {
+          const at = nowIso()
+          transactSoon(store, 'recording a wake', (d) => recordWoke(d, o.ids, o.runId, at)) // agent-protocol: for the log
+        },
         lost: () => lost(store),
         left: () => void unoffer(store, o),
         // Read since (#1514): its CLI took the line, whether or not it told of a prompt (Codex's queued input).
@@ -2136,6 +2133,8 @@ export async function launchWith<T extends { runId: string }>(host: string, nd: 
     show(store, nd.agentId)
     throw e
   }
+  // HI-3611: the launch that carries it has started: it woke the agent then (taken before the save below waits).
+  const started = nowIso()
   // The launch it went into, in memory at once (what the checks follow if saving it fails), and on disk.
   if (run?.runId) {
     store.launches.set(rec.id, run.runId)
@@ -2145,6 +2144,9 @@ export async function launchWith<T extends { runId: string }>(host: string, nd: 
     await transact(store, (d) => {
       const r = byId(d.records, rec.id)
       if (r?.state === 'offered' && r.offerRun === LAUNCHING && run?.runId) put(d, r, { ...r, offerRun: run.runId })
+      // Its woke, in the launch it went into: read already (the agent was quick), never later than its read.
+      // One read before this save still names the launch as about to start.
+      if (run?.runId) recordWoke(d, [rec.id], byId(d.records, rec.id)?.offerRun === LAUNCHING ? LAUNCHING : run.runId, started)
     })
   } catch (e) {
     // Launched with it: still offered into that launch (followed in memory); a restart finds it uncertain.
@@ -2308,15 +2310,6 @@ export async function carryConversation(host: string, agentId: string, from: str
 // agent-protocol: the product's name, as a delivery's sender
 const CARRIED_SENDER = { kind: 'combwork', name: 'Combwork' } as const // i18n-ignore: the product's name, as a delivery's sender
 
-// The workspace's database replaced (#1207 round 2: the upgrade to 1.0, a restore): its hosts' deliveries, read from the
-// file before, go from memory (a save begun from them is refused by their generation). The next use of a host (an agent's
-// status, the workspace opening) reads it again from the file as it is then, with what another Combwork saved meanwhile;
-// nothing reads it for a workspace closed meanwhile, which would open its database again (#1207 round 3). While the upgrade
-// waited no agent could start, so none waits for an offer.
-onDbReplaced((_path, place) => {
-  for (const [k, store] of stores) if (store.place.key === place) stores.delete(k)
-})
-
 // A window closes its workspace (#1391): its hosts' deliveries go from memory, so the tick no longer rechecks them, which
 // leased its closed combwork.db at each change. They stay in the database and are restored when a window opens it again. A
 // save already under way holds its store and lease, and finishes. By real location (`placeKey`), as the fence tells
@@ -2374,12 +2367,10 @@ export async function loadsForTests(): Promise<void> {
 /** For tests: a host's deliveries as saved (#1018: its workspace's database), with what is kept beside them. */
 export async function savedForTests(host: string): Promise<{ next: number | undefined; deliveries: DeliveryRecord[]; invalid?: unknown[] }> {
   const place = await hostPlace(host)
-  // In their table since 1.0 (#1211, store_rows gone); 0.9's rows while the workspace's upgrade waits.
-  const waiting = upgradeWaiting(place.workspace)
-  const old = waiting ? readStore(place.workspace, 'deliveries', place.scope) : null
+  // In their table since 1.0 (#1211, store_rows gone).
   const db = workspaceDb(place.workspace).reader
-  const value = (key: string): string | null => (old ? (old.meta.get(key) ?? null) : storeValue(db, 'deliveries', place.scope, key))
-  const deliveries = old ? old.rows.map((r) => JSON.parse(r.doc) as DeliveryRecord) : (readDeliveryRows(db, place.scope) as unknown as DeliveryRecord[])
+  const value = (key: string): string | null => storeValue(db, 'deliveries', place.scope, key)
+  const deliveries = readDeliveryRows(db, place.scope) as unknown as DeliveryRecord[]
   const next = value('next')
   const invalid = value('invalid')
   return { next: next !== null ? (JSON.parse(next) as number) : undefined, deliveries, ...(invalid ? { invalid: JSON.parse(invalid) as unknown[] } : {}) }

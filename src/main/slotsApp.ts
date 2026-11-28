@@ -32,6 +32,7 @@ import { removeCopiesIn } from './skillCopies'
 import { settleSlotJob } from './slotJobs'
 import { builderCountOf, DETACH_FAILED, operationTold, SlotPool, slotLevelsOf, slotOptionsOf, SlotStore, type OpHolder, type Slot, type SlotConn, type SlotLease, type SlotRenamer, type SlotRunEnd, type SlotRunner, type SlotWriter } from './slots'
 import { onCombworkEvent } from './events'
+import { placeEnded, settleHeld } from './placeEnds'
 import { agentBusy } from './workflow/lineUpdates'
 import { agentRunsGoing } from './workflow/service'
 import { openWorkspaces, workspaceFor, WorkspaceService } from './workspace'
@@ -71,7 +72,7 @@ export function boardConn(ws: WorkspaceService): SlotConn {
  * Starts a command in its job on Combwork's process supervisor: the launcher is put in the job before it runs the command
  * (queueJobs.ts), and one that can't be is ended having run nothing.
  */
-function jobSpawn(job: LeaseJob): Spawn {
+export function jobSpawn(job: LeaseJob): Spawn {
   return (file, args, opts) => {
     const { child, after, before } = startLauncher({ command: file, args, verbatim: !!opts.windowsVerbatimArguments }, { cwd: opts.cwd as string | undefined, env: opts.env })
     const giveUp = (): void => {
@@ -308,7 +309,8 @@ export function poolFor(ws: WorkspaceService, projectPath: string): Promise<Slot
       cap: () => agentMax(projectPath),
       runner: appRunner(ws, projectPath, root),
       settle: async (job) => {
-        const ok = await appSettle(root)(job)
+        // A preview's hold needs its page's guard proved gone too (HI-3615 round 2).
+        const ok = await settleHeld(job, appSettle(root))
         if (ok) retireSealOf(root, job)
         return ok
       },
@@ -324,10 +326,14 @@ export function poolFor(ws: WorkspaceService, projectPath: string): Promise<Slot
         }
       },
       removeIdle: () => advanced.get(SLOTS_REMOVE_IDLE) !== false,
-      ended: (lease, slot) => {
+      ended: async (lease, slot) => {
         stopLeaseSession(projectPath, lease, slot, { ws, pool: made })
         // Where its agent works changes (#1442: an idle builder's "in slot-b" goes): the window reads it again.
         if (!ws.lifetime.aborted) ws.scheduleRefresh()
+        // HI-3614: a preview running in the slot under this lease stops with it, its server gone before the slot settles;
+        // one not proved gone keeps the slot held for its job (round 2).
+        const held = await placeEnded({ kind: 'generation', id: lease.id })
+        return held.length ? { holdJob: held[0] } : undefined
       },
       writerOver: (w) => writerOver(w),
       overCleared: (run) => writerCleared(run),
@@ -882,7 +888,7 @@ export function stopSlots(): void {
  * A pool's slots as the window reads them (`slots:list`). A writer is held (#1506) when its run isn't live here and its
  * Combwork is this one or one known to have gone: Release Slot… is offered for it.
  */
-export async function slotViews(pool: SlotPool): Promise<SlotView[]> {
+export async function slotViews(pool: SlotPool, target: string | null = null): Promise<SlotView[]> {
   const slots = pool.slots()
   return Promise.all(
     slots.map(async (s) => {
@@ -895,7 +901,9 @@ export async function slotViews(pool: SlotPool): Promise<SlotView[]> {
       // HI-3467: or its detach at the target failing, once that has repeated (as the user is told).
       const recorded = !l ? pool.operation(s.name) : null
       const operation = operationTold(recorded) ? recorded : null
-      return { name: s.name, folder: s.folder, state: s.state, warmError: s.warmError, warmLog: s.warmLog, lease: l ? { id: l.id, kind: l.kind, agent: l.agent, card: l.card, lane: l.lane } : null, writer: w ? { agent: w.agent, lease: w.lease, held } : null, ...(goneFree ? { goneFree: true as const } : {}), ...(operation ? { operation: { what: operation.what, since: operation.since, ...(operation.what === DETACH_FAILED ? { error: operation.error ?? '', ...(s.target ? { target: s.target } : {}) } : {}) } } : {}) }
+      // HI-3592: free and left on another branch than Work merges into: its row offers to move it there.
+      const movable = !!target && !!s.target && s.target !== target && s.state === 'ready' && !l && !w && !s.op && !s.job && !recorded
+      return { name: s.name, folder: s.folder, state: s.state, warmError: s.warmError, warmLog: s.warmLog, lease: l ? { id: l.id, kind: l.kind, agent: l.agent, card: l.card, lane: l.lane } : null, writer: w ? { agent: w.agent, lease: w.lease, held } : null, ...(goneFree ? { goneFree: true as const } : {}), ...(movable ? { moveOn: { from: s.target!, to: target! } } : {}), ...(operation ? { operation: { what: operation.what, since: operation.since, ...(operation.what === DETACH_FAILED ? { error: operation.error ?? '', ...(s.target ? { target: s.target } : {}) } : {}) } } : {}) }
     })
   )
 }
