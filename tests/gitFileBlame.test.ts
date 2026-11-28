@@ -193,11 +193,11 @@ describe('the panel', () => {
       })
     }
     const first = blame('f.txt', 'a\n', false, 'same')
-    await vi.waitFor(() => expect(signals).toHaveLength(1))
+    await vi.waitFor(() => expect(signals).toHaveLength(1), { timeout: timing('wait.hang') })
     const second = blame('f.txt', 'a\nb\n', false, 'same')
     await expect(first).rejects.toThrow(/changed meanwhile/)
     expect(signals[0].aborted).toBe(true)
-    await vi.waitFor(() => expect(signals).toHaveLength(2))
+    await vi.waitFor(() => expect(signals).toHaveLength(2), { timeout: timing('wait.hang') })
     P.fileBlameCancel('same')
     await expect(second).rejects.toThrow(/changed meanwhile/)
     expect(signals[1].aborted).toBe(true)
