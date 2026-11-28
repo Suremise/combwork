@@ -151,11 +151,32 @@ const check = (name, ok, extra = '') => {
     await cardDialog.locator('.dialog-header button[aria-label^="Close"]').click()
     await lib.until(async () => (await cardDialog.count()) === 0, HUNG_MS)
     // Typing is blamed a moment later: a new line is not committed yet.
-    await page.locator('.split-main .monaco').first().click({ position: { x: 90, y: 10 } })
-    await page.keyboard.press('Control+Home')
-    await page.keyboard.type('top line\n')
-    // Until the new text's blame comes (a moment after typing stops), the old one isn't drawn beside the moved lines.
-    check('as soon as a line is typed, the old annotations are gone', (await column.locator('.blame-block').count()) === 0 && (await column.getAttribute('aria-busy')) === 'true')
+    // The new text's blame is held in main until released, so the stale interval is seen whatever the timing: until it
+    // comes, the old annotations aren't drawn beside the lines that moved.
+    await app.evaluate(({ ipcMain }) => {
+      const handlers = ipcMain._invokeHandlers
+      const h = handlers.get('files:blame')
+      globalThis.__blameHold = { on: true, held: [], h }
+      handlers.set('files:blame', (...x) => (globalThis.__blameHold.on ? new Promise((r) => globalThis.__blameHold.held.push(() => r(h(...x)))) : h(...x)))
+    })
+    const releaseBlame = () =>
+      app.evaluate(({ ipcMain }) => {
+        const hold = globalThis.__blameHold
+        if (!hold) return
+        hold.on = false
+        for (const r of hold.held.splice(0)) r()
+        ipcMain._invokeHandlers.set('files:blame', hold.h)
+        globalThis.__blameHold = null
+      })
+    try {
+      await page.locator('.split-main .monaco').first().click({ position: { x: 90, y: 10 } })
+      await page.keyboard.press('Control+Home')
+      await page.keyboard.type('top line\n')
+      check("the new text's blame is asked for (and held)", !!(await lib.until(async () => (await app.evaluate(() => globalThis.__blameHold.held.length)) >= 1 && (await editorText()).includes('top line'), HUNG_MS)))
+      check('while it is held, none of the old annotations is drawn', (await column.locator('.blame-block').count()) === 0 && (await column.getAttribute('aria-busy')) === 'true')
+    } finally {
+      await releaseBlame()
+    }
     check('a line typed is blamed as not committed', !!(await lib.until(async () => (await column.locator('.blame-block.uncommitted[data-blame-line="1"]').count()) === 1, HUNG_MS)))
     await page.keyboard.press('Control+Home')
     await page.keyboard.press('Shift+ArrowDown')
