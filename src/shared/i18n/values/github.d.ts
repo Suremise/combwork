@@ -103,6 +103,7 @@ interface CombworkMessageValues {
   'github.shipped.cancel': undefined
   'github.shipped.close': { count: number }
   'github.shipped.desc': { version: string | number }
+  'github.shipped.doubt': { reason: string; issue: string | number; card: string | number; tag: string | number }
   'github.shipped.failed': undefined
   'github.shipped.line': undefined
   'github.shipped.loading': undefined

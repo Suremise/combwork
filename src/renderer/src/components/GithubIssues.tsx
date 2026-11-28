@@ -41,6 +41,7 @@ const S = {
   noLines: msg({ id: 'github.shipped.noLines', defaultMessage: 'No branch of this project is released yet: a release is a tag named after its branch (v1.7.0 or 1.7.0), merged into the default branch.', description: 'In the Close Shipped Issues dialog (HI-3555) when none of the project’s branches is released. Keep the example tags.' }),
   published: msg({ id: 'github.shipped.published', defaultMessage: '{published, select, yes {The release {tag} is published on GitHub.} other {The release {tag} isn’t published on GitHub yet: its issues can be closed once it is.}}', description: 'In the Close Shipped Issues dialog (HI-3555): whether the release of the chosen branch is published on GitHub (not a draft). {tag} is its tag, such as v1.7.0. Keep the select keys.' }),
   none: msg({ id: 'github.shipped.none', defaultMessage: 'No card linked to a GitHub issue shipped in {line}.', description: 'In the Close Shipped Issues dialog (HI-3555) when no card with a GitHub issue merged into the chosen released branch. {line} is a branch such as 1.7.0.' }),
+  doubt: msg({ id: 'github.shipped.doubt', defaultMessage: '{reason, select, earlier {Issue #{issue} · {card}: left out, as it couldn’t be told whether the earlier release {tag} shipped it} other {Issue #{issue} · {card}: left out, as it couldn’t be read whether its merge is in {tag}}}', description: 'A row of the Close Shipped Issues dialog (HI-3613): a card linked to a GitHub issue that was left out, not closed, because something couldn’t be read (Git or GitHub didn’t answer, or its merge commit isn’t in this repository). {card} is a card key like HI-12, {tag} a release tag such as v1.7.0. Keep the select keys.' }),
   row: msg({ id: 'github.shipped.row', defaultMessage: 'Issue #{issue} · {card}', description: 'A row of the Close Shipped Issues dialog (HI-3555): a GitHub issue and the card that fixed it. {card} is a card key like HI-12.' }),
   state: msg({ id: 'github.shipped.state', defaultMessage: '{state, select, open {open} closed {already closed} other {state unknown}}', description: 'Beside a row of the Close Shipped Issues dialog (HI-3555): the issue’s state on GitHub now. Keep the select keys.' }),
   outcome: msg({ id: 'github.shipped.outcome', defaultMessage: '{outcome, select, closed {closed} alreadyClosed {already closed} unknown {couldn’t tell whether it closed: {detail}} stopped {not closed: something changed meanwhile, look again} other {not closed: {detail}}}', description: 'Beside a row of the Close Shipped Issues dialog (HI-3555) after closing, as read back from GitHub: what happened to that issue (closed, already closed, couldn’t be read back, not tried because the repository, the release’s tag or its card changed while closing, or still open). {detail} is why (gh’s own words). Keep the select keys.' }),
@@ -260,11 +261,11 @@ export function ShippedIssuesDialog({ projectPath, onClose }: { projectPath: str
               <div className={shipped?.published ? 's-desc' : 's-desc warn-text'} data-shipped-published={read.published ? 'yes' : 'no'}>
                 {tr(S.published, { published: read.published ? 'yes' : 'no', tag: read.tag })}
               </div>
-              {!read.issues.length ? (
+              {!read.issues.length && !read.doubts.length ? (
                 <div className="muted" data-shipped="none">
                   {tr(S.none, { line: read.line })}
                 </div>
-              ) : (
+              ) : !read.issues.length ? null : (
                 <ul className="github-prs" data-shipped="list">
                   {read.issues.map((i) => {
                     const o = outcomeOf(i.issue)
@@ -279,6 +280,19 @@ export function ShippedIssuesDialog({ projectPath, onClose }: { projectPath: str
                       </li>
                     )
                   })}
+                </ul>
+              )}
+              {read.doubts.length > 0 && (
+                <ul className="github-prs" data-shipped="doubts">
+                  {read.doubts.map((d) => (
+                    <li key={`${d.card}-${d.issue}`} className="github-pr" data-doubt-issue={d.issue} data-reason={d.reason}>
+                      <div className="github-pr-text warn-text">
+                        <a href={d.url} onClick={(e) => (e.preventDefault(), void call('app:openExternal', d.url))}>
+                          {tr(S.doubt, { reason: d.reason, issue: d.issue, card: cardLabelOf(get(), d.card), tag: d.tag })}
+                        </a>
+                      </div>
+                    </li>
+                  ))}
                 </ul>
               )}
             </>

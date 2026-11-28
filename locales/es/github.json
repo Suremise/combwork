@@ -101,6 +101,7 @@
   "github.shipped.cancel": "Cerrar",
   "github.shipped.close": "{count, plural, one {Cerrar # issue} many {Cerrar # issues} other {Cerrar # issues}}",
   "github.shipped.desc": "Las tarjetas con una issue de GitHub que se fusionaron en una rama publicada. Cuando su versión se publica en GitHub, cada issue abierta se cierra con el comentario «Fixed in {version}», con tu cuenta de GitHub.",
+  "github.shipped.doubt": "{reason, select, earlier {Issue #{issue} · {card}: omitida, porque no se pudo saber si la versión anterior {tag} la incluyó} other {Issue #{issue} · {card}: omitida, porque no se pudo leer si su merge está en {tag}}}",
   "github.shipped.failed": "No se pudieron cerrar las issues publicadas",
   "github.shipped.line": "Rama publicada",
   "github.shipped.loading": "Preguntando a GitHub…",

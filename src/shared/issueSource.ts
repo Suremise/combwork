@@ -135,9 +135,22 @@ export type PreviewPairs = Omit<ShippedPreview, 'issues'> & { issues: { card: nu
 /** Whether a close of `preview` may write to `issue` (HI-3588): some row of it was shown not closed, as the button counted. */
 export const closeAuthorised = (preview: ShippedPreview, issue: number): boolean => preview.issues.some((i) => i.issue === issue && i.state !== 'closed')
 
-/** What Close Shipped Issues… shows for a line: its release on GitHub, and its shipped issues. */
+/**
+ * HI-3613: a Done card linked to an issue that Close Shipped Issues… left out because something it rests on couldn't be
+ * read (never closed on doubt, but named): `merge`, whether its merge is in the release's commit; `earlier`, whether
+ * `tag`, an earlier release holding it, shipped it (its containment, or whether it is published on GitHub).
+ */
+export interface DoubtfulIssue {
+  card: number
+  issue: number
+  url: string
+  reason: 'merge' | 'earlier'
+  tag: string
+}
+
+/** What Close Shipped Issues… shows for a line: its release on GitHub, its shipped issues, and (HI-3613) those left out on doubt. */
 export type ShippedIssuesRead =
-  | (Omit<ShippedPreview, 'issues'> & { version: string; published: boolean; releaseUrl: string | null; issues: ShippedIssue[] })
+  | (Omit<ShippedPreview, 'issues'> & { version: string; published: boolean; releaseUrl: string | null; issues: ShippedIssue[]; doubts: DoubtfulIssue[] })
   | { repo: GithubRepoRef | null; problem: ReleaseProblem; detail: string | null }
 
 /**
