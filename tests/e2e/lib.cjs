@@ -2568,13 +2568,36 @@ async function workflowTab(scope, optionOrTab, ms = timing('hang.ui')) {
  * HI-3591: a tab (a Tabs button) chosen with one click, unless it is chosen already; resolves once it is selected. A click
  * that doesn't choose it is never clicked again: it throws, saying what the row shows instead, what is at the tab's centre
  * and whether the tab is still the node clicked (a replaced one loses a click pressed on the old), so a lost click is
- * seen rather than retried.
+ * seen rather than retried. HI-3623: it also says what the click's events reached and where the tab was at each (a press
+ * and a release on different elements make no click), and what changed in the page between the press and the click (a
+ * node removed around the tab drops the press; Playwright checks only the press's target). A click that chose its tab
+ * after such a change logs it, so a near miss is seen too.
  */
 async function chooseTab(tab, what, ms = timing('hang.ui')) {
   if ((await tab.getAttribute('aria-selected')) === 'true') return
-  await tab.evaluate((el) => (window.__cwTabClicked = el))
-  await tab.click()
-  if (await until(async () => (await tab.getAttribute('aria-selected')) === 'true', ms)) return
+  const page = tab.page()
+  let chosen = false
+  let failure = null
+  try {
+    await tab.evaluate(tabClickProbe)
+    await tab.click()
+    chosen = await until(async () => (await tab.getAttribute('aria-selected')) === 'true', ms)
+  } catch (e) {
+    failure = e
+  }
+  // HR1, round 1: ended through the page, whatever failed above, even with the tab gone.
+  const click = await page.evaluate(tabClickEnd).catch((e) => ({ error: String(e) }))
+  if (failure) {
+    if (failure instanceof Error) {
+      failure.message += ` (HI-3623, ${what}: its click saw ${JSON.stringify(click)})`
+      throw failure
+    }
+    throw new Error(`${what}: ${String(failure)} (HI-3623: its click saw ${JSON.stringify(click)})`)
+  }
+  if (chosen) {
+    if (tabClickNearMiss(click)) console.log(`INFO ${what} was chosen, but its click saw changes (HI-3623, ${waitCaller(new Error().stack)}): ${JSON.stringify(click)}`)
+    return
+  }
   const seen = await tab
     .evaluate((el) => {
       const r = el.getBoundingClientRect()
@@ -2588,7 +2611,66 @@ async function chooseTab(tab, what, ms = timing('hang.ui')) {
       }
     })
     .catch((e) => String(e))
-  throw new Error(`${what} wasn't chosen by its click: ${JSON.stringify(seen)}`)
+  throw new Error(`${what} wasn't chosen by its click: ${JSON.stringify({ seen, click })}`)
+}
+
+/**
+ * HI-3623, run in the page (self-contained: Playwright sends its source): records a tab's click, its press, release and
+ * click (each one's target, the point, where the tab was) and any node removed around the tab, in `events`, and the other
+ * changes while it is pressed (outside a tab panel, which changes as a tab is chosen) in `changes`. Each list is bounded
+ * on its own, with what it dropped counted (HR1, round 1: a burst of changes never crowds out the release and the click).
+ */
+function tabClickProbe(el) {
+  window.__cwTabClick?.stop()
+  const MAX_EVENTS = 40
+  const MAX_CHANGES = 20
+  const t0 = performance.now()
+  const at = () => Math.round(performance.now() - t0)
+  const name = (n) => (n && n.tagName ? `${String(n.tagName).toLowerCase()}${n.getAttribute?.('data-tab') ? `[${n.getAttribute('data-tab')}]` : ''}.${String(n.className).slice(0, 40)}` : String(n))
+  const probe = { el, events: [], changes: [], droppedEvents: 0, droppedChanges: 0, stop: () => undefined }
+  const event = (line) => (probe.events.length < MAX_EVENTS ? probe.events.push(line) : probe.droppedEvents++)
+  let pressed = false
+  const onEvent = (e) => {
+    if (e.type === 'pointerdown') pressed = true
+    if (e.type === 'click') pressed = false
+    const r = el.getBoundingClientRect()
+    event(`${at()} ${e.type} at ${e.clientX},${e.clientY} on ${name(e.target)}, tab at ${Math.round(r.x)},${Math.round(r.y)}${el.isConnected ? '' : ', tab detached'}`)
+  }
+  const TYPES = ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click']
+  for (const type of TYPES) window.addEventListener(type, onEvent, { capture: true })
+  const mo = new MutationObserver((records) => {
+    for (const r of records) {
+      const line = () => `${at()} ${r.type} ${name(r.target)}${r.attributeName ? ` @${r.attributeName}` : ''} +${[...r.addedNodes].map(name).join('|')} -${[...r.removedNodes].map(name).join('|')}`
+      if ([...r.removedNodes].some((n) => n === el || n.contains?.(el))) event(`removed around the tab: ${line()}`)
+      else if (pressed && !r.target.closest?.('[role="tabpanel"]')) {
+        if (probe.changes.length < MAX_CHANGES) probe.changes.push(line())
+        else probe.droppedChanges++
+      }
+    }
+  })
+  mo.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['class', 'style', 'hidden'] })
+  probe.stop = () => {
+    for (const type of TYPES) window.removeEventListener(type, onEvent, { capture: true })
+    mo.disconnect()
+  }
+  window.__cwTabClicked = el
+  window.__cwTabClick = probe
+}
+
+/** HI-3623, run in the page: ends the tab click's probe and returns what it saw (null with none running). */
+function tabClickEnd() {
+  const probe = window.__cwTabClick
+  if (!probe) return null
+  probe.stop()
+  window.__cwTabClick = undefined
+  return { events: probe.events, changes: probe.changes, droppedEvents: probe.droppedEvents, droppedChanges: probe.droppedChanges }
+}
+
+/** HI-3623: a click that chose its tab all the same saw the page change while pressed, or the tab move under the press. */
+function tabClickNearMiss(click) {
+  if (!click || !Array.isArray(click.events)) return false
+  if (click.changes.length > 0 || click.droppedChanges > 0 || click.events.some((l) => l.includes('removed around the tab'))) return true
+  return new Set(click.events.filter((l) => / (pointerdown|mouseup) at /.test(l)).map((l) => l.split(', tab at ')[1])).size > 1
 }
 
 /** HI-3591: the open Version Control tab's section (workflow, changes, history, branches, queue) chosen with one click. */
@@ -2598,4 +2680,4 @@ async function vcSection(page, id, ms = timing('hang.ui')) {
   await chooseTab(tab, `The Version Control section ${id}`, ms)
 }
 
-module.exports = { timing, workflowTab, chooseTab, vcSection,PACKAGED_EXE, projectConfig, setAgentLaunch, tokenFile, launchToken, launchTokens, commitBursts, commitChains, acceptCommitChain, watchCommitBursts, burstWatcher, unkey, KEYED, cardLabel, cardDialog, readCard, writeCard, addMenuRun, speakLanguage, agentCount, agentMenu, agentsMenu, agentsMenuRun, menuEntry, openMoreTab, openProjectSettings, setOwnOptions, setMaxAgents, paneHeader, showAgent, accountCatalog, ROOT, ELECTRON, WORK, CODEX_HOME, CLAUDE_TEST_HOME, TRASH, TEST_GIT_IDENTITY, trashed, tidyUp, ownClaudeHome, probeDir, combworkEnv, childEnv, baseEnv, envValue, withPathFirst, gitEnv, git, GIT_LOCKED, plainText, recordPtyOutput, ptyOutput, trustChoice, haikuAutoMode, haikuAutoCaveat, sleep, port, until, within, steady, settled, themeSettled, noDialog, hoverTip, quitWatch, appReady, pageFocused, realFocus, openWorkspace, trustWorktrees, hadEstimate, fitWindow, stubFocus, enableProviders, fakeClaude, launch, waitForProvider, addAgent, setLaunch, setProjectLaunch, soloAgent, ptyKey, themeShown, CLAUDE_TRUST, CLAUDE_AT_PROMPT, trustQuestion, screenNow, typeThenEnter, acceptClaudeTrust, acceptRelaunchTrust, withFileLock, trustForCodex, gitProject, codexSignedIn, pathWithoutStoreAliases, launchDir, launchHook, codexHook, processTree, stopProcessesIn, identify, stillSame, endExactly, endTreeExactly, endChildTree, processRunning, testExecutable, keepPackagedQuiet, keepPackagedOffline, aliasOldBridge, PACKAGED_ARGS, DEAD_PROXY, NO_UPDATE_CHECK, noUpdateChecks, updateChecksLogged, packagedDialect, inDialect, packagedGuardProblems, realFoldersListing, listingChanges, samplePng, environmentProblem, environmentProblems, storePwshRefusals, stepVerdict, checked, cliStep, sendPrompt, combworkLogLines, combworkToolsConnected, TURN_HUNG_MS, agentIdle, logFakeInput, inboxQuiet, inboxPending, agentQuiet, laneBriefDone, typeLine, fakePrompts, skip, zoomTo, viewportIs, framesDrawn, ipcSettled, ipcAnswered, answersDrawn, readyWithin, projectShown, sizesGiven, animationsDone, exitWithin }
+module.exports = { timing, workflowTab, chooseTab, tabClickProbe, tabClickEnd, tabClickNearMiss, vcSection,PACKAGED_EXE, projectConfig, setAgentLaunch, tokenFile, launchToken, launchTokens, commitBursts, commitChains, acceptCommitChain, watchCommitBursts, burstWatcher, unkey, KEYED, cardLabel, cardDialog, readCard, writeCard, addMenuRun, speakLanguage, agentCount, agentMenu, agentsMenu, agentsMenuRun, menuEntry, openMoreTab, openProjectSettings, setOwnOptions, setMaxAgents, paneHeader, showAgent, accountCatalog, ROOT, ELECTRON, WORK, CODEX_HOME, CLAUDE_TEST_HOME, TRASH, TEST_GIT_IDENTITY, trashed, tidyUp, ownClaudeHome, probeDir, combworkEnv, childEnv, baseEnv, envValue, withPathFirst, gitEnv, git, GIT_LOCKED, plainText, recordPtyOutput, ptyOutput, trustChoice, haikuAutoMode, haikuAutoCaveat, sleep, port, until, within, steady, settled, themeSettled, noDialog, hoverTip, quitWatch, appReady, pageFocused, realFocus, openWorkspace, trustWorktrees, hadEstimate, fitWindow, stubFocus, enableProviders, fakeClaude, launch, waitForProvider, addAgent, setLaunch, setProjectLaunch, soloAgent, ptyKey, themeShown, CLAUDE_TRUST, CLAUDE_AT_PROMPT, trustQuestion, screenNow, typeThenEnter, acceptClaudeTrust, acceptRelaunchTrust, withFileLock, trustForCodex, gitProject, codexSignedIn, pathWithoutStoreAliases, launchDir, launchHook, codexHook, processTree, stopProcessesIn, identify, stillSame, endExactly, endTreeExactly, endChildTree, processRunning, testExecutable, keepPackagedQuiet, keepPackagedOffline, aliasOldBridge, PACKAGED_ARGS, DEAD_PROXY, NO_UPDATE_CHECK, noUpdateChecks, updateChecksLogged, packagedDialect, inDialect, packagedGuardProblems, realFoldersListing, listingChanges, samplePng, environmentProblem, environmentProblems, storePwshRefusals, stepVerdict, checked, cliStep, sendPrompt, combworkLogLines, combworkToolsConnected, TURN_HUNG_MS, agentIdle, logFakeInput, inboxQuiet, inboxPending, agentQuiet, laneBriefDone, typeLine, fakePrompts, skip, zoomTo, viewportIs, framesDrawn, ipcSettled, ipcAnswered, answersDrawn, readyWithin, projectShown, sizesGiven, animationsDone, exitWithin }
