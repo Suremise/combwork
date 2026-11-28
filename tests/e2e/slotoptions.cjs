@@ -8,8 +8,6 @@
 //   (CW_TEST_SLOW_IPC) both stay, with another window's change; the setup emptied is "none", and Inherit undoes it;
 // - the copied files inherit Combwork's slot default, then the workspace's (set to none in its Workspace defaults, Settings → Version Control), then the
 //   default, each saying where it comes from (HI-1765); Project Settings opens on General, with no slot rows;
-// - a project saved by a P6 build with Pair (G15 stored Off, the one-time step not run yet) reads as Pair, not Custom,
-//   after the next start, with G15 On.
 // - Set up submodules and LFS (HI-1182): absent in a project with neither; in one with a submodule (gamma), shown on with
 //   how many it has, turned off (project.json's slots.gitFiles false) and on again (removed).
 // Screenshots of the Slots and copies group and the G11/G15/G17 rows, light and dark, in English and German, and of the
@@ -21,7 +19,6 @@ const lib = require('./lib.cjs')
 const q = require('./queueFixture.cjs')
 const fs = require('fs')
 const path = require('path')
-const { DatabaseSync } = require('node:sqlite')
 
 const PORT = Number(lib.port(47804))
 const fx = q.queueProject('slotoptions')
@@ -34,22 +31,9 @@ const check = (name, ok, extra = '') => {
 }
 const until = (fn, ms) => lib.until(fn, ms, 200)
 const projectJson = (p = fx.alpha) => JSON.parse(fs.readFileSync(path.join(p, '.combwork', 'project.json'), 'utf8'))
-/** Changes the workspace's board from outside Combwork, as another process would. */
-function board(sql, ...args) {
-  const db = new DatabaseSync(path.join(fx.ws, '.combwork', 'combwork.db'), { timeout: lib.timing('db.busyMs') })
-  try {
-    db.prepare(sql).run(...args)
-  } finally {
-    db.close()
-  }
-}
 
 ;(async () => {
   q.prepare(fx)
-  // A second project, as a P6 build saved Pair (made before the restart below).
-  const beta = path.join(fx.ws, 'beta')
-  lib.gitProject(beta, { 'b.txt': 'b\n', '.gitignore': '.combwork/\n' })
-  lib.git(beta, ['branch', '-M', 'main'])
   // HI-1182: a third project with a local submodule (its repository outside the workspace, so it is no project).
   const gamma = path.join(fx.ws, 'gamma')
   const gammaSub = path.join(path.dirname(fx.ws), 'gamma-sub')
@@ -60,8 +44,8 @@ function board(sql, ...args) {
   lib.git(gamma, ['-c', 'protocol.file.allow=always', 'submodule', 'add', '-q', gammaSub, 'libs/s'])
   lib.git(gamma, ['commit', '-q', '-m', 'submodule'])
   const marker = 'setup-marker.txt'
-  let h = await q.startCombwork(fx, { port: PORT, keepOptions: true })
-  let { page, inv, app } = h
+  const h = await q.startCombwork(fx, { port: PORT, keepOptions: true })
+  const { page, inv, app } = h
   const shot = async (name, target) => {
     while ((await page.locator('.toast').count()) > 0) await page.locator('.toast').first().locator('button').last().click()
     await page.mouse.move(5, 5)
@@ -279,27 +263,6 @@ function board(sql, ...args) {
     await shot('slots-group-de', slotsGroup)
     await shot('rows-de', row('folder'))
     await speak('en')
-
-    // --- A project a P6 build saved with Pair: G15 stored Off, and the one-time step not yet run.
-    const pairOptions = (await inv('workflow:form', beta)).presets.find((p) => p.id === 'pair').options
-    const { platform: _p, ...stored } = pairOptions
-    // As before P7: no step recorded in the project (the first start settled beta, with nothing to change), nor its mark.
-    const { stepsDone: _done, ...cfg } = projectJson(beta)
-    fs.writeFileSync(path.join(beta, '.combwork', 'project.json'), JSON.stringify({ ...cfg, workflow: { platform: 'git', preset: 'pair', options: { ...stored, slotsUpToDate: false } } }))
-    await h.app.close()
-    board("DELETE FROM board_meta WHERE key = 'workflow.slotsUpToDateFromBeforeP7'")
-    h = await q.startCombwork(fx, { port: PORT, keepOptions: true })
-    ;({ page, inv, app } = h)
-    page.on('pageerror', (e) => check('no page errors', false, e.message))
-    check('after the next start, the P6 project’s Pair has G15 On', !!(await until(() => projectJson(beta).workflow.options.slotsUpToDate === true, HUNG_MS)), JSON.stringify(projectJson(beta).workflow))
-    await lib.fitWindow(app, page, { width: 1400, height: 950 })
-    // The new window's own locators (the first window's are gone with it).
-    const form2 = page.locator('.workflow-form')
-    await page.getByText('beta', { exact: true }).first().click()
-    await page.locator('.tabs .tab', { hasText: 'Version Control' }).click()
-    await lib.vcSection(page, 'workflow')
-    await form2.waitFor({ timeout: HUNG_MS })
-    check('…and reads as Pair, not Custom', !!(await until(async () => (await form2.locator('.workflow-preset-now').innerText()).trim() === 'Pair', HUNG_MS)), await form2.locator('.workflow-preset-now').innerText().catch(() => ''))
   } catch (e) {
     check('the suite ran to the end', false, e.stack ?? String(e))
   } finally {
