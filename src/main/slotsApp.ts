@@ -325,12 +325,12 @@ export function poolFor(ws: WorkspaceService, projectPath: string): Promise<Slot
         }
       },
       removeIdle: () => advanced.get(SLOTS_REMOVE_IDLE) !== false,
-      ended: (lease, slot) => {
-        // HI-3614: a preview running in the slot under this lease stops with it.
-        placeEnded({ kind: 'generation', id: lease.id })
+      ended: async (lease, slot) => {
         stopLeaseSession(projectPath, lease, slot, { ws, pool: made })
         // Where its agent works changes (#1442: an idle builder's "in slot-b" goes): the window reads it again.
         if (!ws.lifetime.aborted) ws.scheduleRefresh()
+        // HI-3614: a preview running in the slot under this lease stops with it, its server gone before the slot settles.
+        await placeEnded({ kind: 'generation', id: lease.id })
       },
       writerOver: (w) => writerOver(w),
       overCleared: (run) => writerCleared(run),

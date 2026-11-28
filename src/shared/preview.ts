@@ -100,16 +100,19 @@ export interface PreviewPlace {
   generation: string
 }
 
-/** The source a preview was started from, or is at now: the place's commit, and the tree of its files when they differ from it. */
-export interface PreviewSource {
-  /** HEAD's commit, or null in a repository with none. */
-  commit: string | null
-  /**
-   * The tree id of the place's files (tracked, and untracked ones git doesn't ignore) when they differ from the commit:
-   * the same files give the same id. Null when clean.
-   */
-  content: string | null
-}
+/**
+ * The source a place holds (HI-3614, s16 §B; HI-3614 round 1: a tree that couldn't be read is never taken for clean):
+ * - `clean`: its files are exactly its commit's;
+ * - `dirty`: they differ, `content` the tree id of its files (tracked, and untracked ones git doesn't ignore), the same
+ *   files always giving the same id; `commit` null in a repository with none yet;
+ * - `none`: the folder isn't in a git repository, so there is no source to name;
+ * - `unknown`: git couldn't read it (why: its error's first line), so whether it changed can't be told.
+ */
+export type PreviewSource =
+  | { kind: 'clean'; commit: string }
+  | { kind: 'dirty'; commit: string | null; content: string }
+  | { kind: 'none' }
+  | { kind: 'unknown'; commit: string | null; why: string }
 
 /** Why a preview isn't running. */
 export type PreviewEnd =
@@ -143,7 +146,7 @@ export interface PreviewView {
   stoppedAt: string | null
   /** Why it stopped, or failed to start. */
   end: PreviewEnd | null
-  /** The source at its start. */
+  /** The source at its start (unknown until its stamp is read). */
   source: PreviewSource
   /** When the place's files last changed after its start, as its watcher saw (null: not since). */
   changedAt: string | null
@@ -154,5 +157,14 @@ export interface PreviewView {
 /** The address a preview's page is at. */
 export const previewUrl = (port: number, path = '/'): string => `http://127.0.0.1:${port}${path}`
 
-/** Whether two sources are the same files. */
-export const sameSource = (a: PreviewSource, b: PreviewSource): boolean => a.commit === b.commit && a.content === b.content
+/**
+ * Whether two sources are the same files: true or false when both are known (two folders outside a repository are the
+ * same, for want of anything to tell); null when either couldn't be read.
+ */
+export function sameSource(a: PreviewSource, b: PreviewSource): boolean | null {
+  if (a.kind === 'unknown' || b.kind === 'unknown') return null
+  if (a.kind !== b.kind) return false
+  if (a.kind === 'none') return true
+  if (a.kind === 'clean') return a.commit === (b as typeof a).commit
+  return a.commit === (b as typeof a).commit && a.content === (b as typeof a).content
+}

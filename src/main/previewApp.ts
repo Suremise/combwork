@@ -37,7 +37,7 @@ import { defaultProbe } from './workflow/queueProcs'
 import { workspaceFor, WorkspaceService } from './workspace'
 import { msg } from '../shared/i18n'
 import { PREVIEW_ENABLED, PREVIEW_PORT_RANGE, PREVIEW_START_SECONDS } from '../shared/advanced'
-import { PREVIEW_LOCKFILES, PREVIEW_PORT_DEFAULT, previewConfigOf, suggestPreviewCommand, type PreviewConfig, type PreviewPlace, type PreviewSuggestion, type PreviewView } from '../shared/preview'
+import { PREVIEW_LOCKFILES, PREVIEW_PORT_DEFAULT, previewConfigOf, suggestPreviewCommand, type PreviewConfig, type PreviewEnd, type PreviewPlace, type PreviewSuggestion, type PreviewView } from '../shared/preview'
 
 const log = createLogger('preview')
 
@@ -60,9 +60,6 @@ const M = {
 
 /** This Combwork tells processes apart and ends them so (a job's settle). */
 const probe = defaultProbe()
-
-/** The workspace each running preview's project was in, for its closing. */
-const workspaceOf = new Map<string, string>()
 
 let runner: PreviewRunner | null = null
 
@@ -87,9 +84,6 @@ function runnerNow(): PreviewRunner {
       }
     },
     log: { info: (l) => log.info(l), warn: (l, e) => log.warn(l, e) }
-  })
-  runner.onChange((v) => {
-    if (v.state === 'stopped') workspaceOf.delete(v.id)
   })
   return runner
 }
@@ -118,7 +112,7 @@ async function launch(o: { id: string; place: PreviewPlace; projectPath: string;
       return { code: null }
     }
   )
-  let ended: Promise<void> | null = null
+  let ended: Promise<boolean> | null = null
   return {
     exited,
     tree: async () => {
@@ -137,8 +131,10 @@ async function launch(o: { id: string; place: PreviewPlace; projectPath: string;
         else log.warn(`Preview ${o.id} in ${userText(o.place.folder)} left processes that could not be ended`)
         // Its command's end, bounded: a quit never waits on a server its job couldn't end.
         let bound: NodeJS.Timeout | undefined
-        await Promise.race([exited, new Promise<void>((res) => (bound = setTimeout(res, END_WAIT_MS)))])
+        const over = await Promise.race([exited.then(() => true), new Promise<boolean>((res) => (bound = setTimeout(() => res(false), END_WAIT_MS)))])
         clearTimeout(bound)
+        // Proved only when its job is settled and its command has ended: otherwise its ports stay held (the runner).
+        return settled && over
       })())
   }
 }
@@ -208,19 +204,42 @@ async function configOf(ws: WorkspaceService, projectPath: string): Promise<Prev
   return cfg
 }
 
-/** Starts the preview of a place (or gives the one running there): the tab's Start, the agent tool's start. */
+/**
+ * Whether a start may still go on, asked again just before its server starts (HI-3614 round 1): the switch on, its
+ * workspace open, its place still under the generation it was started for. Null: yes; else why not.
+ */
+function admission(ws: WorkspaceService, projectPath: string, place: PreviewPlace): () => Promise<PreviewEnd | null> {
+  const life = ws.lifetime
+  return async () => {
+    if (!previewOn()) return { kind: 'turnedOff' }
+    if (life.aborted || ws.lifetime !== life) return { kind: 'projectClosed' }
+    const now = await placeOf(ws, projectPath, place.folder).catch(() => null)
+    if (!previewOn()) return { kind: 'turnedOff' }
+    if (life.aborted || ws.lifetime !== life) return { kind: 'projectClosed' }
+    return now && now.kind === place.kind && now.generation === place.generation ? null : { kind: 'placeEnded' }
+  }
+}
+
+/**
+ * Starts the preview of a place (or gives the one running there): the tab's Start, the agent tool's start. It is
+ * registered with its workspace at once (a closing finds it), and admitted again before its server starts.
+ */
 export async function startPreview(ws: WorkspaceService, projectPath: string, folder?: string | null): Promise<PreviewView> {
   assertOn()
   const place = await placeOf(ws, projectPath, folder)
   const cfg = await configOf(ws, projectPath)
-  const r = runnerNow()
-  const started = r.start(projectPath, place, cfg)
-  // Its workspace, for that workspace's closing (known as soon as it starts).
-  const known = r.at(place.folder)
-  if (known && ws.path) workspaceOf.set(known.id, ws.path)
-  const v = await started
-  if (v.state !== 'stopped' && ws.path) workspaceOf.set(v.id, ws.path)
-  return v
+  // Checked again after those awaits: the switch, and the workspace.
+  assertOn()
+  if (ws.lifetime.aborted || !ws.path) throw combworkError(M.notAPlace, { project: basename(projectPath) }, { kind: 'invalid' })
+  return runnerNow().start(projectPath, place, cfg, { owner: ws.path.toLowerCase(), admit: admission(ws, projectPath, place) })
+}
+
+/** Checks a running preview's ports again before its page is loaded (HI-3615): a stranger on any of them stops it. */
+export async function checkPreview(projectPath: string, id: string): ReturnType<PreviewRunner['checkOwnership']> {
+  assertOn()
+  const v = runner?.views(projectPath).find((x) => x.id === id)
+  if (!v || !runner) return { ok: false, end: { kind: 'stopped' } }
+  return runner.checkOwnership(id)
 }
 
 /** Stops the preview of a place (a folder of the project's; left out: the project folder's). Whether one was running. */
@@ -270,11 +289,11 @@ export async function setPreviewConfig(ws: WorkspaceService, projectPath: string
   return cfg
 }
 
-/** Stops every preview of a workspace's projects (it is closing). */
+/** Stops every preview of a workspace's projects (it is closing), starting ones too, and waits for their servers to end. */
 function closeWorkspace(path: string): Promise<void> {
   if (!runner) return Promise.resolve()
   const key = path.toLowerCase()
-  return runner.stopWhere((v) => workspaceOf.get(v.id)?.toLowerCase() === key, { kind: 'projectClosed' }).then(() => undefined)
+  return runner.stopWhere((_v, owner) => owner === key, { kind: 'projectClosed' }).then(() => undefined)
 }
 
 let offEnds: (() => void) | null = null
@@ -283,10 +302,11 @@ let offAdvanced: (() => void) | null = null
 /** Starts listening for places' ends and the switch (index.ts, once). Nothing runs until a preview is asked for. */
 export function startPreviews(): void {
   if (offEnds) return
+  // Awaited by the pools and the project's removal: the slot or copy is settled only once its preview's server is gone.
   offEnds = onPlaceEnded((e) => {
     if (!runner) return
-    if (e.kind === 'generation') void runner.stopWhere((v) => v.place.generation === e.id, { kind: 'placeEnded' })
-    else void runner.stopWhere((v) => v.projectPath.toLowerCase() === e.path.toLowerCase(), { kind: 'projectClosed' })
+    if (e.kind === 'generation') return runner.stopWhere((v) => v.place.generation === e.id, { kind: 'placeEnded' })
+    return runner.stopWhere((v) => v.projectPath.toLowerCase() === e.path.toLowerCase(), { kind: 'projectClosed' })
   })
   offAdvanced = advanced.onChange(() => {
     if (!previewOn() && runner) void runner.stopWhere(() => true, { kind: 'turnedOff' })

@@ -442,8 +442,8 @@ interface CopyPoolDeps {
   reviewOn: () => boolean
   /** How long a returning copy is held back before it shows as still in use (Settings → Advanced). */
   quietWaitMs: () => number
-  /** HI-3614: a lease was returned (a preview running in its copy stops with it). */
-  returned?: (lease: CopyLease) => void
+  /** HI-3614: a lease was returned (a preview running in its copy stops with it, awaited before the copy is freed). */
+  returned?: (lease: CopyLease) => void | Promise<void>
   now?: () => number
 }
 
@@ -723,7 +723,7 @@ export class CopyPool {
   async returnCopy(lease: string, why: string): Promise<boolean> {
     const l = await this.store.returnLease(lease, why)
     if (!l) return false
-    this.deps.returned?.(l)
+    await this.deps.returned?.(l)
     if (await this.tryFree(l.copy)) this.soon(l.copy)
     return true
   }
@@ -804,7 +804,7 @@ export class CopyPool {
       const over = mine ? await this.deps.leaseOver(l) : (await this.deps.holder.alive(l.pid, l.started)) === false
       if (over === true) {
         const r = await this.store.returnLease(l.id, mine ? 'over' : 'combworkGone')
-        if (r) this.deps.returned?.(r)
+        if (r) await this.deps.returned?.(r)
       }
     }
     for (const c of this.store.copies()) {

@@ -1258,7 +1258,7 @@ interface PoolDeps {
   /** The owed pass's wake (HI-2906): a timer by default; tests give a scheduler they fire themselves. */
   later?: (fn: () => void, ms: number) => { cancel(): void }
   /** A lease ended (#1434): its builder's session in the slot (the slot's writer) is stopped once its turn ends. */
-  ended?: (lease: SlotLease, slot: Slot) => void
+  ended?: (lease: SlotLease, slot: Slot) => void | Promise<void>
   /**
    * Whether a writer's run is over and its processes are known to have ended (#1434): only then does a refresh clear it
    * (a release that couldn't be written). A writer of a Combwork that is gone is cleared only as `writerGone` says.
@@ -1730,7 +1730,7 @@ export class SlotPool {
     const r = await this.store.laneOver(lease, why, decide)
     if (!r || !('ended' in r)) return r
     const slot = this.store.slot(r.ended.slot)
-    if (slot) this.deps.ended?.(r.ended, slot)
+    if (slot) await this.deps.ended?.(r.ended, slot)
     await this.drained(r.ended.slot)
     return r
   }
@@ -1740,7 +1740,7 @@ export class SlotPool {
     if (!ended) return false
     const slot = this.store.slot(ended.slot)
     // Its writer (the builder's session there) drains, and is stopped once its turn is over (#1434).
-    if (slot) this.deps.ended?.(ended, slot)
+    if (slot) await this.deps.ended?.(ended, slot)
     await this.drained(ended.slot)
     return true
   }

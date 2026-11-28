@@ -188,16 +188,16 @@ const free = (port) =>
     // --- 3. Identity: the source at start; an edit a content id; the revert the commit alone.
     const head = lib.git(fx.alpha, ['rev-parse', 'HEAD']).trim()
     const clean = await inv('preview:start', fx.alpha)
-    check('clean: the source is the commit alone', clean.state === 'running' && clean.source.commit === head && clean.source.content === null, JSON.stringify(clean.source))
+    check('clean: the source is the commit alone', clean.state === 'running' && clean.source.kind === 'clean' && clean.source.commit === head, JSON.stringify(clean.source))
     fs.writeFileSync(path.join(fx.alpha, 'a.txt'), 'one\ntwo\nthree\nfour\n')
     check('…an edit while it runs is noted (its files changed)', !!(await until(async () => !!(await at(fx.alpha))?.changedAt, HUNG_MS)))
     await inv('preview:stop', fx.alpha)
     const dirty = await inv('preview:start', fx.alpha)
-    check('an edit: started again, the commit and a content id', dirty.source.commit === head && /^[0-9a-f]{40}$/.test(dirty.source.content ?? ''), JSON.stringify(dirty.source))
+    check('an edit: started again, the commit and a content id', dirty.source.kind === 'dirty' && dirty.source.commit === head && /^[0-9a-f]{40}$/.test(dirty.source.content ?? ''), JSON.stringify(dirty.source))
     await inv('preview:stop', fx.alpha)
     fs.writeFileSync(path.join(fx.alpha, 'a.txt'), 'one\ntwo\nthree\n')
     const reverted = await inv('preview:start', fx.alpha)
-    check('the revert: the commit alone again', reverted.source.commit === head && reverted.source.content === null, JSON.stringify(reverted.source))
+    check('the revert: the commit alone again', reverted.source.kind === 'clean' && reverted.source.commit === head, JSON.stringify(reverted.source))
     await inv('preview:stop', fx.alpha)
 
     // --- 3. A slot's preview stops with its lease; the slot's next lease gets a new one.
@@ -209,18 +209,30 @@ const free = (port) =>
     const inSlot = await inv('preview:start', fx.alpha, folder)
     check("a preview in the slot runs, under its lease", inSlot.state === 'running' && inSlot.place.kind === 'slot' && inSlot.place.generation === lent.lease.id, JSON.stringify([inSlot.place, inSlot.end]))
     await op({ op: 'release', lease: lent.lease.id, why: 'done' })
-    check('…the lease ended: the preview is stopped (its place ended)', !!(await until(async () => (await at(folder))?.end?.kind === 'placeEnded', HUNG_MS)), JSON.stringify(await at(folder)))
-    check('…its server gone', !!(await until(() => free(inSlot.port), HUNG_MS)))
+    // Awaited by the release (HI-3614 round 1): by the time it returns, the preview has stopped and its server is gone.
+    const afterRelease = await at(folder)
+    check('…the lease ended: by the time its release returns, the preview is stopped (its place ended)', afterRelease?.end?.kind === 'placeEnded', JSON.stringify(afterRelease))
+    check('…and its server is gone, its port free', await free(inSlot.port))
     check('a slot no card holds is refused', /isn't lent/.test(await refusal(inv('preview:start', fx.alpha, folder))))
     const again = await op({ op: 'lend', agent: b1.id, card: 102 })
     const next = again.ok && again.slot.folder.toLowerCase() === folder.toLowerCase() ? await inv('preview:start', fx.alpha, folder) : null
     check("the slot's next lease gets a new preview, under it", !!next && next.state === 'running' && next.id !== inSlot.id && next.place.generation === again.lease.id, JSON.stringify([again.slot?.name, next?.place]))
     check('a folder that is no place of the project is refused', /isn't alpha's folder/.test(await refusal(inv('preview:start', fx.alpha, fx.tools))))
 
+    // --- A workspace closing stops its previews, awaited: beta's server is gone once the close returns.
+    const betaRun = await inv('preview:start', beta)
+    check("beta's preview runs before its workspace closes", betaRun.state === 'running', JSON.stringify(betaRun.end))
+    // (The slot's preview of alpha is stopped below, by the switch: the workspace is reopened for it.)
+    await inv('workspace:close')
+    check("the workspace closed: beta's server is gone, its port free", await free(betaRun.port))
+    await lib.openWorkspace(inv, page, fx.ws)
+    const reopened = next ? await inv('preview:start', fx.alpha, folder) : null
+    check('…and the workspace reopened, the slot’s preview of alpha started again under its lease', reopened?.state === 'running' && reopened.place.generation === again.lease.id, JSON.stringify(reopened?.end))
+
     // --- 4. Turned off again: what runs is stopped, and the section goes.
     await command('project.tab.settings')
     await inv('advanced:set', 'cw.preview.enabled', false)
-    check('off again: the slot’s running preview is stopped, its port free', !!next && !!(await until(() => free(next.port), HUNG_MS)))
+    check('off again: the slot’s running preview is stopped, its port free', !!reopened && !!(await until(() => free(reopened.port), HUNG_MS)))
     check('…preview:list refused again', /turned off/.test(await refusal(list())))
     check('…and Project Settings has no Preview section', !!(await until(async () => (await navRow('Preview').count()) === 0, HUNG_MS)))
     if (again.ok) await op({ op: 'release', lease: again.lease.id, why: 'done' })

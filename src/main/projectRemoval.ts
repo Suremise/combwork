@@ -172,7 +172,7 @@ export async function removeProject(projectPath: string, how: ProjectRemoval): P
   try {
     await stopAgents(p)
     // HI-3614: its previews' servers stop with it.
-    placeEnded({ kind: 'project', path: p })
+    await placeEnded({ kind: 'project', path: p })
     // HI-1185: a signing check of its Version Control view given up (its signer and temp folder gone first).
     await endOwnedWork((owner) => owner.toLowerCase() === key)
     // Looked at again now nothing runs there: a stopping agent may have written to its worktree at the last moment.

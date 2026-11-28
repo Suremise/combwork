@@ -15,9 +15,9 @@ import { createRequire } from 'module'
 import { join } from 'path'
 import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
 import { bindFree, parseNetstat, readListeners } from '../src/main/previewPorts'
-import { PreviewRunner, rangeOf, type Launched, type RunnerDeps } from '../src/main/previewRunner'
+import { PreviewRunner, rangeOf, type Launched, type Listener, type RunnerDeps } from '../src/main/previewRunner'
 import { previewSource } from '../src/main/previewSource'
-import { previewConfigOf, suggestPreviewCommand, type PreviewPlace, type PreviewView } from '../src/shared/preview'
+import { previewConfigOf, sameSource, suggestPreviewCommand, type PreviewEnd, type PreviewPlace, type PreviewSource, type PreviewView } from '../src/shared/preview'
 import { tempDir } from './tempDir'
 import { timing } from './timing.cjs'
 
@@ -89,6 +89,7 @@ const launch: RunnerDeps['launch'] = async (o) => {
     stop: async () => {
       if (child.exitCode === null) child.kill()
       await exited
+      return true
     }
   }
   return l
@@ -102,7 +103,7 @@ function runner(range: [number, number], over: Partial<RunnerDeps> = {}): Previe
     bindFree,
     listeners: readListeners,
     launch,
-    source: async () => ({ commit: 'c0ffee', content: null }),
+    source: async () => ({ kind: 'clean', commit: 'c0ffee' }),
     watch: () => () => undefined,
     logPath: () => null,
     pollMs: 100,
@@ -221,21 +222,192 @@ describe.skipIf(process.platform !== 'win32')('the preview runner (HI-3614)', ()
   it('takes the stamp at its start, and says when the files change after', { timeout: TEST_MS }, async () => {
     const range = await freeBlock(2)
     let changed: (() => void) | null = null
-    let source = { commit: 'c0ffee', content: null as string | null }
+    let source: PreviewSource = { kind: 'clean', commit: 'c0ffee' }
     const r = runner(range, { watch: (_f, fn) => ((changed = fn), () => (changed = null)), source: async () => source })
     const seen: PreviewView[] = []
     r.onChange((v) => seen.push(v))
     const v = await r.start('C:\\ws\\alpha', place('alpha'), { command: 'port' })
-    expect(v.source).toEqual({ commit: 'c0ffee', content: null })
+    expect(v.source).toEqual({ kind: 'clean', commit: 'c0ffee' })
     expect(v.changedAt).toBeNull()
-    source = { commit: 'c0ffee', content: 'feed' }
+    source = { kind: 'dirty', commit: 'c0ffee', content: 'feed' }
     changed!()
     expect(r.at(place('alpha').folder)?.changedAt).not.toBeNull()
-    expect(await r.sourceNow(v.id)).toEqual({ now: { commit: 'c0ffee', content: 'feed' }, changed: true })
+    expect(await r.sourceNow(v.id)).toEqual({ now: source, changed: true })
+    // A tree that can't be read now: whether it changed can't be told (never "unchanged").
+    source = { kind: 'unknown', commit: 'c0ffee', why: 'add: fatal' }
+    expect((await r.sourceNow(v.id))?.changed).toBeNull()
     await r.stopWhere(() => true, { kind: 'stopped' })
     // Its watcher closed with it.
     expect(changed).toBeNull()
     expect(seen.some((x) => x.changedAt)).toBe(true)
+  })
+})
+
+/** A runner on fakes (HI-3614 round 1): a TCP table the test sets, every port bindable, launches the test answers. */
+function fakeRunner(over: Partial<RunnerDeps> = {}) {
+  const table: Listener[] = []
+  const launches: { o: Parameters<RunnerDeps['launch']>[0]; answer: (l: Launched | { problem: string }) => void }[] = []
+  const r = new PreviewRunner({
+    range: () => [53000, 53009],
+    reserved: () => new Set(),
+    startSeconds: () => 60,
+    bindFree: async () => true,
+    listeners: async () => [...table],
+    launch: (o) => new Promise((answer) => launches.push({ o, answer })),
+    source: async () => ({ kind: 'clean', commit: 'c0ffee' }),
+    watch: () => () => undefined,
+    logPath: () => null,
+    pollMs: 1,
+    ...over
+  })
+  return { r, table, launches }
+}
+
+/** A launched stand-in: its tree is `pid`; its stop is logged, and proved unless told otherwise (or held until `held` settles). */
+function fakeServer(pid: number, log: string[], name: string, o: { proved?: boolean; held?: Promise<void> } = {}): Launched {
+  let exit!: (e: { code: number | null }) => void
+  const exited = new Promise<{ code: number | null }>((res) => (exit = res))
+  return {
+    exited,
+    tree: async () => [pid],
+    stop: async () => {
+      log.push(`stop ${name}`)
+      await o.held
+      exit({ code: null })
+      return o.proved ?? true
+    }
+  }
+}
+
+/** Lets every promise already settled run on (no time passes: what can happen without the test's answer has). */
+const settle = async (): Promise<void> => {
+  for (let i = 0; i < 50; i++) await Promise.resolve()
+}
+const waitUntil = (fn: () => boolean): Promise<void> => vi.waitFor(() => expect(fn()).toBe(true), { timeout: HUNG_MS })
+
+describe("a preview's lifetime and its ports' owners (HI-3614 round 1)", () => {
+  it('a Stop while its launch is under way is over only once that launch has finished and its server has ended', async () => {
+    const { r, launches } = fakeRunner()
+    const log: string[] = []
+    const started = r.start('P', place('a'), { command: 'x' })
+    await waitUntil(() => launches.length === 1)
+    let over = false
+    const stop = r.stop(r.at(place('a').folder)!.id).then(() => (over = true))
+    await settle()
+    expect([over, log]).toEqual([false, []])
+    expect(r.at(place('a').folder)?.state).toBe('stopped')
+    launches[0].answer(fakeServer(101, log, 'a'))
+    await stop
+    expect(log).toEqual(['stop a'])
+    expect((await started).end).toEqual({ kind: 'stopped' })
+    expect(r.heldPorts()).toEqual([])
+  })
+
+  it("is its owner's from the moment it is asked for: a workspace closing stops one still reading its stamp, and nothing launches", async () => {
+    const answers: ((s: PreviewSource) => void)[] = []
+    const { r, launches } = fakeRunner({ source: () => new Promise((res) => answers.push(res)) })
+    // Stopped before its turn has begun: it reads nothing at all.
+    const early = r.start('P', place('a'), { command: 'x' }, { owner: 'ws-1' })
+    expect(await r.stopWhere((_v, owner) => owner === 'ws-1', { kind: 'projectClosed' })).toBe(1)
+    expect((await early).end).toEqual({ kind: 'projectClosed' })
+    expect(answers.length).toBe(0)
+    // Stopped while it reads its stamp.
+    const started = r.start('P', place('a'), { command: 'x' }, { owner: 'ws-1' })
+    await waitUntil(() => answers.length === 1)
+    expect(await r.stopWhere((_v, owner) => owner === 'ws-2', { kind: 'projectClosed' })).toBe(0)
+    expect(await r.stopWhere((_v, owner) => owner === 'ws-1', { kind: 'projectClosed' })).toBe(1)
+    answers[0]({ kind: 'clean', commit: 'c0ffee' })
+    expect((await started).end).toEqual({ kind: 'projectClosed' })
+    await settle()
+    expect(launches.length).toBe(0)
+    expect(r.heldPorts()).toEqual([])
+  })
+
+  it('is admitted again just before its server starts: a place that ended meanwhile launches nothing', async () => {
+    const asked: string[] = []
+    let generation = 'lease-1'
+    const { r, launches } = fakeRunner({ source: async () => ((generation = 'lease-2'), { kind: 'clean', commit: 'c0ffee' }) })
+    const admit = async (): Promise<PreviewEnd | null> => (asked.push(generation), generation === 'lease-1' ? null : { kind: 'placeEnded' })
+    const v = await r.start('P', place('slot-a', 'lease-1'), { command: 'x' }, { admit })
+    expect(asked).toEqual(['lease-1', 'lease-2'])
+    expect(v.end).toEqual({ kind: 'placeEnded' })
+    expect(launches.length).toBe(0)
+    expect(r.heldPorts()).toEqual([])
+  })
+
+  it("a new lease's start in a place waits until the old lease's server has gone", async () => {
+    const { r, table, launches } = fakeRunner()
+    const log: string[] = []
+    const folder = place('slot-a').folder
+    const first = r.start('P', place('slot-a', 'lease-1', folder), { command: 'x' })
+    await waitUntil(() => launches.length === 1)
+    table.push({ port: 53000, pid: 101 })
+    let release!: () => void
+    launches[0].answer(fakeServer(101, log, 'lease-1', { held: new Promise<void>((res) => (release = res)) }))
+    expect((await first).state).toBe('running')
+    const second = r.start('P', place('slot-a', 'lease-2', folder), { command: 'x' })
+    await waitUntil(() => log.length === 1)
+    await settle()
+    // The old server is still ending: the new one hasn't launched.
+    expect(launches.length).toBe(1)
+    table.length = 0
+    release()
+    await waitUntil(() => launches.length === 2)
+    table.push({ port: Number(launches[1].o.env.PORT), pid: 202 })
+    launches[1].answer(fakeServer(202, log, 'lease-2'))
+    const v = await second
+    expect([v.state, v.place.generation]).toEqual(['running', 'lease-2'])
+    expect(r.views().filter((x) => x.place.generation === 'lease-1').length).toBe(0)
+    await r.stopWhere(() => true, { kind: 'stopped' })
+  })
+
+  it("fails the start when a stranger listens on its hot reload port, though its own port is its server's", async () => {
+    const { r, table, launches } = fakeRunner()
+    const log: string[] = []
+    const started = r.start('P', place('a'), { command: 'x', hmrPort: true })
+    await waitUntil(() => launches.length === 1)
+    expect([launches[0].o.env.PORT, launches[0].o.env.CW_PREVIEW_HMR_PORT]).toEqual(['53000', '53001'])
+    table.push({ port: 53000, pid: 101 }, { port: 53001, pid: 999 })
+    launches[0].answer(fakeServer(101, log, 'a'))
+    const v = await started
+    expect(v.end).toEqual({ kind: 'stranger', port: 53001, pid: 999 })
+    expect(log).toEqual(['stop a'])
+  })
+
+  it('checks its ports again later: a stranger on the hot reload port then stops it', async () => {
+    const { r, table, launches } = fakeRunner()
+    const log: string[] = []
+    const started = r.start('P', place('a'), { command: 'x', hmrPort: true })
+    await waitUntil(() => launches.length === 1)
+    table.push({ port: 53000, pid: 101 })
+    launches[0].answer(fakeServer(101, log, 'a'))
+    const v = await started
+    expect(v.state).toBe('running')
+    expect(await r.checkOwnership(v.id)).toEqual({ ok: true })
+    // Its own hot reload socket is its own.
+    table.push({ port: 53001, pid: 101 })
+    expect(await r.checkOwnership(v.id)).toEqual({ ok: true })
+    table[1] = { port: 53001, pid: 999 }
+    expect(await r.checkOwnership(v.id)).toEqual({ ok: false, end: { kind: 'stranger', port: 53001, pid: 999 } })
+    expect(r.at(place('a').folder)?.state).toBe('stopped')
+  })
+
+  it("keeps its ports held when its server's end can't be proved", async () => {
+    const { r, table, launches } = fakeRunner()
+    const log: string[] = []
+    const started = r.start('P', place('a'), { command: 'x' })
+    await waitUntil(() => launches.length === 1)
+    table.push({ port: 53000, pid: 101 })
+    launches[0].answer(fakeServer(101, log, 'a', { proved: false }))
+    const v = await started
+    await r.stop(v.id)
+    expect(r.heldPorts()).toEqual([53000])
+    table.length = 0
+    const next = r.start('P', place('b'), { command: 'x' })
+    await waitUntil(() => launches.length === 2)
+    expect(launches[1].o.env.PORT).toBe('53001')
+    launches[1].answer({ problem: 'no' })
+    expect((await next).end).toEqual({ kind: 'noStart', detail: 'no' })
   })
 })
 
@@ -254,15 +426,14 @@ describe("a preview's source (HI-3614, s16 §B)", () => {
     g(repo, 'commit', '-qm', 'first')
     const head = g(repo, 'rev-parse', 'HEAD')
     const clean = await previewSource(repo, scratch)
-    expect(clean).toEqual({ commit: head, content: null })
+    expect(clean).toEqual({ kind: 'clean', commit: head })
     writeFileSync(join(repo, 'a.txt'), 'two\n')
     const edited = await previewSource(repo, scratch)
-    expect(edited.commit).toBe(head)
-    expect(edited.content).toMatch(/^[0-9a-f]{40}$/)
+    expect(edited).toEqual({ kind: 'dirty', commit: head, content: expect.stringMatching(/^[0-9a-f]{40}$/) })
     // An untracked file counts; an ignored one doesn't.
     writeFileSync(join(repo, 'b.txt'), 'new\n')
     const untracked = await previewSource(repo, scratch)
-    expect(untracked.content).not.toBe(edited.content)
+    expect(untracked.kind === 'dirty' && edited.kind === 'dirty' && untracked.content !== edited.content).toBe(true)
     rmSync(join(repo, 'b.txt'))
     execFileSync(process.execPath, ['-e', `require('fs').mkdirSync(${JSON.stringify(join(repo, 'ignored'))}); require('fs').writeFileSync(${JSON.stringify(join(repo, 'ignored', 'x.txt'))}, 'x')`], { env })
     expect(await previewSource(repo, scratch)).toEqual(edited)
@@ -279,10 +450,29 @@ describe("a preview's source (HI-3614, s16 §B)", () => {
     const scratch = tempDir('preview-scratch-')
     g(repo, 'init', '-q')
     writeFileSync(join(repo, 'a.txt'), 'one\n')
+    expect(await previewSource(repo, scratch)).toEqual({ kind: 'dirty', commit: null, content: expect.stringMatching(/^[0-9a-f]{40}$/) })
+    expect(await previewSource(tempDir('preview-none-'), scratch)).toEqual({ kind: 'none' })
+  })
+
+  it("is unknown, never clean, when git can't build the tree (a required clean filter failing)", { timeout: TEST_MS }, async () => {
+    const repo = tempDir('preview-filter-')
+    const scratch = tempDir('preview-scratch-')
+    g(repo, 'init', '-q')
+    g(repo, 'config', 'user.email', 't@example.com')
+    g(repo, 'config', 'user.name', 't')
+    writeFileSync(join(repo, 'a.txt'), 'one\n')
+    g(repo, 'add', '-A')
+    g(repo, 'commit', '-qm', 'first')
+    const head = g(repo, 'rev-parse', 'HEAD')
+    // From now on every .txt must pass a filter that always fails: the add of a changed one fails.
+    g(repo, 'config', 'filter.broken.clean', 'false')
+    g(repo, 'config', 'filter.broken.required', 'true')
+    writeFileSync(join(repo, '.git', 'info', 'attributes'), '*.txt filter=broken\n')
+    writeFileSync(join(repo, 'a.txt'), 'two\n')
     const s = await previewSource(repo, scratch)
-    expect(s.commit).toBeNull()
-    expect(s.content).toMatch(/^[0-9a-f]{40}$/)
-    expect(await previewSource(tempDir('preview-none-'), scratch)).toEqual({ commit: null, content: null })
+    expect(s.kind).toBe('unknown')
+    expect(s).toMatchObject({ commit: head })
+    expect(sameSource(s, { kind: 'clean', commit: head })).toBeNull()
   })
 })
 
