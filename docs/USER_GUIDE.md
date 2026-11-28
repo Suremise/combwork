@@ -2605,7 +2605,7 @@ With the Preview on and a project's command set, the project's agents can use th
 
 - An agent can **start**, **check** and **stop** its place's dev server, as the Preview tab's buttons do. The tab's **Place** picker shows the previews agents started.
 - It reads the page as **text** (its title, headings, buttons, fields and text), takes **screenshots** and reads the page's console **errors and warnings**. Its page is its own, behind the same network guard as yours: it never moves the page your Preview tab shows.
-- Screenshots are small files in Combwork's temp folder: over 2 MB as a PNG, a JPEG is saved, then a smaller one; a page taller than 6,000 pixels is cut. A place keeps its last 20, and they're removed when its preview stops.
+- Screenshots are small files in the place's own `.combwork\preview-shots` folder, which git leaves out: over 2 MB as a PNG, a JPEG is saved, then a smaller one; a page taller than 6,000 pixels is cut. A place keeps its last 20, and they're removed when its preview stops.
 - Each answer says which source the server was started from and whether the files changed after the page loaded, so an agent knows when it's looking at an older page.
 
 **Settings → Advanced → Preview: longest an agent's capture takes** (10 seconds by default) bounds each look: past it, the agent is told the capture timed out, and nothing is saved.

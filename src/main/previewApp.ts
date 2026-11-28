@@ -42,6 +42,7 @@ import { endLeaseJob, journalPath, LeaseJob } from './workflow/queueJobs'
 import { defaultProbe } from './workflow/queueProcs'
 import { workspaceFor, WorkspaceService } from './workspace'
 import { msg } from '../shared/i18n'
+import { CW_DIR } from '../shared/defaults'
 import { PREVIEW_ENABLED, PREVIEW_PORT_RANGE, PREVIEW_START_SECONDS } from '../shared/advanced'
 import { PREVIEW_LOCKFILES, PREVIEW_PORT_DEFAULT, previewConfigOf, suggestPreviewCommand, type PreviewConfig, type PreviewEnd, type PreviewPlace, type PreviewSuggestion, type PreviewView } from '../shared/preview'
 
@@ -254,6 +255,8 @@ function admission(ws: WorkspaceService, projectPath: string, place: PreviewPlac
 export async function startPreview(ws: WorkspaceService, projectPath: string, folder?: string | null): Promise<PreviewView> {
   assertOn()
   const place = await placeOf(ws, projectPath, folder)
+  // Screenshots an earlier preview of the place left (one that ended with Combwork, HI-3616), before a new one runs.
+  if (runner?.at(place.folder)?.state !== 'running') await removeShots(shotsDirIn(place.folder))
   const cfg = await configOf(ws, projectPath)
   // Checked again after those awaits: the switch, and the workspace.
   assertOn()
@@ -387,13 +390,16 @@ async function closeShown(id: string): Promise<boolean> {
   shownIn.delete(id)
   // Its agents' screenshots go with it (HI-3616).
   const v = runner?.views().find((x) => x.id === id)
-  if (v) await removeShots(shotsDirOf(v))
+  if (v) await removeShots(shotsDirIn(v.place.folder))
   return proved
 }
 
-/** Where agents' screenshots of previews go: Combwork's temp folder, preview\<project>-<place> (HI-3616). */
-export const shotsRoot = (): string => join(app.getPath('temp'), 'combwork-preview')
-export const shotsDirOf = (v: PreviewView): string => join(shotsRoot(), `${basename(v.projectPath)}-${v.place.name}`.replace(/[^\w.-]/g, '-'))
+/**
+ * Where agents' screenshots of a place's preview go (HI-3616): the place's own .combwork folder, which git leaves out
+ * and the preview's watcher skips. Never a temp folder: a CLI asks before it reads a file outside its folders (Claude
+ * Code, unwatched, waits on that for good), and the place is its folder (a reviewer's copy, one it was given).
+ */
+export const shotsDirIn = (folder: string): string => join(folder, CW_DIR, 'preview-shots')
 
 /** HI-3616: the runner and the guarded pages, for the agents' tool (previewAgent.ts), refused while the Preview is off. */
 export function previewForAgents(): { runner: PreviewRunner; guard: (id: string) => Promise<PreviewGuard> } {
@@ -496,8 +502,6 @@ let offAdvanced: (() => void) | null = null
 /** Starts listening for places' ends and the switch (index.ts, once). Nothing runs until a preview is asked for. */
 export function startPreviews(): void {
   if (offEnds) return
-  // Screenshots a previous run left (HI-3616).
-  void removeShots(shotsRoot())
   // Awaited by the pools and the project's removal: the slot or copy is settled only once its preview's server is gone.
   offEnds = onPlaceEnded((e) => {
     if (!runner) return
@@ -515,7 +519,6 @@ export function startPreviews(): void {
 
 /** Combwork quitting: every preview's server ended. */
 export async function stopPreviews(): Promise<void> {
-  void removeShots(shotsRoot())
   offEnds?.()
   offAdvanced?.()
   offEnds = offAdvanced = null

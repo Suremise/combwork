@@ -13,7 +13,7 @@ import { readFile } from 'original-fs/promises'
 import { basename } from 'path'
 import { advanced } from './advanced'
 import { copiesFor } from './copiesApp'
-import { placeOf, previewForAgents, shotsDirOf, startPreview, stopPreview } from './previewApp'
+import { placeOf, previewForAgents, shotsDirIn, startPreview, stopPreview } from './previewApp'
 import { axText, consoleList, encodeWithin, logTail, saveShot, shotMax, SHOT, type AxNode, type Encodable } from './previewCapture'
 import type { AgentPage, PreviewGuard } from './previewGuard'
 import { poolIfMade } from './slotsApp'
@@ -223,7 +223,7 @@ export async function agentPreview(ws: WorkspaceService, projectPath: string, ag
   const shot = await bounded(screenshot(page, body.full === true))
   const encoded = encodeWithin(encodable(shot.img), shotMax())
   if (!encoded.ok) refuse('tooLarge', 413)
-  const saved = await saveShot(shotsDirOf(running), encoded, ++shots)
+  const saved = await saveShot(shotsDirIn(running.place.folder), encoded, ++shots)
   if (!saved) refuse('tooLarge', 413)
   const size = shot.img.getSize()
   const scale = encoded.ok ? encoded.scale : 1
